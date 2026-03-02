@@ -1,0 +1,17 @@
+{
+  "portfolio_usd": 100000.0,
+  "max_positions": 5,
+  "sizing_method": "kelly",
+  "kelly_shrink": 0.25,
+  "regime": "stress",
+  "gross_weight": 0.25,
+  "positions": 5,
+  "tickers": [
+    "Q",
+    "CF",
+    "EME",
+    "AMBQ",
+    "SB"
+  ],
+  "total_notional_usd": 25000.0
+}

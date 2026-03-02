@@ -1,0 +1,103 @@
+{
+  "date": "2026-03-02",
+  "asof_trading_date": "2026-03-02",
+  "technical_score_distribution": {
+    "pro30": {
+      "count": 23,
+      "count_gte_6": 23,
+      "count_gte_8": 23,
+      "min": 17.98,
+      "p25": 19.25,
+      "median": 21.38,
+      "p75": 24.29,
+      "max": 45.47
+    },
+    "weekly": {
+      "count": 3,
+      "count_gte_6": 3,
+      "count_gte_8": 3,
+      "min": 8.25,
+      "p25": 8.35,
+      "median": 8.45,
+      "p75": 9.22,
+      "max": 10.0
+    }
+  },
+  "overlap_stats": {
+    "weekly_only": 3,
+    "pro30_only": 23,
+    "movers_only": 0,
+    "weekly_pro30": 0,
+    "weekly_movers": 0,
+    "pro30_movers": 0,
+    "all_three": 0,
+    "any_overlap_count": 0,
+    "overlap_potential": {
+      "weekly_candidates": 3,
+      "pro30_candidates": 23,
+      "movers_candidates": 0,
+      "intersection_possible": true
+    }
+  },
+  "confidence_distribution": {
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 26
+  },
+  "confidence_rates": {
+    "high_pct": 0.0,
+    "medium_pct": 0.0,
+    "low_pct": 100.0
+  },
+  "near_misses": [
+    {
+      "ticker": "BHR",
+      "conviction_score": 6.2,
+      "sources": [
+        "pro30"
+      ],
+      "missing": "needs overlap or tech>=6"
+    },
+    {
+      "ticker": "DCGO",
+      "conviction_score": 6.2,
+      "sources": [
+        "pro30"
+      ],
+      "missing": "needs overlap or tech>=6"
+    },
+    {
+      "ticker": "SLSN",
+      "conviction_score": 6.2,
+      "sources": [
+        "pro30"
+      ],
+      "missing": "needs overlap or tech>=6"
+    },
+    {
+      "ticker": "STGW",
+      "conviction_score": 6.2,
+      "sources": [
+        "pro30"
+      ],
+      "missing": "needs overlap or tech>=6"
+    },
+    {
+      "ticker": "ULCC",
+      "conviction_score": 6.2,
+      "sources": [
+        "pro30"
+      ],
+      "missing": "needs overlap or tech>=6"
+    }
+  ],
+  "model_maturity": {
+    "observations": 0,
+    "min_required": 50,
+    "pct_complete": 0.0,
+    "observations_remaining": 50,
+    "version": 1,
+    "last_trained": null
+  },
+  "regime": "stress"
+}

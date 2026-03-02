@@ -1,0 +1,22 @@
+{
+  "date": "2026-03-02",
+  "asof": "2026-03-02",
+  "config_path": "config/default.yaml",
+  "config_hash": "7e7134dcf92adaee0d0f37bab6c13caff56354cce4fb74ed6e0a411adc67dded",
+  "workflow_name": "Auto Run (Daily)",
+  "workflow_run_id": "22597994964",
+  "workflow_run_attempt": "1",
+  "prices_db_path": "data/prices.db",
+  "prices_db_exists": true,
+  "prices_db_last_modified_utc": "2026-03-02T22:13:25.819918Z",
+  "prices_db_row_count": 675090,
+  "prices_db_ticker_count": 2477,
+  "universe_mode": "SP500+NASDAQ100+R2000",
+  "universe_cache_file": "universe_cache.csv",
+  "universe_cache_max_age_days": 7,
+  "universe_size": 2478,
+  "lookback_days": 300,
+  "polygon_enabled": true,
+  "polygon_workers": 8,
+  "allow_partial_day_attention": false
+}
