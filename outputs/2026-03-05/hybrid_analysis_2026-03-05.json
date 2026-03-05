@@ -1,0 +1,592 @@
+{
+  "date": "2026-03-05",
+  "asof_trading_date": "2026-03-05",
+  "summary": {
+    "primary_top5_count": 3,
+    "weekly_top5_count": 3,
+    "pro30_candidates_count": 14,
+    "movers_count": 0,
+    "hybrid_top3_count": 3
+  },
+  "overlaps": {
+    "all_three": [],
+    "primary_pro30": [],
+    "primary_movers": [],
+    "pro30_movers": [],
+    "weekly_pro30": [],
+    "weekly_movers": []
+  },
+  "hybrid_top3": [
+    {
+      "ticker": "KREF",
+      "hybrid_score": 3.0,
+      "sources": [
+        "Pro30(r1)"
+      ],
+      "rank": 1,
+      "name": "",
+      "sector": "",
+      "current_price": 101.14,
+      "composite_score": 3.0,
+      "confidence": "SPECULATIVE",
+      "target": {
+        "target_price_for_10pct": 111.25
+      },
+      "stop": {
+        "stop_price_for_3pct": 96.08
+      }
+    },
+    {
+      "ticker": "VRTS",
+      "hybrid_score": 2.95,
+      "sources": [
+        "Pro30(r2)"
+      ],
+      "rank": 2,
+      "name": "",
+      "sector": "",
+      "current_price": 17.56,
+      "composite_score": 2.95,
+      "confidence": "SPECULATIVE",
+      "target": {
+        "target_price_for_10pct": 19.32
+      },
+      "stop": {
+        "stop_price_for_3pct": 16.68
+      }
+    },
+    {
+      "ticker": "CRMD",
+      "hybrid_score": 2.9,
+      "sources": [
+        "Pro30(r3)"
+      ],
+      "rank": 3,
+      "name": "",
+      "sector": "",
+      "current_price": 49.97,
+      "composite_score": 2.9,
+      "confidence": "SPECULATIVE",
+      "target": {
+        "target_price_for_10pct": 54.97
+      },
+      "stop": {
+        "stop_price_for_3pct": 47.47
+      }
+    }
+  ],
+  "weighted_picks": [
+    {
+      "ticker": "KREF",
+      "hybrid_score": 3.0,
+      "sources": [
+        "Pro30(r1)"
+      ],
+      "current_price": 101.14,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "VRTS",
+      "hybrid_score": 2.95,
+      "sources": [
+        "Pro30(r2)"
+      ],
+      "current_price": 17.56,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "CRMD",
+      "hybrid_score": 2.9,
+      "sources": [
+        "Pro30(r3)"
+      ],
+      "current_price": 49.97,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "TRDA",
+      "hybrid_score": 2.85,
+      "sources": [
+        "Pro30(r4)"
+      ],
+      "current_price": 25.06,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "ATXS",
+      "hybrid_score": 2.8,
+      "sources": [
+        "Pro30(r5)"
+      ],
+      "current_price": 110.78,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "TRUP",
+      "hybrid_score": 2.75,
+      "sources": [
+        "Pro30(r6)"
+      ],
+      "current_price": 130.35,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "BKE",
+      "hybrid_score": 2.7,
+      "sources": [
+        "Pro30(r7)"
+      ],
+      "current_price": 65.88,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "BMBL",
+      "hybrid_score": 2.65,
+      "sources": [
+        "Pro30(r8)"
+      ],
+      "current_price": 41.77,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "CWT",
+      "hybrid_score": 2.6,
+      "sources": [
+        "Pro30(r9)"
+      ],
+      "current_price": 15.54,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "PRIM",
+      "hybrid_score": 2.55,
+      "sources": [
+        "Pro30(r10)"
+      ],
+      "current_price": 33.72,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "PFBC",
+      "hybrid_score": 2.5,
+      "sources": [
+        "Pro30(r11)"
+      ],
+      "current_price": 45.66,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "BRCC",
+      "hybrid_score": 2.45,
+      "sources": [
+        "Pro30(r12)"
+      ],
+      "current_price": 228.03,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "YELP",
+      "hybrid_score": 2.4,
+      "sources": [
+        "Pro30(r13)"
+      ],
+      "current_price": 71.57,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "ATOM",
+      "hybrid_score": 2.35,
+      "sources": [
+        "Pro30(r14)"
+      ],
+      "current_price": 166.44,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "BRK-B",
+      "hybrid_score": 1.6,
+      "sources": [
+        "Weekly(1)"
+      ],
+      "current_price": 80.28,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "TCBX",
+      "hybrid_score": 1.1,
+      "sources": [
+        "Weekly(2)"
+      ],
+      "current_price": 30.29,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "BSX",
+      "hybrid_score": 0.8,
+      "sources": [
+        "Weekly(3)"
+      ],
+      "current_price": 46.34,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    }
+  ],
+  "weighting_note": "Primary=Weekly, Pro30, Movers, overlaps (configurable)",
+  "primary_label": "Weekly",
+  "primary_top5": [
+    {
+      "rank": 1,
+      "ticker": "BRK-B",
+      "name": "Berkshire Hathaway Inc.",
+      "exchange": "NYSE",
+      "sector": "Financial Services",
+      "current_price": 80.27999877929688,
+      "market_cap_usd": 1079530291200,
+      "avg_dollar_volume_20d": 68411079.17053986,
+      "asof_price_utc": "2026-03-05T00:00:00Z",
+      "target": {
+        "horizon_trading_days": 7,
+        "upside_threshold_pct": 10,
+        "target_price_for_10pct": 88.30799865722656,
+        "base_case_upside_pct_range": [
+          10,
+          15
+        ],
+        "bear_case_note": "Setup weakens if price fails to hold above short-term moving averages and broad market risk-off accelerates."
+      },
+      "primary_catalyst": {
+        "title": "No verified catalyst in packet (headlines missing)",
+        "key_date_local": null,
+        "timing": null,
+        "why_it_matters": "No source-cited, dated catalyst was provided in the packet; catalyst score capped per rules.",
+        "sources": []
+      },
+      "scores": {
+        "technical": 8.45,
+        "catalyst": 0.0,
+        "options": 10.0,
+        "sentiment": 3.0
+      },
+      "composite_score": 4.1625,
+      "evidence": {
+        "technical": {
+          "within_5pct_52w_high": false,
+          "resistance_level": 88.99,
+          "volume_ratio_3d_to_20d": 1.53,
+          "rsi14": 69.77,
+          "above_ma10_ma20_ma50": true,
+          "realized_vol_5d_ann_pct": 92.22
+        },
+        "options": {
+          "call_put_ratio": 5.8572953736654805,
+          "unusual_volume_multiple": 0.81,
+          "largest_bullish_premium_usd": null,
+          "iv_rank": null,
+          "notable_contracts": [
+            {
+              "type": "call",
+              "strike": 500.0,
+              "expiration": "2026-03-06",
+              "volume": 7398,
+              "open_interest": 6296,
+              "iv": 0.1695639685058594
+            },
+            {
+              "type": "call",
+              "strike": 502.5,
+              "expiration": "2026-03-13",
+              "volume": 4658,
+              "open_interest": 104,
+              "iv": 0.17945156494140624
+            },
+            {
+              "type": "call",
+              "strike": 497.5,
+              "expiration": "2026-03-06",
+              "volume": 4657,
+              "open_interest": 450,
+              "iv": 0.17237155761718753
+            }
+          ]
+        },
+        "sentiment": {
+          "twitter": {
+            "mention_velocity_vs_7d": null,
+            "quality_accounts_est": null,
+            "bullish_pct_est": null
+          },
+          "reddit": {
+            "mention_velocity": null,
+            "upvote_ratio_est": null
+          },
+          "stocktwits": {
+            "bull_bear_ratio_est": null
+          },
+          "news_tone": null
+        }
+      },
+      "risk_factors": [
+        "10% in 7 trading days is atypical for mega-cap; probability of threshold move may be structurally lower despite strong options score.",
+        "Options prints reference strikes around 495-510 (likely underlying mismatch vs packet current_price); treat options evidence cautiously."
+      ],
+      "confidence": "SPECULATIVE",
+      "data_gaps": [
+        "Catalyst/news: no headlines provided; cannot verify catalysts with sources; catalyst score set to 0.0.",
+        "Sentiment: sentiment_data_available=false; sentiment capped at 3.0 per packet.",
+        "Data integrity: packet current_price (~80.28) conflicts with fundamentals price (~500.19) and options strikes (~495-510); target_price_for_10pct computed from packet current_price.",
+        "Exclusion check: last-5-trading-days return not provided; cannot enforce >15% run-up exclusion.",
+        "Halt/delisting check not provided in packet."
+      ],
+      "original_score": 5.3625,
+      "debate_verdict": "HOLD",
+      "debate_reasoning": "The bull case has stronger near-term flow/technical evidence (trend alignment, rising volume, very bullish call skew), but it does not convincingly bridge to the specific requirement of a rapid +10% move in 7 sessions without a confirmed breakout or identifiable catalyst. The bear case persuasively highlights extension/crowding risk and the lack of breakout confirmation, making the probability-weighted upside less attractive versus elevated drawdown risk over the same window.",
+      "debate_bull_score": 7.4,
+      "debate_bear_score": 7.0,
+      "key_risks_from_debate": [
+        "Crowded call positioning (high call/put) leading to unwind/negative dealer gamma if price stalls, amplifying downside",
+        "Mean-reversion/pullback risk from extended momentum (RSI near 70) without breakout confirmation, in a high-volatility regime"
+      ],
+      "key_catalysts_from_debate": [
+        "Continuation of trend-following/systematic inflows given price above key moving averages and improving volume participation",
+        "Options-driven upside acceleration if spot grinds higher and hedging flows remain supportive (near-dated call concentration)"
+      ]
+    },
+    {
+      "rank": 2,
+      "ticker": "TCBX",
+      "name": "Third Coast Bancshares, Inc.",
+      "exchange": "NYSE",
+      "sector": "Financial Services",
+      "current_price": 30.290000915527344,
+      "market_cap_usd": 646119552,
+      "avg_dollar_volume_20d": 41894277.11346932,
+      "asof_price_utc": "2026-03-05T00:00:00Z",
+      "target": {
+        "horizon_trading_days": 7,
+        "upside_threshold_pct": 10,
+        "target_price_for_10pct": 33.31900100708008,
+        "base_case_upside_pct_range": [
+          10,
+          18
+        ],
+        "bear_case_note": "Momentum fails if price loses short-term trend (back below rising MAs) and volume does not expand on attempts to reclaim recent highs."
+      },
+      "primary_catalyst": {
+        "title": "No verified catalyst in packet (headlines missing)",
+        "key_date_local": null,
+        "timing": null,
+        "why_it_matters": "No source-cited, dated catalyst was provided in the packet; catalyst score capped per rules.",
+        "sources": []
+      },
+      "scores": {
+        "technical": 8.25,
+        "catalyst": 0.0,
+        "options": 7.0,
+        "sentiment": 3.0
+      },
+      "composite_score": 3.5625,
+      "evidence": {
+        "technical": {
+          "within_5pct_52w_high": true,
+          "resistance_level": 30.35,
+          "volume_ratio_3d_to_20d": 1.1,
+          "rsi14": 65.9,
+          "above_ma10_ma20_ma50": true,
+          "realized_vol_5d_ann_pct": 100.16
+        },
+        "options": {
+          "call_put_ratio": 6.5,
+          "unusual_volume_multiple": 0.68,
+          "largest_bullish_premium_usd": null,
+          "iv_rank": null,
+          "notable_contracts": []
+        },
+        "sentiment": {
+          "twitter": {
+            "mention_velocity_vs_7d": null,
+            "quality_accounts_est": null,
+            "bullish_pct_est": null
+          },
+          "reddit": {
+            "mention_velocity": null,
+            "upvote_ratio_est": null
+          },
+          "stocktwits": {
+            "bull_bear_ratio_est": null
+          },
+          "news_tone": null
+        }
+      },
+      "risk_factors": [
+        "Regional bank beta to rates/credit headlines; macro-driven gaps can overwhelm technicals.",
+        "Options signal may be noisy given lack of premium/IV-rank context in packet."
+      ],
+      "confidence": "SPECULATIVE",
+      "data_gaps": [
+        "Liquidity gate: avg_dollar_volume_20d in packet is 41.89M (<50M); strict filter would exclude. Included to satisfy 'return exactly 5' requirement.",
+        "Catalyst/news: no headlines provided; cannot verify catalysts with sources; catalyst score set to 0.0.",
+        "Sentiment: sentiment_data_available=false; sentiment capped at 3.0 per packet.",
+        "Exclusion check: last-5-trading-days return not provided; cannot enforce >15% run-up exclusion.",
+        "Halt/delisting check not provided in packet."
+      ],
+      "original_score": 4.5625,
+      "debate_verdict": "HOLD",
+      "debate_reasoning": "The bull case has solid technical momentum and supportive options skew, but the bear case more directly addresses the key near-term question: there is no confirmed breakout above the Donchian highs, so upside follow-through is not yet validated. With elevated implied/realized volatility and no identified catalyst, the probability of a clean +10% move in 7 trading days is not sufficiently favorable versus the risk of a rejection/pullback from resistance.",
+      "debate_bull_score": 7.4,
+      "debate_bear_score": 7.0,
+      "key_risks_from_debate": [
+        "Failed breakout/rejection near 52-week highs (is_breakout_20=false; price still below prior channel high), leading to a fast mean-reversion drawdown in a high-vol regime",
+        "Event-risk uncertainty (unknown earnings date/no headlines) combined with elevated IV can produce adverse gap risk and makes upside already partially priced"
+      ],
+      "key_catalysts_from_debate": [
+        "Confirmed technical breakout/close above ~30.35 (Donchian 20/55 prior high) with improving volume/flow confirmation",
+        "Any positive fundamental/news catalyst (earnings timing clarity, guidance, sector/regional bank tailwind) that justifies expansion beyond a technical squeeze"
+      ]
+    },
+    {
+      "rank": 3,
+      "ticker": "BSX",
+      "name": "Boston Scientific Corporation",
+      "exchange": "NYSE",
+      "sector": "Healthcare",
+      "current_price": 46.34000015258789,
+      "market_cap_usd": 108308791296,
+      "avg_dollar_volume_20d": 53976167.76596966,
+      "asof_price_utc": "2026-03-05T00:00:00Z",
+      "target": {
+        "horizon_trading_days": 7,
+        "upside_threshold_pct": 10,
+        "target_price_for_10pct": 50.97400016784668,
+        "base_case_upside_pct_range": [
+          10,
+          14
+        ],
+        "bear_case_note": "Invalidation if price fails to hold above key moving averages and momentum mean-reverts after extended run."
+      },
+      "primary_catalyst": {
+        "title": "No verified catalyst in packet (headlines missing)",
+        "key_date_local": null,
+        "timing": null,
+        "why_it_matters": "No source-cited, dated catalyst was provided in the packet; catalyst score capped per rules.",
+        "sources": []
+      },
+      "scores": {
+        "technical": 9.45,
+        "catalyst": 0.0,
+        "options": 6.0,
+        "sentiment": 3.0
+      },
+      "composite_score": 3.2125,
+      "evidence": {
+        "technical": {
+          "within_5pct_52w_high": true,
+          "resistance_level": 48.5,
+          "volume_ratio_3d_to_20d": 1.61,
+          "rsi14": 68.02,
+          "above_ma10_ma20_ma50": true,
+          "realized_vol_5d_ann_pct": 76.3
+        },
+        "options": {
+          "call_put_ratio": 25.330849478390462,
+          "unusual_volume_multiple": 0.38,
+          "largest_bullish_premium_usd": null,
+          "iv_rank": null,
+          "notable_contracts": [
+            {
+              "type": "call",
+              "strike": 79.0,
+              "expiration": "2026-03-13",
+              "volume": 12000,
+              "open_interest": 12265,
+              "iv": 0.35547519531249994
+            },
+            {
+              "type": "call",
+              "strike": 78.0,
+              "expiration": "2026-03-06",
+              "volume": 4013,
+              "open_interest": 1833,
+              "iv": 0.5195360546875
+            }
+          ]
+        },
+        "sentiment": {
+          "twitter": {
+            "mention_velocity_vs_7d": null,
+            "quality_accounts_est": null,
+            "bullish_pct_est": null
+          },
+          "reddit": {
+            "mention_velocity": null,
+            "upvote_ratio_est": null
+          },
+          "stocktwits": {
+            "bull_bear_ratio_est": null
+          },
+          "news_tone": null
+        }
+      },
+      "risk_factors": [
+        "10% in 7 trading days is large for a mega-cap medtech absent a catalyst; move may be less likely than screen implies.",
+        "Options strikes shown (78-79) conflict with packet current_price (~46.34) and fundamentals price (~72.99); treat options evidence cautiously."
+      ],
+      "confidence": "SPECULATIVE",
+      "data_gaps": [
+        "Liquidity gate: avg_dollar_volume_20d in packet is 53.98M (passes).",
+        "Catalyst/news: no headlines provided; cannot verify catalysts with sources; catalyst score set to 0.0.",
+        "Sentiment: sentiment_data_available=false; sentiment capped at 3.0 per packet.",
+        "Data integrity: packet current_price conflicts with fundamentals price and options strikes; target_price_for_10pct computed from packet current_price.",
+        "Exclusion check: last-5-trading-days return not provided; cannot enforce >15% run-up exclusion.",
+        "Halt/delisting check not provided in packet."
+      ],
+      "original_score": 4.6125,
+      "debate_verdict": "HOLD",
+      "debate_reasoning": "The bull case is supported by clear trend strength (price above key MAs) and above-average recent volume, but the setup lacks clean breakout confirmation and is flagged as extended, which reduces the odds of a fast +10% follow-through in a 7-trading-day window. The options signal is directionally bullish but potentially crowded and partially inconsistent (strikes vs spot), lowering its evidentiary weight; netting these, edge is not strong enough to upgrade to BUY.",
+      "debate_bull_score": 7.2,
+      "debate_bear_score": 6.8,
+      "key_risks_from_debate": [
+        "Near-term mean reversion/consolidation risk given RSI ~68 and model 'extended move' penalty while near the 52-week high",
+        "False-start breakout risk: no 20-day breakout and negative breakout strength (ATR-based), implying exhaustion rather than continuation",
+        "Options data/actionability risk (very high call/put but low unusual volume and strike/spot inconsistency), reducing confidence in derivatives as a confirming signal",
+        "Event/catalyst opacity (earnings date unknown, no sentiment feed), increasing tail-risk over a short horizon"
+      ],
+      "key_catalysts_from_debate": [
+        "Clean breakout above recent resistance/52-week-high zone with continued >1.5x volume confirmation",
+        "Any positive company/sector catalyst (e.g., guidance, regulatory/clinical updates, or peer read-through) that can supply incremental demand to extend momentum"
+      ]
+    }
+  ],
+  "pro30_tickers": [
+    "ATOM",
+    "ATXS",
+    "BKE",
+    "BMBL",
+    "BRCC",
+    "CRMD",
+    "CWT",
+    "KREF",
+    "PFBC",
+    "PRIM",
+    "TRDA",
+    "TRUP",
+    "VRTS",
+    "YELP"
+  ],
+  "movers_tickers": []
+}

@@ -1,0 +1,16 @@
+{
+  "date": "2026-03-05",
+  "candidates": [
+    {
+      "ticker": "BMBL",
+      "score": 7.5,
+      "signals": 2,
+      "conviction": "HIGH",
+      "thesis": "Multi-factor alignment (2 signals)",
+      "sources": [
+        "pro30",
+        "weekly"
+      ]
+    }
+  ]
+}

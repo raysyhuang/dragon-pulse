@@ -1,0 +1,4 @@
+rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
+1,BRK-B,Berkshire Hathaway Inc.,Financial Services,0,,80.27999877929688,4.1625,SPECULATIVE,8.45,0.0,10.0,3.0,No verified catalyst in packet (headlines missing),88.30799865722656
+2,TCBX,"Third Coast Bancshares, Inc.",Financial Services,0,,30.290000915527344,3.5625,SPECULATIVE,8.25,0.0,7.0,3.0,No verified catalyst in packet (headlines missing),33.31900100708008
+3,BSX,Boston Scientific Corporation,Healthcare,0,,46.34000015258789,3.2125,SPECULATIVE,9.45,0.0,6.0,3.0,No verified catalyst in packet (headlines missing),50.97400016784668
