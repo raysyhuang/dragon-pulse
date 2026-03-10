@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Optional, Callable
 from dataclasses import dataclass
 import time as _time
+import re
 import requests
 
 # Load environment variables from .env
@@ -45,6 +46,15 @@ def _regime_emoji(regime: str) -> str:
 
 def _section_line() -> str:
     return "\u2500" * 28
+
+
+def _starts_with_title_block(message: str, title: str) -> bool:
+    """Detect a leading title even when it is wrapped in simple HTML tags."""
+    first_line = (message or "").lstrip().split("\n", 1)[0].strip()
+    if not first_line:
+        return False
+    normalized = re.sub(r"</?[^>]+>", "", first_line).strip()
+    return normalized == title.strip()
 
 from src.utils.time import utc_now
 
@@ -434,8 +444,7 @@ class AlertManager:
                 return True
 
         # Avoid repeating the same header when the formatted body already includes it.
-        normalized_message = message.lstrip()
-        text = message if normalized_message.startswith(title) else f"{title}\n\n{message}"
+        text = message if _starts_with_title_block(message, title) else f"{title}\n\n{message}"
 
         logger.info(
             "Telegram config: token_present=%s chat_id=%s run_id=%s attempt=%s",
@@ -786,9 +795,6 @@ def send_run_summary_alert(
                 lines.append(f"   \U0001f48e Pro30+Movers: {', '.join(display_list)}")
         lines.append("")
 
-    # Summary counts
-    lines.append(f"\U0001f4ca {primary_label}: {weekly_count} | Pro30: {pro30_count} | Movers: {movers_count}")
-
     # Model Health
     if model_health:
         health_status = model_health.get("status", "Unknown")
@@ -803,11 +809,6 @@ def send_run_summary_alert(
         if strategies:
             strat_parts = [f"{s.get('name', '?')}:{s.get('hit_rate', 0) * 100:.0f}%" for s in strategies[:3]]
             lines.append(f"  {' | '.join(strat_parts)}")
-
-    if position_alerts:
-        lines.append(f"\U0001f4cc Positions: {position_alerts.get('count', 0)} | High: {position_alerts.get('high', 0)} | Warn: {position_alerts.get('warning', 0)}")
-        for msg in (position_alerts.get("sample") or [])[:3]:
-            lines.append(f"  - {msg}")
 
     # Determine priority
     if all_three:

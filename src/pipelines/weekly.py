@@ -66,7 +66,15 @@ from ..core.packets import build_weekly_scanner_packet, build_weekly_scanner_pac
 from ..core.data_quality import TickerDataQuality, RunDataQuality
 
 
-def run_weekly(config: Optional[dict] = None, config_path: Optional[str] = None, asof_date: Optional[date_type] = None) -> dict:
+def run_weekly(
+    config: Optional[dict] = None,
+    config_path: Optional[str] = None,
+    asof_date: Optional[date_type] = None,
+    *,
+    output_date: Optional[date_type] = None,
+    run_dir: Optional[Path] = None,
+    regime: Optional[str] = None,
+) -> dict:
     """
     Run the Weekly Momentum Scanner pipeline.
     
@@ -87,6 +95,8 @@ def run_weekly(config: Optional[dict] = None, config_path: Optional[str] = None,
     if config is None:
         config = load_config(config_path)
 
+    del regime  # Reserved for compatibility with cmd_all.
+
     # Resolve market + data providers
     market_settings = resolve_market_settings(config)
     download_daily, download_daily_range, provider_config, market = get_data_functions(config)
@@ -102,14 +112,17 @@ def run_weekly(config: Optional[dict] = None, config_path: Optional[str] = None,
         close_minute=close_minute,
         timezone=tz,
     )
-    run_dir = get_run_dir(
-        today,
-        get_config_value(config, "outputs", "root_dir", default="outputs"),
-        market=market,
-        close_hour=close_hour,
-        close_minute=close_minute,
-        timezone=tz,
-    )
+    if output_date is None:
+        output_date = today
+    if run_dir is None:
+        run_dir = get_run_dir(
+            output_date,
+            get_config_value(config, "outputs", "root_dir", default="outputs"),
+            market=market,
+            close_hour=close_hour,
+            close_minute=close_minute,
+            timezone=tz,
+        )
     
     # Build universe
     china_sources = []
@@ -579,4 +592,3 @@ def run_weekly(config: Optional[dict] = None, config_path: Optional[str] = None,
         "metadata_json": metadata_json,
         "html_report": str(html_file) if html_file else None,
     }
-

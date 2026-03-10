@@ -76,6 +76,20 @@ def test_build_universe():
     assert all(isinstance(t, str) for t in tickers)
 
 
+def test_build_universe_china_a_uses_cn_source(monkeypatch):
+    """CHINA_A mode should not silently fall back to US universes."""
+    monkeypatch.setattr("src.core.universe.load_universe_from_cache", lambda *args, **kwargs: [])
+    monkeypatch.setattr("src.core.universe.save_universe_to_cache", lambda *args, **kwargs: None)
+    monkeypatch.setattr("src.core.universe.get_china_a_universe", lambda **kwargs: ["600519.SH", "000001.SZ"], raising=False)
+    monkeypatch.setattr("src.core.universe.get_sp500_universe", lambda: pytest.fail("US universe should not be used for CHINA_A"))
+    monkeypatch.setattr("src.core.universe.get_nasdaq100_universe", lambda: pytest.fail("US universe should not be used for CHINA_A"))
+    monkeypatch.setattr("src.core.universe.get_russell2000_universe", lambda: pytest.fail("US universe should not be used for CHINA_A"))
+
+    tickers = build_universe(mode="CHINA_A", cache_file=None, quarantine_enabled=False)
+
+    assert sorted(tickers) == ["000001.SZ", "600519.SH"]
+
+
 def test_load_config():
     """Test that config loading works."""
     config = load_config("config/default.yaml")
@@ -96,4 +110,3 @@ def test_logging_setup():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
-

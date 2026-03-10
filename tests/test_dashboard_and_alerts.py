@@ -21,10 +21,45 @@ def test_send_telegram_avoids_duplicate_header(monkeypatch):
     monkeypatch.setattr(manager, "_send_telegram_message", capture_message)
 
     title = "🐉 Dragon Pulse — 2026-03-10"
-    message = f"{title}\n\n🟢 Regime: <b>BULL</b> | Picks: <b>3</b>"
+    message = f"<b>{title}</b>\n\n🟢 Regime: <b>BULL</b> | Picks: <b>3</b>"
 
     assert manager._send_telegram(title, message, {"asof": "2026-03-10"}, "normal") is True
     assert sent_messages == [message]
+
+
+def test_send_run_summary_alert_omits_legacy_counts_and_positions(monkeypatch):
+    captured: dict[str, str] = {}
+
+    def fake_send_alert(self, title, message, data=None, priority="normal"):
+        captured["title"] = title
+        captured["message"] = message
+        return {"telegram": True}
+
+    monkeypatch.setattr("src.core.alerts.AlertManager.send_alert", fake_send_alert)
+
+    from src.core.alerts import send_run_summary_alert
+
+    send_run_summary_alert(
+        date_str="2026-03-09",
+        weekly_count=0,
+        pro30_count=7,
+        movers_count=0,
+        overlaps={},
+        hybrid_top3=[
+            {"rank": 1, "ticker": "600519.SH", "name": "贵州茅台", "hybrid_score": 82, "sources": ["Weekly"]},
+        ],
+        position_alerts={
+            "count": 4,
+            "high": 2,
+            "warning": 0,
+            "sample": ["🎯 TARGET HIT: COHR up 28.8%"],
+        },
+        regime="bull",
+    )
+
+    assert "📊 Weekly:" not in captured["message"]
+    assert "📌 Positions:" not in captured["message"]
+    assert "TARGET HIT" not in captured["message"]
 
 
 def test_dashboard_overlap_chips_include_company_names():

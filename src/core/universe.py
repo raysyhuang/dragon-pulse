@@ -185,6 +185,70 @@ def get_russell2000_universe() -> list[str]:
         return []
 
 
+def get_china_a_universe(
+    china_source_preference: Optional[list[str]] = None,
+    tushare_token_env: str = "TUSHARE_TOKEN",
+    china_board_filters: Optional[list[str]] = None,
+) -> list[str]:
+    """
+    Best-effort China A-share universe.
+
+    Returns SSE/SZSE symbols like ``600519.SH`` / ``000001.SZ``.
+    """
+    from . import cn_data
+
+    providers = [str(p).lower() for p in (china_source_preference or ["akshare", "tushare"])]
+    tickers: list[str] = []
+    last_error: Optional[Exception] = None
+
+    for provider in providers:
+        try:
+            if provider == "akshare":
+                df = cn_data._ak_fetch_basic_info()
+            elif provider == "tushare":
+                token = os.environ.get(tushare_token_env)
+                df = cn_data._tushare_fetch_basic_info(token)
+            else:
+                continue
+
+            if df is None or df.empty or "ticker" not in df.columns:
+                continue
+
+            tickers = (
+                df["ticker"]
+                .dropna()
+                .astype(str)
+                .str.upper()
+                .tolist()
+            )
+            if tickers:
+                break
+        except Exception as exc:
+            last_error = exc
+            continue
+
+    if not tickers:
+        if last_error:
+            print(f"[WARN] China A-share universe fetch failed; last error: {last_error}")
+        return []
+
+    board_filters = {str(item).upper() for item in (china_board_filters or [])}
+    if board_filters:
+        filtered: list[str] = []
+        for ticker in tickers:
+            code = ticker.split(".", 1)[0]
+            if "STAR" in board_filters and code.startswith("688"):
+                continue
+            if "CHINEXT" in board_filters and code.startswith(("300", "301")):
+                continue
+            if "BSE" in board_filters and code.startswith(("4", "8", "92")):
+                continue
+            filtered.append(ticker)
+        tickers = filtered
+
+    return sorted(set(tickers))
+
+
 def load_universe_from_cache(cache_file: str, max_age_days: Optional[int] = 7) -> list[str]:
     """
     Load tickers from cache file if it exists and is fresh.
@@ -238,6 +302,9 @@ def build_universe(
     manual_include_mode: str = "ALWAYS",
     quarantine_file: Optional[str] = None,
     quarantine_enabled: bool = True,
+    china_board_filters: Optional[list[str]] = None,
+    china_source_preference: Optional[list[str]] = None,
+    tushare_token_env: str = "TUSHARE_TOKEN",
 ) -> list[str]:
     """
     Build ticker universe based on mode and optional manual includes.
@@ -265,22 +332,29 @@ def build_universe(
         base_tickers = cached
     else:
         # Build from sources
-        sp = get_sp500_universe()
-        n100 = get_nasdaq100_universe() if "NASDAQ100" in mode else []
-        r2k = get_russell2000_universe() if "R2000" in mode else []
-        
-        # Warn if R2000 fetch failed when it was requested, and fallback to local file if present
-        if not r2k and "R2000" in mode:
-            print("[WARN] Russell 2000 fetch failed; proceeding with SP500 + NASDAQ100 only.")
-            if r2000_include_file:
-                fallback_r2k = load_tickers_from_file(r2000_include_file)
-                if fallback_r2k:
-                    r2k = fallback_r2k
-                    print(f"[INFO] Loaded Russell 2000 fallback from {r2000_include_file} ({len(r2k)} tickers)")
-                else:
-                    print("[WARN] Russell 2000 fallback file empty or missing.")
-        
-        base_tickers = sorted(set(sp + n100 + r2k))
+        if mode in {"CHINA_A", "CHINA_ALL"}:
+            base_tickers = get_china_a_universe(
+                china_source_preference=china_source_preference,
+                tushare_token_env=tushare_token_env,
+                china_board_filters=china_board_filters,
+            )
+        else:
+            sp = get_sp500_universe()
+            n100 = get_nasdaq100_universe() if "NASDAQ100" in mode else []
+            r2k = get_russell2000_universe() if "R2000" in mode else []
+
+            # Warn if R2000 fetch failed when it was requested, and fallback to local file if present
+            if not r2k and "R2000" in mode:
+                print("[WARN] Russell 2000 fetch failed; proceeding with SP500 + NASDAQ100 only.")
+                if r2000_include_file:
+                    fallback_r2k = load_tickers_from_file(r2000_include_file)
+                    if fallback_r2k:
+                        r2k = fallback_r2k
+                        print(f"[INFO] Loaded Russell 2000 fallback from {r2000_include_file} ({len(r2k)} tickers)")
+                    else:
+                        print("[WARN] Russell 2000 fallback file empty or missing.")
+            
+            base_tickers = sorted(set(sp + n100 + r2k))
         
         # Fallback to stale cache if live fetch fails
         if not base_tickers and cache_file and os.path.exists(cache_file):
