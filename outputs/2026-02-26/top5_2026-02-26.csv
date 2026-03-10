@@ -1,4 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,AVY,Avery Dennison Corporation,Consumer Cyclical,0,,116.0,4.55,MEDIUM,10.0,4.0,4.0,3.0,No verified dated catalyst in packet (catalyst score capped),127.6
-2,SPXC,"SPX Technologies, Inc.",Industrials,0,,116.0,3.15,SPECULATIVE,10.0,4.0,2.0,3.0,No verified dated catalyst in packet (catalyst score capped),127.6
-3,GLNG,Golar LNG Limited,Energy,0,,116.0,2.95,SPECULATIVE,10.0,4.0,2.0,3.0,No verified dated catalyst in packet (catalyst score capped),127.6

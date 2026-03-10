@@ -1,4 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,CLSK,"CleanSpark, Inc.",Financial Services,0,,12.73,5.21,MEDIUM,8.45,2.0,8.0,2.0,Crypto/miner sentiment tailwind + renewed bullish coverage,14.0
-2,NUE,Nucor Corporation,Basic Materials,0,,174.79,4.5600000000000005,MEDIUM,8.65,2.0,6.0,2.0,Analyst commentary ahead of Q4 steel earnings + sector tailwind,192.27
-3,MS,Morgan Stanley,Financial Services,0,,191.23,4.2,MEDIUM,10.0,1.0,3.0,4.0,Post-earnings newsflow and bank-sector rotation narrative,210.35

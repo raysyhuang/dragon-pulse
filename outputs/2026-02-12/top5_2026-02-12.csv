@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,SXT,Sensient Technologies Corporation,Basic Materials,0,,87.11000061035156,3.7625,MEDIUM,9.85,0.0,5.0,3.0,No verified dated catalyst in packet (headlines/catalyst_sources empty),95.82100067138671
-2,LQDT,"Liquidity Services, Inc.",Consumer Cyclical,0,,285.5299987792969,3.0625,SPECULATIVE,8.25,0.0,5.0,3.0,No verified dated catalyst in packet (headlines/catalyst_sources empty),314.0829986572266

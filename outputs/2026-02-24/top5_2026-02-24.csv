@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,TXN,Texas Instruments Incorporated,Technology,0,,113.20999908447266,5.0625,SPECULATIVE,8.25,4.0,10.0,3.0,No verified dated catalyst in packet (headlines empty),124.531
-2,T,AT&T Inc.,Communication Services,0,,116.79000091552734,4.0625,SPECULATIVE,8.25,4.0,6.0,3.0,No verified dated catalyst in packet (headlines empty),128.469

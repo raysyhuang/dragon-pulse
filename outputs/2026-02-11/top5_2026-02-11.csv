@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,PKG,Packaging Corporation of America,Consumer Cyclical,0,,139.32000732421875,5.2124999999999995,MEDIUM,8.65,4.0,6.0,3.0,No verified dated catalyst in packet (catalyst score capped),153.25200805664062
-2,MZTI,The Marzetti Company,Consumer Defensive,0,,35.029998779296875,4.5625,SPECULATIVE,8.25,4.0,7.0,3.0,No verified dated catalyst in packet (catalyst score capped),38.53299865722656

@@ -1,4 +1,0 @@
-rank,ticker,name,sector,current_price,composite_score,verdict,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price,upside_pct_min,upside_pct_max
-1,MS,Morgan Stanley,Financial Services,191.23,4.25,SPECULATIVE,SPECULATIVE,10,0,3,4,,210.35,10,18
-2,CADE,Cadence Bank,Financial Services,44.4,4.25,SPECULATIVE,SPECULATIVE,10,0,3,4,,48.84,10,16
-3,DAL,"Delta Air Lines, Inc.",Industrials,71.34,4.25,SPECULATIVE,SPECULATIVE,10,0,3,4,,78.47,10,17

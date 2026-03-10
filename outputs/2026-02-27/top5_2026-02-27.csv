@@ -1,4 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,ONDS,Ondas Inc.,Technology,0,,223.8699951171875,4.8,MEDIUM,10.0,4,5,3,No verified catalyst in packet (headlines missing),246.25699462890626
-2,NKE,"NIKE, Inc.",Consumer Cyclical,0,,112.5199966430664,4.3125,SPECULATIVE,8.25,4,6,3,No verified catalyst in packet (headlines missing),123.77199630737304
-3,EB,"Eventbrite, Inc.",Communication Services,0,,112.5199966430664,4.3125,SPECULATIVE,8.25,4,6,3,No verified catalyst in packet (headlines missing),123.77199630737304

@@ -1,6 +1,0 @@
-Sent at: 2026-02-20T22:43:28.933859
-Workflow: Auto Run (Daily)
-Run ID: 22243060023
-Attempt: 1
-SHA: 652f0c5
-Title: Scan Complete: 2026-02-20 (Weekly)

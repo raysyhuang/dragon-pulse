@@ -1,4 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,TBRG,,,3.0,Pro30(r1),0,3.0,SPECULATIVE,0,0,0,0,,0
-2,KRUS,,,2.95,Pro30(r2),0,2.95,SPECULATIVE,0,0,0,0,,0
-3,KRYS,,,2.9,Pro30(r3),0,2.9,SPECULATIVE,0,0,0,0,,0

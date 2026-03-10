@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,NUAI,"New Era Energy & Digital, Inc.",Technology,0,,1283.6500244140625,5.112500000000001,MEDIUM,8.85,4.0,5.0,3.0,No verified dated catalyst in packet (headlines empty),1412.02
-2,NTST,NETSTREIT Corp.,Real Estate,0,,1283.6500244140625,4.862500000000001,MEDIUM,8.85,4.0,4.0,3.0,No verified dated catalyst in packet (headlines empty),1412.02

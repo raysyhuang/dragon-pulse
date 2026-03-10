@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,TCMD,"Tactile Systems Technology, Inc.",Healthcare,0,,115.83999633789062,4.95,MEDIUM,10.0,4,4,3,No verified catalyst in packet (headlines/catalyst_sources empty),127.42399597167969
-2,FORR,"Forrester Research, Inc.",Industrials,0,,69.86000061035156,4.6625,MEDIUM,9.05,4,5,3,No verified catalyst in packet (headlines/catalyst_sources empty),76.84600067138672

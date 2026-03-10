@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,OFLX,"Omega Flex, Inc.",Industrials,0,,660.6199951171875,3.7625,SPECULATIVE,8.25,4.0,3.0,3.0,Earnings (scheduled),726.6819946289063
-2,EME,"EMCOR Group, Inc.",Industrials,0,,35.2400016784668,3.5625,SPECULATIVE,8.25,4.0,3.0,3.0,Earnings (scheduled),38.76400184631348

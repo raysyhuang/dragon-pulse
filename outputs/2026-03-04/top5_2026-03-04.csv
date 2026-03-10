@@ -1,4 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,PRLB,"Proto Labs, Inc.",Industrials,0,,463.3599853515625,4.262499999999999,MEDIUM,8.65,0.0,5.0,3.0,No verified dated catalyst in packet headlines,509.6959838867188
-2,IDT,IDT Corporation,Communication Services,0,,120.08000183105469,4.05,MEDIUM,10.0,2.0,4.0,3.0,Earnings (date provided by FMP in packet),132.08800201416017
-3,TSCO,Tractor Supply Company,Consumer Cyclical,0,,83.80000305175781,3.4124999999999996,SPECULATIVE,8.45,0.0,7.0,3.0,No verified dated catalyst in packet headlines,92.1800033569336

@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,NAT,Nordic American Tankers Limited,Energy,0,,233.02000427246094,3.5625,SPECULATIVE,8.25,4.0,4.0,3.0,Earnings (scheduled),256.32200469970707
-2,XPOF,"Xponential Fitness, Inc.",Consumer Cyclical,0,,174.77000427246094,3.5125,SPECULATIVE,7.25,4.0,3.0,3.0,Earnings (scheduled),192.24700469970705

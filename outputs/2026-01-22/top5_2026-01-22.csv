@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,OSIS,"OSI Systems, Inc.",Technology,0,,290.8,5.5600000000000005,MEDIUM,8.65,4.0,7.0,3.0,Technical/flow-driven momentum (no dated catalyst verified),319.88
-2,CLSK,"CleanSpark, Inc.",Financial Services,0,,12.73,5.21,MEDIUM,8.45,4.0,6.0,2.0,Crypto/miner beta + near-term newsflow sensitivity (no dated event verified),14.0

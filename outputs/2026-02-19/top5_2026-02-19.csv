@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,AMGN,Amgen Inc.,Healthcare,0,,111.58999633789062,4.8125,SPECULATIVE,8.25,4.0,8.0,3.0,No verified dated catalyst in packet (headlines empty),122.75
-2,BXP,"BXP, Inc.",Real Estate,0,,99.45999908447266,4.362500000000001,MEDIUM,8.85,4.0,2.0,3.0,No verified dated catalyst in packet (headlines empty),109.41

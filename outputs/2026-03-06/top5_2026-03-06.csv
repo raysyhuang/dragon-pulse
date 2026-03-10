@@ -1,4 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,FANG,"Diamondback Energy, Inc.",Energy,0,,180.5399932861328,4.8125,SPECULATIVE,8.25,4.0,8.0,3.0,No verified catalyst in packet headlines (catalyst score capped),198.5949926147461
-2,CINF,Cincinnati Financial Corporation,Financial Services,0,,74.11000061035156,4.0125,MEDIUM,9.85,4.0,2.0,3.0,No verified catalyst in packet headlines (catalyst score capped),81.52100067138672
-3,GLNG,Golar LNG Limited,Energy,0,,47.08000183105469,3.55,SPECULATIVE,10.0,4.0,6.0,3.0,No verified catalyst in packet headlines (catalyst score capped),51.78800201416016

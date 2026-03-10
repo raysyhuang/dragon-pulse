@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,GFF,Griffon Corporation,Industrials,0,,764.3499755859375,5.362500000000001,MEDIUM,8.85,4.0,6.0,3.0,,840.785
-2,GEV,GE Vernova Inc.,Industrials,0,,764.3499755859375,4.862500000000001,MEDIUM,8.85,4.0,4.0,3.0,,840.785

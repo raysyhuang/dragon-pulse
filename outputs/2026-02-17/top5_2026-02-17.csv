@@ -1,4 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,FMAO,,,3.0,Pro30(r1),0.0,3.0,SPECULATIVE,0.0,0.0,0.0,0.0,,0.0
-2,UPS,"United Parcel Service, Inc.",Industrials,1.6,Weekly(1),24.100000381469727,4.762499999999999,SPECULATIVE,8.45,4.0,8.0,3.0,No verified dated catalyst in packet,26.51
-3,PYPL,"PayPal Holdings, Inc.",Financial Services,1.1,Weekly(2),66.54000091552734,4.0625,SPECULATIVE,8.25,4.0,4.0,4.0,No verified dated catalyst in packet,73.19

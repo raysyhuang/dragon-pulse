@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,MU,"Micron Technology, Inc.",Technology,0,,336.63,6.26,MEDIUM,8.25,5.0,5.0,4.0,Corporate development + AI/memory newsflow (LOI for Taiwan fab site; ongoing analyst/insider headlines),370.29
-2,GS,"The Goldman Sachs Group, Inc.",Financial Services,0,,975.86,5.61,MEDIUM,8.85,4.0,6.0,4.0,Analyst price-target raise / bullish 2026 investment banking outlook,1073.45

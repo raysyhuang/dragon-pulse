@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,CIFR,Cipher Mining Inc.,Financial Services,0,,298.70001220703125,5.112500000000001,MEDIUM,8.85,4.0,5.0,3.0,No verified dated catalyst in packet (catalyst score capped),328.5700134277344
-2,BHE,"Benchmark Electronics, Inc.",Technology,0,,118.37000274658203,4.3125,SPECULATIVE,8.25,4.0,6.0,3.0,No verified dated catalyst in packet (catalyst score capped),130.20700302124024

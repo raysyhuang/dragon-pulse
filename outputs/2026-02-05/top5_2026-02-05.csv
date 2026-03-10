@@ -1,3 +1,0 @@
-rank,ticker,name,sector,hybrid_score,sources,current_price,composite_score,confidence,technical_score,catalyst_score,options_score,sentiment_score,primary_catalyst,target_price
-1,AX,"Axos Financial, Inc.",Financial Services,0,,192.8800048828125,4.35,SPECULATIVE,10.0,4,6,3,,212.16800537109376
-2,IESC,"IES Holdings, Inc.",Industrials,0,,345.04998779296875,4.112500000000001,MEDIUM,8.85,4,1,3,,379.5549865722656
