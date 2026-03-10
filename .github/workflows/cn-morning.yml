@@ -1,0 +1,85 @@
+name: CN Morning Check
+
+on:
+  schedule:
+    # 09:26 Shanghai = 01:26 UTC (weekdays)
+    - cron: "26 1 * * 1-5"
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  PYTHONUNBUFFERED: "1"
+  TZ: "Asia/Shanghai"
+
+concurrency:
+  group: cn-morning
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Pre-Flight Gap Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Pull latest to get nightly outputs
+          ref: main
+
+      - name: Compute trading date
+        id: date
+        run: |
+          TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+          echo "trade_date=${TRADE_DATE}" >> "$GITHUB_OUTPUT"
+
+      - name: Check for watchlist
+        id: check
+        run: |
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          WL_FILE="outputs/${TRADE_DATE}/execution_watchlist_${TRADE_DATE}.json"
+          if [ -f "${WL_FILE}" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Watchlist found: ${WL_FILE}"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No watchlist for ${TRADE_DATE}. Nightly run may have failed or produced no picks."
+          fi
+
+      - name: Set up Python
+        if: steps.check.outputs.found == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        if: steps.check.outputs.found == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run morning check
+        if: steps.check.outputs.found == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          python scripts/morning_check.py --date "${TRADE_DATE}"
+
+      - name: Commit check results
+        if: steps.check.outputs.found == 'true' && success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          git add "outputs/${TRADE_DATE}/execution_check_${TRADE_DATE}.json" 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No check results to commit"
+          else
+            git commit -m "auto: CN morning check for ${TRADE_DATE}"
+            git push origin HEAD:main || {
+              git fetch origin main
+              git rebase origin/main
+              git push origin HEAD:main
+            }
+          fi

@@ -23,7 +23,7 @@ from src.utils.time import utc_now
 try:
     from fastapi import FastAPI, HTTPException, Query
     from fastapi.middleware.cors import CORSMiddleware
-    from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
     from fastapi.staticfiles import StaticFiles
     from pydantic import BaseModel
     FASTAPI_AVAILABLE = True
@@ -167,85 +167,51 @@ if FASTAPI_AVAILABLE:
         
         # ----- Routes -----
         
+        # Mount static files
+        static_dir = Path(__file__).resolve().parent.parent.parent / "static"
+        if static_dir.exists():
+            app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
         @app.get("/", response_class=HTMLResponse)
         async def root():
-            """Dashboard home page."""
-            dates = get_available_dates()[:10]
-            
-            html = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Momentum Trading System</title>
-                <style>
-                    :root {
-                        --bg: #0b1020;
-                        --card: rgba(255,255,255,0.06);
-                        --text: rgba(255,255,255,0.92);
-                        --accent: #7dd3fc;
-                    }
-                    body {
-                        font-family: system-ui, sans-serif;
-                        background: var(--bg);
-                        color: var(--text);
-                        margin: 0;
-                        padding: 20px;
-                    }
-                    .container { max-width: 1200px; margin: 0 auto; }
-                    h1 { color: var(--accent); }
-                    .card {
-                        background: var(--card);
-                        border-radius: 12px;
-                        padding: 20px;
-                        margin: 15px 0;
-                    }
-                    a { color: var(--accent); text-decoration: none; }
-                    a:hover { text-decoration: underline; }
-                    .date-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
-                    .date-item {
-                        background: rgba(125,211,252,0.1);
-                        padding: 10px 15px;
-                        border-radius: 8px;
-                        text-align: center;
-                    }
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <h1>📈 Momentum Trading System</h1>
-                    
-                    <div class="card">
-                        <h2>Recent Scans</h2>
-                        <div class="date-list">
-            """
-            
-            for d in dates:
-                html += f'<a href="/runs/{d}" class="date-item">{d}</a>'
-            
+            """Serve the dashboard SPA."""
+            index = static_dir / "dashboard.html"
+            if index.exists():
+                return FileResponse(str(index), media_type="text/html")
+            return HTMLResponse("<h1>Dashboard not found. Place static/dashboard.html.</h1>")
+
+        @app.get("/api/latest")
+        async def get_latest_run():
+            """Return the most recent run's hybrid analysis."""
+            dates = get_available_dates()
             if not dates:
-                html += '<p>No scan results found. Run <code>python main.py all</code> to generate data.</p>'
-            
-            html += """
-                        </div>
-                    </div>
-                    
-                    <div class="card">
-                        <h2>API Endpoints</h2>
-                        <ul>
-                            <li><a href="/docs">/docs</a> - Interactive API documentation</li>
-                            <li><a href="/health">/health</a> - Health check</li>
-                            <li><a href="/runs">/runs</a> - List available runs</li>
-                            <li>/runs/{date} - Get run details</li>
-                            <li>/runs/{date}/top5 - Weekly Top 5</li>
-                            <li>/runs/{date}/pro30 - Pro30 candidates</li>
-                        </ul>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-            
-            return HTMLResponse(content=html)
+                raise HTTPException(status_code=404, detail="No runs available")
+            latest = dates[0]
+            hybrid = load_hybrid_analysis(latest)
+            if not hybrid:
+                raise HTTPException(status_code=404, detail=f"No data for {latest}")
+            hybrid["date"] = latest
+            return hybrid
+
+        @app.post("/api/alert/test")
+        async def send_test_alert():
+            """Send a test Telegram alert to verify configuration."""
+            try:
+                from src.core.alerts import AlertManager, AlertConfig
+                cfg = AlertConfig(
+                    enabled=True,
+                    channels=["telegram"],
+                )
+                mgr = AlertManager(cfg)
+                results = mgr.send_alert(
+                    title="Dragon Pulse Test Alert",
+                    message="If you see this, Telegram is configured correctly.",
+                    priority="low",
+                )
+                success = results.get("telegram", False)
+                return {"success": success, "results": results}
+            except Exception as e:
+                return {"success": False, "error": str(e)}
         
         @app.get("/health", response_model=HealthResponse)
         async def health_check():

@@ -202,8 +202,8 @@ cache:
 # ALERTS (optional)
 # =============================================================================
 alerts:
-  enabled: false
-  channels: ["file"]         # Options: telegram, desktop, file
+  enabled: true
+  channels: ["telegram", "file"]   # Options: telegram, desktop, file
   triggers:
     high_composite_score: 7.0
     dragon_tiger_signal: true

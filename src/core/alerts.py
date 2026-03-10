@@ -15,6 +15,7 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from typing import Optional, Callable
 from dataclasses import dataclass
+import time as _time
 import requests
 
 # Load environment variables from .env
@@ -25,6 +26,25 @@ except ImportError:
     pass
 
 logger = logging.getLogger(__name__)
+
+
+# ─── Formatting Helpers ────────────────────────────
+
+def _bar(value: float, max_val: float = 100, width: int = 10) -> str:
+    """Unicode progress bar."""
+    ratio = max(0, min(1, value / max_val))
+    filled = round(ratio * width)
+    return "\u2588" * filled + "\u2591" * (width - filled)
+
+
+def _regime_emoji(regime: str) -> str:
+    return {"bull": "\U0001f7e2", "bear": "\U0001f534", "choppy": "\U0001f7e1", "caution": "\U0001f7e1"}.get(
+        (regime or "").lower(), "\u26aa"
+    )
+
+
+def _section_line() -> str:
+    return "\u2500" * 28
 
 from src.utils.time import utc_now
 
@@ -327,6 +347,44 @@ class AlertManager:
             logger.error(f"Email send failed: {e}")
             return False
     
+    def _send_telegram_message(self, token: str, chat_id: str, text: str) -> bool:
+        """Send a single Telegram message with HTML parse mode and exponential backoff retry."""
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
+        payload = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
+        }
+
+        for attempt in range(3):
+            try:
+                response = requests.post(url, json=payload, timeout=10)
+                if response.status_code == 200:
+                    return True
+
+                # If HTML parse fails, retry without parse_mode on first attempt
+                if attempt == 0 and response.status_code == 400:
+                    payload.pop("parse_mode", None)
+                    response = requests.post(url, json=payload, timeout=10)
+                    if response.status_code == 200:
+                        return True
+
+                try:
+                    err = response.json().get("description", "Unknown")
+                except Exception:
+                    err = response.text[:200]
+                logger.warning(f"Telegram attempt {attempt + 1} failed ({response.status_code}): {err}")
+
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"Telegram attempt {attempt + 1} error: {e}")
+
+            if attempt < 2:
+                _time.sleep(2 ** attempt)  # 1s, 2s
+
+        logger.error("Telegram send failed after 3 attempts")
+        return False
+
     def _send_telegram(
         self,
         title: str,
@@ -335,13 +393,13 @@ class AlertManager:
         priority: str
     ) -> bool:
         """
-        Send alert to Telegram.
-        
+        Send alert to Telegram with HTML formatting.
+
         Note: Retries are compute-only - no side effects emitted on retry attempts.
         """
         from pathlib import Path
         from src.core.retry_guard import is_retry_attempt, log_retry_suppression
-        
+
         token = self.config.telegram_bot_token or os.environ.get("TELEGRAM_BOT_TOKEN")
         chat_id = self.config.telegram_chat_id or os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -353,127 +411,76 @@ class AlertManager:
         if missing:
             logger.warning(f"Telegram not configured (missing {', '.join(missing)})")
             return False
-        
-        # Get GitHub workflow metadata (will be empty locally, populated in CI)
-        workflow = os.environ.get("GITHUB_WORKFLOW", "local")
+
         run_id = os.environ.get("GITHUB_RUN_ID", "N/A")
         run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "1")
-        sha = os.environ.get("GITHUB_SHA", "N/A")
-        if sha != "N/A" and len(sha) > 7:
-            sha = sha[:7]
-        
+
         # Retries re-run computation but MUST NOT emit side effects
         if is_retry_attempt():
             log_retry_suppression("Telegram alert", run_id=run_id, title=title)
-            return True  # Silent success - don't break workflow
-        
+            return True
+
         # Extract asof date from data or title if available
         asof_date = data.get("asof") if data and "asof" in data else None
         if not asof_date and data and "Date" in data:
             asof_date = data["Date"]
-        
+
         # Check for duplicate send marker file
         if asof_date and run_id != "N/A":
             outputs_dir = Path("outputs") / asof_date
             marker_file = outputs_dir / f".telegram_sent_{run_id}_{run_attempt}.txt"
-            
             if marker_file.exists():
                 logger.info(f"Telegram alert already sent for run_id={run_id}, attempt={run_attempt}. Skipping.")
-                return True  # Return True since it was already sent successfully
-        
-        emoji = {"low": "📊", "normal": "📈", "high": "🚨"}.get(priority, "📈")
-        
-        # Build message header with GitHub metadata
-        run_started_utc = datetime.utcnow().isoformat()
-        
-        header_parts = [
-            f"{emoji} {title}",
-            "",
-            "━━━━━━━━━━━━━━━━━━━━━━━",
-            f"🔍 Run Metadata:",
-            f"  workflow: {workflow}",
-            f"  run_id: {run_id}",
-            f"  attempt: {run_attempt}",
-            f"  sha: {sha}",
-            f"  run_started_utc: {run_started_utc}",
-        ]
-        
-        if asof_date:
-            header_parts.append(f"  asof: {asof_date}")
-            report_path = f"outputs/{asof_date}/report_{asof_date}.html"
-            header_parts.append(f"  report_path: {report_path}")
-        
-        header_parts.append("━━━━━━━━━━━━━━━━━━━━━━━")
-        header_parts.append("")
-        
-        # Build full message
-        text = "\n".join(header_parts) + message
-        
-        if data:
-            text += "\n\nDetails:"
-            for k, v in data.items():
-                if k not in ["asof", "Date"]:  # Skip these as they're in header
-                    text += f"\n• {k}: {v}"
-        
-        url = f"https://api.telegram.org/bot{token}/sendMessage"
-        
-        # Try without Markdown first (more reliable)
-        payload = {
-            "chat_id": chat_id,
-            "text": text,
-        }
-        
-        try:
-            logger.info(
-                "Telegram config: token_present=%s chat_id=%s run_id=%s attempt=%s",
-                bool(token),
-                chat_id if chat_id else None,
-                run_id,
-                run_attempt,
-            )
-            response = requests.post(url, json=payload, timeout=10)
-            
-            if response.status_code == 200:
-                logger.info(f"Telegram alert sent successfully: {title} (run_id={run_id}, attempt={run_attempt})")
-
-                # Forward to MAS telegram log (best-effort)
-                _forward_to_mas_log("koocore_d", text, chat_id)
-
-                # Write marker file to prevent duplicate sends
-                if asof_date and run_id != "N/A":
-                    outputs_dir = Path("outputs") / asof_date
-                    outputs_dir.mkdir(parents=True, exist_ok=True)
-                    marker_file = outputs_dir / f".telegram_sent_{run_id}_{run_attempt}.txt"
-
-                    try:
-                        with open(marker_file, "w") as f:
-                            f.write(f"Sent at: {run_started_utc}\n")
-                            f.write(f"Workflow: {workflow}\n")
-                            f.write(f"Run ID: {run_id}\n")
-                            f.write(f"Attempt: {run_attempt}\n")
-                            f.write(f"SHA: {sha}\n")
-                            f.write(f"Title: {title}\n")
-                        logger.info(f"Created marker file: {marker_file}")
-                    except Exception as e:
-                        logger.warning(f"Failed to create marker file: {e}")
-
                 return True
-            else:
-                # Log the actual error from Telegram
+
+        # Avoid repeating the same header when the formatted body already includes it.
+        normalized_message = message.lstrip()
+        text = message if normalized_message.startswith(title) else f"{title}\n\n{message}"
+
+        logger.info(
+            "Telegram config: token_present=%s chat_id=%s run_id=%s attempt=%s",
+            bool(token), chat_id, run_id, run_attempt,
+        )
+
+        # Split long messages (Telegram limit: 4096 chars)
+        MAX_LEN = 4000
+        chunks = []
+        if len(text) <= MAX_LEN:
+            chunks = [text]
+        else:
+            lines = text.split("\n")
+            chunk = ""
+            for line in lines:
+                if len(chunk) + len(line) + 1 > MAX_LEN:
+                    chunks.append(chunk)
+                    chunk = line
+                else:
+                    chunk = f"{chunk}\n{line}" if chunk else line
+            if chunk:
+                chunks.append(chunk)
+
+        success = True
+        for chunk in chunks:
+            if not self._send_telegram_message(token, chat_id, chunk):
+                success = False
+
+        if success:
+            logger.info(f"Telegram alert sent: {title} (run_id={run_id})")
+            # Forward to MAS telegram log (best-effort)
+            _forward_to_mas_log("dragon_pulse", text, chat_id)
+            # Write marker file
+            if asof_date and run_id != "N/A":
+                outputs_dir = Path("outputs") / asof_date
+                outputs_dir.mkdir(parents=True, exist_ok=True)
+                marker_file = outputs_dir / f".telegram_sent_{run_id}_{run_attempt}.txt"
                 try:
-                    error_data = response.json()
-                    error_desc = error_data.get('description', 'Unknown error')
-                    logger.error(f"Telegram API error ({response.status_code}): {error_desc}")
-                except Exception:
-                    logger.error(f"Telegram API error ({response.status_code}): {response.text[:200]}")
-                return False
-                
-        except requests.exceptions.Timeout:
-            logger.error("Telegram request timed out")
-            return False
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Telegram request failed: {e}")
-            return False
+                    with open(marker_file, "w") as f:
+                        f.write(f"Title: {title}\nRun ID: {run_id}\nAttempt: {run_attempt}\n")
+                    logger.info(f"Created marker file: {marker_file}")
+                except Exception as e:
+                    logger.warning(f"Failed to create marker file: {e}")
+
+        return success
     
     def _send_desktop(
         self,
@@ -652,6 +659,14 @@ def send_high_score_alert(
     )
 
 
+def _ticker_display(ticker: str, name: str | None = None) -> str:
+    """Format ticker with company name for readability: '贵州茅台 600519.SH'."""
+    if name:
+        short_name = name[:12]
+        return f"{short_name} {ticker}"
+    return ticker
+
+
 def send_run_summary_alert(
     date_str: str,
     weekly_count: int,
@@ -670,134 +685,131 @@ def send_run_summary_alert(
     position_alerts: Optional[dict] = None,
     regime: Optional[str] = None,
 ) -> dict[str, bool]:
-    """Send comprehensive daily scan summary - ONE message with all details."""
+    """Send comprehensive daily scan summary with HTML formatting."""
     manager = AlertManager(config)
-    
+
     all_three = overlaps.get("all_three", [])
     primary_pro30 = overlaps.get("primary_pro30", overlaps.get("weekly_pro30", []))
     primary_movers = overlaps.get("primary_movers", overlaps.get("weekly_movers", []))
     pro30_movers = overlaps.get("pro30_movers", [])
-    
-    # Ensure lists
+
     weekly_tickers = list(weekly_tickers) if weekly_tickers else []
     pro30_tickers = list(pro30_tickers) if pro30_tickers else []
     movers_tickers = list(movers_tickers) if movers_tickers else []
     weekly_top5_data = weekly_top5_data or []
     hybrid_top3 = hybrid_top3 or []
-    
-    # Build comprehensive message similar to CLI output
+
+    # Build a name lookup from available data
+    name_map: dict[str, str] = {}
+    for item in hybrid_top3:
+        t = item.get("ticker", "")
+        n = item.get("name", "")
+        if t and n:
+            name_map[t] = n
+    for item in weekly_top5_data:
+        t = item.get("ticker", "")
+        n = item.get("name", "")
+        if t and n:
+            name_map.setdefault(t, n)
+
+    regime_em = _regime_emoji(regime) if regime else ""
+    pick_count = len(hybrid_top3) if hybrid_top3 else weekly_count
+
     lines = [
-        f"{'='*35}",
-        f"SCAN COMPLETE - {date_str}",
-        f"{'='*35}",
+        f"<b>\U0001f409 Dragon Pulse \u2014 {date_str}</b>",
+        "",
     ]
+
     if regime:
-        lines.append(f"Regime: {regime}")
-    lines.append(f"Primary Strategy: {primary_label}")
-    if primary_candidates_count is not None:
-        lines.append(f"Primary Candidates: {primary_candidates_count}")
+        lines.append(f"{regime_em} Regime: <b>{regime.upper()}</b> | Picks: <b>{pick_count}</b>")
+    else:
+        lines.append(f"Picks: <b>{pick_count}</b>")
     lines.append("")
-    
-    # ═══════════════════════════════════════════════════════════════════════════════
-    # HYBRID TOP 3 (Most Important - Best across all models by weighted hit rate)
-    # ═══════════════════════════════════════════════════════════════════════════════
+
+    # Hybrid Top 3
     if hybrid_top3:
-        lines.append("🏆 HYBRID TOP 3 (Best Picks):")
+        lines.append(_section_line())
+        lines.append("\U0001f3c6 <b>Hybrid Top 3</b>")
+        lines.append("")
         for item in hybrid_top3[:3]:
             ticker = item.get("ticker", "?")
+            name = item.get("name", "") or name_map.get(ticker, "")
+            display = _ticker_display(ticker, name)
             hybrid_score = item.get("hybrid_score", 0)
             sources = ", ".join(item.get("sources", []))
-            confidence = item.get("confidence", "?")
-            name = item.get("name", "")
-            if name:
-                name = name[:20]  # Truncate for Telegram
-            
-            lines.append(f"  {item.get('rank', '?')}. {ticker} ({sources})")
-            lines.append(f"     Score: {hybrid_score:.1f} pts | {confidence}")
-        lines.append("")
+            score_bar = _bar(hybrid_score, 100, 10)
 
-    # Primary Top 5
+            lines.append(f"<b>{item.get('rank', '?')}. {display}</b>  {sources}")
+            lines.append(f"   {score_bar} {hybrid_score:.0f}/100")
+            lines.append("")
+
+    # Weekly Top 5
     if weekly_top5_data:
-        lines.append(f"⭐ {primary_label} TOP PICKS:")
+        lines.append(_section_line())
+        lines.append(f"\u2b50 <b>{primary_label} Top 5</b>")
+        lines.append("")
         for item in weekly_top5_data[:5]:
             ticker = item.get("ticker", "?")
-            score = item.get("composite_score")
-            if score is None:
-                score = item.get("swing_score", 0) or 0
+            name = item.get("name", "") or name_map.get(ticker, "")
+            display = _ticker_display(ticker, name)
+            score = item.get("composite_score") or item.get("swing_score", 0) or 0
             try:
                 score = float(score)
             except Exception:
                 score = 0.0
             verdict = item.get("verdict") or item.get("confidence", "")
-            lines.append(f"  - {ticker}: {score:.2f} {verdict}".rstrip())
+            score_bar = _bar(score, 10, 10)
+            lines.append(f"  {display}: {score_bar} {score:.1f} {verdict}".rstrip())
         lines.append("")
-    
-    # Overlaps Section
+
+    # Overlaps
     if all_three or primary_pro30 or primary_movers or pro30_movers:
-        lines.append("🎯 OVERLAPS (High Conviction):")
+        lines.append(_section_line())
+        lines.append("\U0001f3af <b>Overlaps</b>")
         if all_three:
-            lines.append(f"  ⭐ ALL THREE: {', '.join(all_three)}")
+            display_list = [_ticker_display(t, name_map.get(t)) for t in all_three]
+            lines.append(f"   \u2b50 ALL THREE: {', '.join(display_list)}")
         if primary_pro30:
             non_triple = [t for t in primary_pro30 if t not in all_three]
             if non_triple:
-                lines.append(f"  🔥 {primary_label}+Pro30: {', '.join(non_triple)}")
+                display_list = [_ticker_display(t, name_map.get(t)) for t in non_triple]
+                lines.append(f"   \U0001f525 {primary_label}+Pro30: {', '.join(display_list)}")
         if primary_movers:
             non_other = [t for t in primary_movers if t not in all_three]
             if non_other:
-                lines.append(f"  📈 {primary_label}+Movers: {', '.join(non_other)}")
+                display_list = [_ticker_display(t, name_map.get(t)) for t in non_other]
+                lines.append(f"   \U0001f4c8 {primary_label}+Movers: {', '.join(display_list)}")
         if pro30_movers:
             non_other = [t for t in pro30_movers if t not in all_three]
             if non_other:
-                lines.append(f"  💎 Pro30+Movers: {', '.join(non_other)}")
+                display_list = [_ticker_display(t, name_map.get(t)) for t in non_other]
+                lines.append(f"   \U0001f48e Pro30+Movers: {', '.join(display_list)}")
         lines.append("")
-    
+
     # Summary counts
-    lines.append("📊 SUMMARY:")
-    lines.append(f"  {primary_label}: {weekly_count} | Pro30: {pro30_count} | Movers: {movers_count}")
-    lines.append("")
-    
+    lines.append(f"\U0001f4ca {primary_label}: {weekly_count} | Pro30: {pro30_count} | Movers: {movers_count}")
+
     # Model Health
     if model_health:
         health_status = model_health.get("status", "Unknown")
-        lines.append(f"📈 MODEL: {health_status}")
-        
         hit_rate = model_health.get("hit_rate")
         win_rate = model_health.get("win_rate")
+        parts = [f"\U0001f4c8 Model: {health_status}"]
         if hit_rate is not None and win_rate is not None:
-            lines.append(f"  Hit: {hit_rate * 100:.0f}% | Win: {win_rate * 100:.0f}%")
-        
-        # Strategy breakdown (compact)
+            parts.append(f"Hit: {hit_rate * 100:.0f}% | Win: {win_rate * 100:.0f}%")
+        lines.append("  ".join(parts))
+
         strategies = model_health.get("strategies", [])
         if strategies:
-            strat_parts = []
-            for s in strategies[:3]:
-                name = s.get("name", "?")
-                s_hit = s.get("hit_rate", 0) * 100
-                strat_parts.append(f"{name}:{s_hit:.0f}%")
+            strat_parts = [f"{s.get('name', '?')}:{s.get('hit_rate', 0) * 100:.0f}%" for s in strategies[:3]]
             lines.append(f"  {' | '.join(strat_parts)}")
 
-        # Regime breakdown (compact)
-        regime_bd = model_health.get("regime_breakdown", [])
-        if regime_bd:
-            parts = []
-            for r in regime_bd:
-                name = r.get("regime", "?")
-                hr = (r.get("hit_rate") or 0) * 100
-                parts.append(f"{name}:{hr:.0f}%")
-            lines.append(f"  📊 {' | '.join(parts)}")
-        lines.append("")
-
     if position_alerts:
-        lines.append("📌 POSITION ALERTS:")
-        lines.append(f"  Total: {position_alerts.get('count', 0)} | High: {position_alerts.get('high', 0)} | Warning: {position_alerts.get('warning', 0)}")
-        samples = position_alerts.get("sample") or []
-        for msg in samples[:3]:
+        lines.append(f"\U0001f4cc Positions: {position_alerts.get('count', 0)} | High: {position_alerts.get('high', 0)} | Warn: {position_alerts.get('warning', 0)}")
+        for msg in (position_alerts.get("sample") or [])[:3]:
             lines.append(f"  - {msg}")
-        lines.append("")
-    
-    lines.append(f"{'='*35}")
-    
-    # Determine priority based on hybrid top 3 and overlaps
+
+    # Determine priority
     if all_three:
         priority = "high"
     elif hybrid_top3 and any("Pro30" in item.get("sources", []) for item in hybrid_top3):
@@ -806,17 +818,15 @@ def send_run_summary_alert(
         priority = "normal"
     else:
         priority = "low"
-    
+
+    emoji = {"\U0001f4ca": "low", "\U0001f4c8": "normal", "\U0001f6a8": "high"}.get(priority, "\U0001f4c8")
+
     message = "\n".join(lines)
-    
-    # Pass asof date for marker file creation
-    metadata = {
-        "asof": date_str,
-    }
-    
+    title = f"\U0001f409 Dragon Pulse \u2014 {date_str}"
+
     return manager.send_alert(
-        title=f"Scan Complete: {date_str} ({primary_label})",
+        title=title,
         message=message,
-        data=metadata,  # Include asof for marker file tracking
-        priority=priority
+        data={"asof": date_str},
+        priority=priority,
     )

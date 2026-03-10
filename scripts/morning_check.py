@@ -228,27 +228,47 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    # Load picks
-    if args.picks_file:
-        picks_path = Path(args.picks_file)
-    else:
-        date_str = args.date or datetime.now().strftime("%Y-%m-%d")
-        picks_path = Path("data/dragon_pulse.db")
-        # Try loading from yesterday's output
-        output_dir = Path("outputs") / date_str
-        candidates = list(output_dir.glob("*top5*.json")) + list(output_dir.glob("*picks*.json"))
-        if candidates:
-            picks_path = candidates[0]
+    # Resolve date and output directory
+    date_str = args.date or datetime.now().strftime("%Y-%m-%d")
+    output_dir = Path("outputs") / date_str
+
+    # Priority: load from execution watchlist artifact (Phase 5.3 contract)
+    watchlist_path = output_dir / f"execution_watchlist_{date_str}.json"
+    picks = None
+    if not args.picks_file and watchlist_path.exists():
+        wl_data = json.loads(watchlist_path.read_text(encoding="utf-8"))
+        picks = wl_data.get("picks", [])
+        # Map watchlist fields to morning check expected fields
+        for p in picks:
+            p.setdefault("name_cn", p.get("name", p.get("ticker", "")))
+        preflight_config = wl_data.get("preflight_config", {})
+        if preflight_config:
+            if "max_gap_up_pct" in preflight_config:
+                args.max_gap_up = preflight_config["max_gap_up_pct"]
+            if "max_gap_down_pct" in preflight_config:
+                args.max_gap_down = preflight_config["max_gap_down_pct"]
+        logger.info(f"Loaded {len(picks)} picks from execution watchlist: {watchlist_path}")
+
+    # Fallback: load picks from explicit file or glob
+    if picks is None:
+        if args.picks_file:
+            picks_path = Path(args.picks_file)
         else:
-            logger.error(f"No picks found for {date_str}")
+            picks_path = Path("data/dragon_pulse.db")
+            # Try loading from yesterday's output
+            candidates = list(output_dir.glob("*top5*.json")) + list(output_dir.glob("*picks*.json"))
+            if candidates:
+                picks_path = candidates[0]
+            else:
+                logger.error(f"No picks found for {date_str}")
+                return 1
+
+        if not picks_path.exists():
+            logger.error(f"File not found: {picks_path}")
             return 1
 
-    if not picks_path.exists():
-        logger.error(f"File not found: {picks_path}")
-        return 1
-
-    data = json.loads(picks_path.read_text(encoding="utf-8"))
-    picks = data.get("top5", data.get("picks", []))
+        data = json.loads(picks_path.read_text(encoding="utf-8"))
+        picks = data.get("top5", data.get("picks", []))
 
     if not picks:
         logger.info("No picks to validate.")
@@ -297,6 +317,77 @@ def main():
     warn_count = sum(1 for r in results if r.action == "WARN")
     cancel_count = sum(1 for r in results if r.action == "CANCEL")
     logger.info(f"\nSummary: {go_count} GO, {warn_count} WARN, {cancel_count} CANCEL")
+
+    # Save machine-readable results
+    check_output = {
+        "date": date_str,
+        "generated_utc": datetime.utcnow().isoformat(),
+        "results": [],
+    }
+    for r in results:
+        check_output["results"].append({
+            "ticker": r.ticker,
+            "name": r.name_cn,
+            "action": r.action,
+            "entry_price": r.entry_price,
+            "open_price": r.open_price,
+            "gap_pct": r.gap_pct,
+            "reasons": r.reasons,
+        })
+
+    check_file = output_dir / f"execution_check_{date_str}.json"
+    check_file.parent.mkdir(parents=True, exist_ok=True)
+    check_file.write_text(json.dumps(check_output, ensure_ascii=False, indent=2), encoding="utf-8")
+    logger.info(f"Saved execution check to {check_file}")
+
+    # Send Telegram execution alert
+    try:
+        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _section_line
+
+        alert_config = AlertConfig(enabled=True, channels=["telegram"])
+        if alert_config.telegram_bot_token and alert_config.telegram_chat_id:
+            lines = [f"<b>\U0001f3af Dragon Pulse — Execution Check {date_str}</b>", ""]
+
+            go_picks = [r for r in results if r.action == "GO"]
+            cancel_picks = [r for r in results if r.action == "CANCEL"]
+            warn_picks = [r for r in results if r.action == "WARN"]
+
+            if go_picks:
+                lines.append(f"\u2705 <b>GO ({len(go_picks)})</b>")
+                for r in go_picks:
+                    display = _ticker_display(r.ticker, r.name_cn)
+                    lines.append(f"  {display}")
+                    lines.append(f"  Entry \u00a5{r.entry_price:.2f} \u2192 Open \u00a5{r.open_price:.2f} ({r.gap_pct:+.1f}%)")
+                lines.append("")
+
+            if warn_picks:
+                lines.append(f"\u26a0\ufe0f <b>WARN ({len(warn_picks)})</b>")
+                for r in warn_picks:
+                    display = _ticker_display(r.ticker, r.name_cn)
+                    reason = r.reasons[0] if r.reasons else "elevated risk"
+                    lines.append(f"  {display} — {reason}")
+                lines.append("")
+
+            if cancel_picks:
+                lines.append(f"\u274c <b>CANCEL ({len(cancel_picks)})</b>")
+                for r in cancel_picks:
+                    display = _ticker_display(r.ticker, r.name_cn)
+                    reason = r.reasons[0] if r.reasons else "threshold breached"
+                    lines.append(f"  {display} — {reason}")
+                lines.append("")
+
+            lines.append(f"\U0001f4ca GO: {len(go_picks)} | WARN: {len(warn_picks)} | CANCEL: {len(cancel_picks)}")
+
+            mgr = AlertManager(alert_config)
+            mgr.send_alert(
+                title=f"Execution Check: {date_str}",
+                message="\n".join(lines),
+                data={"asof": date_str},
+                priority="high" if go_picks else "low",
+            )
+            logger.info("Execution alert sent to Telegram")
+    except Exception as e:
+        logger.warning(f"Failed to send execution alert: {e}")
 
     return 0
 

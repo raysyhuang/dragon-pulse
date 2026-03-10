@@ -765,8 +765,8 @@ def cmd_all(args) -> int:
             # For Pro30/Movers only picks, get basic info from packets if available
             fallback_price = float(pick.get("current_price") or 0)
             hybrid_entry.update({
-                "name": "",
-                "sector": "",
+                "name": pick.get("name") or packet_item.get("name", ""),
+                "sector": pick.get("sector") or packet_item.get("sector", ""),
                 "current_price": fallback_price,
                 "composite_score": pick["hybrid_score"],  # Use hybrid score
                 "confidence": "MEDIUM" if "Pro30" in sources else "SPECULATIVE",
@@ -840,7 +840,38 @@ def cmd_all(args) -> int:
     }
     
     save_json(hybrid_data, hybrid_file)
-    
+
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # EXECUTION WATCHLIST ARTIFACT
+    # ═══════════════════════════════════════════════════════════════════════════════
+    dp_config = config.get("dragon_pulse", {})
+    preflight_cfg = dp_config.get("preflight", {})
+    watchlist = {
+        "date": output_date_str,
+        "regime": primary_regime or "unknown",
+        "generated_utc": utc_now().isoformat(),
+        "preflight_config": {
+            "max_gap_up_pct": preflight_cfg.get("max_gap_up_pct", 3.0),
+            "max_gap_down_pct": preflight_cfg.get("max_gap_down_pct", 5.0),
+            "min_volume_ratio": preflight_cfg.get("min_volume_ratio", 0.10),
+        },
+        "picks": [],
+    }
+    for item in hybrid_top3:
+        watchlist["picks"].append({
+            "ticker": item["ticker"],
+            "name": item.get("name", ""),
+            "sources": item.get("sources", []),
+            "entry_price": item.get("current_price", 0),
+            "target_price": (item.get("target") or {}).get("target_price_for_10pct", 0),
+            "stop_price": (item.get("stop") or {}).get("stop_price_for_3pct", 0),
+            "hybrid_score": item.get("hybrid_score", 0),
+            "confidence": item.get("confidence", ""),
+        })
+    watchlist_file = output_dir / f"execution_watchlist_{output_date_str}.json"
+    save_json(watchlist, watchlist_file)
+    logger.info(f"  ✓ Execution watchlist saved to {watchlist_file}")
+
     # ═══════════════════════════════════════════════════════════════════════════════
     # CONVICTION RANKER (Self-Improving Model)
     # ═══════════════════════════════════════════════════════════════════════════════
