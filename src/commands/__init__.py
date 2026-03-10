@@ -11,27 +11,14 @@ from .movers import cmd_movers
 from .all import cmd_all
 from .performance import cmd_performance
 from .replay import cmd_replay
-from .validate import run_validation
-from .learn import (
-    cmd_learn, cmd_learn_status, cmd_learn_export,
-    cmd_learn_resolve, cmd_learn_merge, cmd_learn_analyze, cmd_learn_stats,
-)
+from .cmd_scan import cmd_scan
+from .cmd_backtest import cmd_backtest
+from .cmd_evolve import cmd_evolve
+from .cmd_calibrate import cmd_calibrate
 
 __all__ = [
-    "cmd_weekly", 
-    "cmd_pro30", 
-    "cmd_llm", 
-    "cmd_movers", 
-    "cmd_all", 
-    "cmd_performance", 
-    "cmd_replay",
-    "run_validation",
-    "cmd_learn",
-    "cmd_learn_status",
-    "cmd_learn_export",
-    "cmd_learn_resolve",
-    "cmd_learn_merge",
-    "cmd_learn_analyze",
-    "cmd_learn_stats",
+    "cmd_weekly", "cmd_pro30", "cmd_llm", "cmd_movers", "cmd_all",
+    "cmd_performance", "cmd_replay", "cmd_scan", "cmd_backtest", "cmd_evolve",
+    "cmd_calibrate",
 ]
 

@@ -1,509 +1,341 @@
-# =============================================================================
-# Momentum Trading System - Default Configuration
-# =============================================================================
-# This file contains all configurable parameters for the screening system.
-# Copy to config/custom.yaml and modify as needed.
+# Momentum Trading System v3.1 - China A-Shares Configuration
+# This is the single source of truth for all parameters
+# Optimized for China A-share market characteristics
 
-# -----------------------------------------------------------------------------
-# Universe Settings
-# -----------------------------------------------------------------------------
+market:
+  region: "CN"               # Options: "US", "CN"
+  timezone: "Asia/Shanghai"  # Trading timezone for outputs/calendars
+  close_hour_local: 15       # Local market close hour (A-shares close at 15:00)
+  close_minute_local: 0
+
+data:
+  provider: "AUTO"           # AUTO selects by market
+  china:
+    primary: "akshare"       # Primary data source
+    backup: "tushare"        # Backup if AkShare fails
+    adjust: "qfq"            # qfq (前复权) recommended for technical analysis
+    tushare_token_env: "TUSHARE_TOKEN"
+  us:
+    provider: "yahoo"
+
 universe:
-  # Mode options: "SP500", "SP500+NASDAQ100", "SP500+NASDAQ100+R2000"
-  mode: "SP500+NASDAQ100+R2000"
-  
-  # Cache settings for universe tickers
-  cache_file: "universe_cache.csv"
+  mode: "CHINA_A"  # Options: "CHINA_A", "SP500", "SP500+NASDAQ100", "SP500+NASDAQ100+R2000"
+  cache_file: "universe_cache_CHINA_A.csv"
   cache_max_age_days: 7
-  
-  # Manual ticker files (one ticker per line, # for comments)
   manual_include_file: "tickers/manual_include_tickers.txt"
   r2000_include_file: "tickers/r2000.txt"
-  
-  # "ALWAYS" = always add manual tickers
-  # "ONLY_IF_IN_UNIVERSE" = only add if ticker exists in base universe
-  manual_include_mode: "ALWAYS"
+  manual_include_mode: "ALWAYS"  # Options: "ALWAYS", "ONLY_IF_IN_UNIVERSE"
+  china_board_filters: []  # Optional: ["SSE", "SZSE"] or leave empty for all
+  # ST stock handling
+  exclude_st: true           # Exclude ST and *ST stocks (higher risk)
+  exclude_delisting_warning: true  # Exclude stocks with delisting warnings
 
-# -----------------------------------------------------------------------------
-# Liquidity Filters (Hard Gates - Must Pass)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# LIQUIDITY FILTERS - Adjusted for China A-share market
+# =============================================================================
+# Note: A-shares typically have higher average volumes than US small caps
+# CNY values (not USD)
 liquidity:
-  # Minimum stock price (excludes penny stocks)
-  price_min: 5.0
-  
-  # Minimum 20-day average dollar volume (USD)
-  # 30M = liquid enough for retail; widened from 75M to increase candidate pool
-  min_avg_dollar_volume_20d: 30_000_000
-  
-  # Maximum 5-day return (exclude already-exploded names)
-  # 0.15 = 15%
-  max_5d_return: 0.15
+  min_price: 5.0             # CNY - avoid penny stocks (≤5 CNY often speculative)
+  min_avg_dollar_volume_20d: 50000000  # 50M CNY - institutional-grade liquidity
+  min_avg_volume: 1000000    # 1M shares minimum
+  max_5d_return: 0.25        # 25% max 5-day return (adjusted for 10% daily limit)
+  # A-shares have 10% daily limit, so 20%+ in 5 days = already hot
 
-# -----------------------------------------------------------------------------
-# Technical Settings
-# -----------------------------------------------------------------------------
-technicals:
-  # Lookback period for historical data (days)
-  lookback_days: 300
-  
-  # Minimum price for quality filter
-  price_min: 8.0
-
-# -----------------------------------------------------------------------------
-# Weekly Scanner Quality Filters (OPTIMIZED Jan 2026)
-# -----------------------------------------------------------------------------
-# INSIGHT: Composite ≥5.5 has 66.7% hit rate vs 32% for 5.0-5.5
-# INSIGHT: Rank 1=38% hit, Rank 2=29%, Ranks 3-5 underperform
-quality_filters_weekly:
-  # Minimum technical score (0-10) to pass screening
-  # Lowered from 6.5 to widen funnel — 5.5 still filters bottom half
-  min_technical_score: 5.5
-  
-  # Minimum composite score for final ranking
-  # RAISED from 5.25 - composite ≥5.5 has 2x hit rate
-  min_composite_score: 5.5
-  
-  # Weekly rank filtering - allow Rank 3 for convergence opportunities
-  # Rank 1=38% hit, Rank 2=29%, Rank 3 still has value for cross-engine overlap
-  top_ranks_only: 3
-  
-  # Prefer Rank 1 picks (has 38% hit rate vs 27.6% avg)
-  prefer_rank_1: true
-
-# -----------------------------------------------------------------------------
-# Regime Overrides (bear market adjustments)
-# -----------------------------------------------------------------------------
-# When SPY is below its 50-day SMA, the system shifts to favor reversals
-# over momentum/breakout setups.
-regime_overrides:
-  bear:
-    # Boost reversal setup bonus (default is 3.0)
-    reversal_setup_bonus: 6.0
-    # Penalize breakout setup bonus (default is 4.0)
-    breakout_setup_bonus: 2.0
-    # Widen weekly funnel for reversals (default is 5.5)
-    weekly_min_technical_score: 5.0
-
-# -----------------------------------------------------------------------------
-# Swing Strategy (5-10 trading day horizon) - NEW
-# -----------------------------------------------------------------------------
-swing_strategy:
-  enabled: true
-  # Use Swing as the primary source for LLM ranking + hybrid analysis
-  use_as_primary: false
-  top_n: 25
-  min_final_score: 5.3
-  block_near_earnings: true
-  earnings_block_days: 3
-  # Optional gates (only applied if calibration model exists)
-  min_prob_hit: 0.30
-  min_expected_value: 0.25
-  risk_on:
-    min_breakout_score: 5.8
-    min_rsi: 52.0
-    max_rsi: 78.0
-    min_vol_ratio: 1.2
-    max_dist_52w_high_pct: 10.0
-  chop:
-    pullback_band_pct: 3.5
-    min_rsi: 38.0
-    max_rsi: 58.0
-    max_vol_ratio: 1.3
-    max_dist_52w_high_pct: 18.0
-    require_ma200: true
-  stress:
-    allow: false
-    min_breakout_score: 8.0
-    min_rsi: 58.0
-  persistence:
-    enabled: true
-    lookback_days: 4
-    min_hits: 1
-    min_score_improve: 0.1
-    allow_new: true
-    min_score_new: 6.2
-    max_days: 30
-    file: "data/signal_history.json"
-
-# -----------------------------------------------------------------------------
-# 30-Day Screener Quality Filters  
-# -----------------------------------------------------------------------------
-# NOTE: Pro30 has 21% hit rate vs Weekly's 9% - prioritize Pro30 picks!
-quality_filters_30d:
-  # Relative volume minimum (today's volume / 20d average)
-  # Lowered from 1.8 — still above average, widens candidate pool
-  rvol_min: 1.3
-
-  # ATR as percentage of price minimum
-  # Lowered from 3.5 — includes moderate-volatility names
-  atr_pct_min: 2.5
-  
-  # Maximum distance from 52W high for breakout setups (%)
-  near_high_max_pct: 10.0
-  
-  # RSI thresholds
-  rsi_reversal_max: 35.0
-  breakout_rsi_min: 50.0
-  reversal_rsi_max: 35.0
-  
-  # Reversal: minimum distance to 52W high (%)
-  reversal_dist_to_high_min_pct: 12.0
-  
-  # Minimum composite score (backtest-calibrated)
-  # Keeping at 0 since Pro30 already performs well
-  min_score: 0.0
-
-# -----------------------------------------------------------------------------
-# 30-Day Output Controls
-# -----------------------------------------------------------------------------
-outputs_30d:
-  top_n_breakout: 15
-  top_n_reversal: 15
-  top_n_total: 25
-
-# -----------------------------------------------------------------------------
-# Attention Pool Settings (Dynamic Universe Filter)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# ATTENTION POOL - Dynamic universe filter
+# =============================================================================
 attention_pool:
-  # Minimum relative volume to enter attention pool
-  # Lowered from 1.8 — biggest bottleneck, 1.3 still above average
-  rvol_min: 1.3
-
-  # Minimum ATR% to enter attention pool
-  # Lowered from 3.5 — widens to include moderate-volatility names
-  atr_pct_min: 2.5
-
-  # Minimum absolute day move (%)
-  # Lowered from 3.0 — 1.5% daily move still meaningful, 3% was very aggressive
-  min_abs_day_move_pct: 1.5
-  
-  # Lookback for attention pool calculation
+  enabled: true  # Only for 30D screener
+  rvol_min: 1.5              # Lower than US (A-shares have natural volume spikes)
+  atr_pct_min: 2.5           # ATR% tends to be lower due to limit-up/down
+  min_abs_day_move_pct: 2.0  # 2% move is significant for A-shares
   lookback_days: 120
-  
-  # Batch size for processing
-  chunk_size: 200
-  
-  # Intraday mode settings
-  enable_intraday: false
+  chunk_size: 300            # Larger chunks for A-share universe (5000+ stocks)
+  enable_intraday: false     # Intraday not available for A-shares via AkShare
   intraday_interval: "5m"
   intraday_lookback_days: 5
   market_open_buffer_min: 20
   intraday_rvol_min: 2.0
 
-# -----------------------------------------------------------------------------
-# Regime Gate (Market Conditions Check)
-# -----------------------------------------------------------------------------
+# =============================================================================
+# TECHNICAL SETTINGS
+# =============================================================================
+technicals:
+  rsi_period: 14
+  ma_windows: [10, 20, 50]
+  atr_period: 14
+  lookback_days: 300         # For 52W high + MA50
+  realized_vol_window: 5
+  realized_vol_threshold_ann_pct: 25.0  # Annualized vol threshold (20% too easy for A-shares)
+  price_min: 8.0             # CNY - For 30D screener (higher quality)
+
+# =============================================================================
+# 30-DAY SCREENER QUALITY FILTERS - Adjusted for A-shares
+# =============================================================================
+quality_filters_30d:
+  rvol_min: 1.5              # Lower threshold (A-shares naturally volatile)
+  atr_pct_min: 2.5           # Lower (10% limit constrains volatility)
+  near_high_max_pct: 10.0    # Within 10% of 52W high for breakouts
+  rsi_reversal_max: 35.0
+  breakout_rsi_min: 50.0     # Lower threshold (momentum starts earlier)
+  reversal_dist_to_high_min_pct: 15.0
+  reversal_rsi_max: 35.0
+  # Backtest-calibrated minimum score
+  min_score: 20.0            # Lower threshold for initial screening
+
+# =============================================================================
+# WEEKLY SCANNER QUALITY FILTERS
+# =============================================================================
+quality_filters_weekly:
+  # Technical scoring threshold (raised from 6.0 for higher signal quality)
+  min_technical_score: 7.0
+  # Composite score threshold (after LLM analysis) — enforced post-LLM
+  min_composite_score: 6.5
+  # Reject SPECULATIVE confidence picks from final top5
+  min_confidence: "MEDIUM"       # Options: "HIGH", "MEDIUM", "SPECULATIVE"
+
+# =============================================================================
+# OUTPUT CONTROLS
+# =============================================================================
+outputs_30d:
+  top_n_breakout: 20         # More candidates (larger universe)
+  top_n_reversal: 20
+  top_n_total: 30
+
+# =============================================================================
+# REGIME GATE - Market conditions check
+# =============================================================================
+# Uses CSI 300 as the benchmark index for A-shares
 regime_gate:
   enabled: true
-  spy_symbol: "SPY"
-  vix_symbol: "^VIX"
+  spy_symbol: "000300.SH"    # CSI 300 Index (沪深300)
+  vix_symbol: ""             # No VIX equivalent for A-shares (leave blank)
   spy_ma_days: 20
-  vix_max: 25.0
-  # "WARN" = log warning but continue, "BLOCK" = stop if regime is bad
-  action: "WARN"
+  vix_max: 30.0              # Not used for CN
+  action: "BLOCK"             # Options: "WARN", "BLOCK" — changed from WARN to prevent picks in downtrends
 
-# -----------------------------------------------------------------------------
-# News Settings
-# -----------------------------------------------------------------------------
+# =============================================================================
+# NEWS SETTINGS
+# =============================================================================
 news:
-  # Maximum headlines to fetch per ticker
-  max_items: 25
-  
-  # Headlines to include in LLM packets
-  packet_headlines: 12
-  
-  # Throttle between API calls (seconds)
-  throttle_sec: 0.15
+  max_items: 30              # More items for CN (news is important driver)
+  packet_headlines: 15       # Include more headlines in packets
+  throttle_sec: 0.2          # Slightly longer throttle for AkShare
 
-# -----------------------------------------------------------------------------
-# Feature Flags (Options & Sentiment Data)
-# -----------------------------------------------------------------------------
-features:
-  # Fetch options data from Polygon API (requires POLYGON_API_KEY)
-  # Options data enhances scoring with call/put ratios, IV, unusual activity
-  fetch_options: true
-  
-  # Fetch sentiment data from StockTwits, Reddit, Polygon News
-  # Sentiment data enhances scoring with social media buzz and news tone
-  fetch_sentiment: true
-  
-  # Use enhanced sentiment (Adanos for Twitter, FMP for news/earnings)
-  # Requires ADANOS_API_KEY and/or FMP_API_KEY in .env
-  # If false, uses basic sentiment (StockTwits, Reddit, Polygon only)
-  use_enhanced_sentiment: true
-
-# -----------------------------------------------------------------------------
-# Risk Management Settings (OPTIMIZED Jan 2026)
-# -----------------------------------------------------------------------------
-# INSIGHT: Winners avg -2.2% drawdown, losers avg -5.4%
-# INSIGHT: Stocks dropping >5% early have only 17% hit rate
-# INSIGHT: Avg max return = 8.8%, but avg exit = 3.2% (leaving money on table)
-risk_management:
-  # TIGHTENED from -7.0 based on drawdown analysis
-  # Stocks with <5% drawdown have 30-50% hit rate
-  suggested_stop_loss_pct: -6.0
-  
-  # TIGHTENED from -5.0 for earlier warning
-  warning_drawdown_pct: -4.0
-  
-  # Profit target based on avg winner return (keep at 7%)
-  suggested_profit_target_pct: 7.0
-  
-  # Holding period (days) - 7d optimal from hit rate matrix
-  default_holding_days: 7
-  
-  # NEW: Trailing stop to capture more upside
-  # Data shows avg max = 8.8% but avg exit = 3.2%
-  trailing_stop:
-    enabled: true
-    trigger_pct: 5.0       # Activate trailing stop after +5% gain
-    distance_pct: 3.0      # Trail by 3% from high
-  
-  # NEW: Source-specific stops (Pro30 has higher volatility but higher hit rate)
-  source_specific_stops:
-    pro30_stop_pct: -7.0   # Wider stop (higher vol, higher hit rate)
-    weekly_stop_pct: -6.0  # Standard stop
-    movers_stop_pct: -5.0  # Tighter stop (worst historical performance)
-
-# -----------------------------------------------------------------------------
-# Daily Movers Settings (DISABLED - Poor Performance)
-# -----------------------------------------------------------------------------
-# WARNING: Movers have 0% hit rate in backtest (n=2, but still concerning)
-# RECOMMENDATION: Keep disabled until more data shows improvement
-# Can re-enable for research/watchlist purposes only
+# =============================================================================
+# DAILY MOVERS - Disabled by default (use Dragon Tiger List instead)
+# =============================================================================
 movers:
-  enabled: false  # DISABLED based on 0% historical hit rate
+  enabled: false             # Recommend using Dragon Tiger List instead
   top_n: 50
-  
-  # Percentage range for gainers [min, max]
-  gainers_pct_range: [7.0, 15.0]
-  
-  # Percentage range for losers [min, max] (negative values)
-  losers_pct_range: [-15.0, -7.0]
-  
-  # Volume spike requirements
-  gainers_volume_spike: 2.0
-  losers_volume_spike: 1.8
-  
-  # Close position in daily range (0.75 = top 25% of range)
-  close_position_min: 0.75
-  
-  # Additional filters
-  price_min: 2.0
-  adv_20d_min: 50_000_000
-  
-  # Cooling period (days before eligible)
+  gainers_pct_range: [0.05, 0.10]  # 5-10% (respect daily limits)
+  losers_pct_range: [-0.10, -0.05]
+  gainers_volume_spike: 1.5  # Lower threshold for A-shares
+  losers_volume_spike: 1.5
+  close_position_min: 0.70
+  price_min: 5.0
+  adv_20d_min: 50000000      # 50M CNY
   cooling_days_required: 1
   max_age_days: 5
-  
-  # NEW: Momentum/Reversal Analysis Settings
-  # Gainers: Look for momentum continuation opportunities
-  # Losers: Look for reversal opportunities
-  momentum_analysis:
-    enabled: true
-    # Minimum momentum score to include (0-10 scale)
-    min_momentum_score: 3
-    # For gainers: RSI threshold above which to flag as overbought
-    gainer_rsi_overbought: 70
-    # For losers: RSI threshold below which to flag as oversold (reversal candidate)
-    loser_rsi_oversold: 30
-    # Volume ratio threshold for "institutional interest"
-    volume_ratio_bullish: 2.0
-    # Volume ratio threshold for "capitulation" in losers
-    volume_ratio_capitulation: 3.0
 
-# -----------------------------------------------------------------------------
-# Hybrid Analysis Weighting (OPTIMIZED Jan 2026)
-# -----------------------------------------------------------------------------
-# BACKTEST DATA:
-# - Pro30: 50% hit rate (+10% in 7d), 68.8% hit rate (+5%)
-# - Weekly Rank 1: 38% hit rate | Rank 2: 29% | Ranks 3-5: <20%
-# - Movers: 0% hit rate (disabled)
-# FORMULA: weight ∝ log(hit_rate / base_rate) * consistency
-hybrid_weighting:
-  # INCREASED from 2.0 - Pro30 has best hit rate (50%)
-  pro30_weight: 2.2
-  
-  # NEW: Swing strategy weights (primary)
-  swing_weight: 1.2
-  swing_rank1_bonus: 0.6
-  swing_rank2_bonus: 0.3
-  
-  # DECREASED from 1.0 - Weekly overall underperforms Pro30
-  weekly_weight: 0.8
-  
-  # INCREASED from 0.5 - Rank 1 significantly outperforms (38% vs 27%)
-  weekly_rank1_bonus: 0.8
-  
-  # NEW: Rank 2 bonus (29% hit rate, still above average)
-  weekly_rank2_bonus: 0.3
-  
-  # ZEROED - Movers have 0% historical hit rate
-  movers_weight: 0.0
-  
-  # INCREASED overlap bonuses - confluence is highest conviction
-  all_three_overlap_bonus: 3.5
-  weekly_pro30_overlap_bonus: 2.0
-
-# -----------------------------------------------------------------------------
-# FMP Fundamentals Enrichment
-# -----------------------------------------------------------------------------
-fmp_fundamentals:
-  # Enable FMP fundamentals in weekly scanner packets (requires FMP_API_KEY)
+# =============================================================================
+# DRAGON TIGER LIST (龙虎榜) - Replaces options flow for A-shares
+# =============================================================================
+dragon_tiger:
   enabled: true
-  # Max tickers per run to avoid exceeding daily API budget
-  max_tickers: 25
+  min_flow_score: 5.0        # Minimum score to consider
+  min_net_buy_cny: 20000000  # 20M CNY minimum net institutional buy (raised from 10M)
+  top_n: 20
+  lookback_days: 5           # Days of Dragon Tiger data to analyze
 
-# -----------------------------------------------------------------------------
-# Data Provider Settings
-# -----------------------------------------------------------------------------
-runtime:
-  # Method version for tracking
-  # v3.2: Optimized weights, tighter filters, trailing stops (Jan 2026)
-  method_version: "v3.2"
-  
-  # yfinance settings
-  yf_auto_adjust: false
-  threads: true
-  
-  # Polygon.io settings (requires POLYGON_API_KEY env var)
-  polygon_primary: true
-  polygon_fallback: true
-  polygon_max_workers: 8
-  polygon_intraday: false
-  polygon_intraday_interval: 5
-  polygon_intraday_lookback_days: 5
-  
-  # Corporate actions
-  block_recent_splits: true
-  split_block_days: 7
-  split_lookback_days: 120
-  
-  # Allow partial day data during market hours
-  allow_partial_day_attention: false
+# =============================================================================
+# SECTOR ROTATION
+# =============================================================================
+sector_rotation:
+  enabled: true
+  top_n_sectors: 5           # Number of hot sectors to track
+  stocks_per_sector: 5       # Leaders per sector
+  min_sector_score: 6.0      # Minimum sector momentum score
 
-# -----------------------------------------------------------------------------
-# Output Settings
-# -----------------------------------------------------------------------------
+# =============================================================================
+# SENTIMENT (Chinese platforms)
+# =============================================================================
+sentiment_cn:
+  enabled: true
+  platforms:
+    - eastmoney_guba         # 东方财富股吧
+    - hot_rank               # 人气榜
+  min_sentiment_score: 4.0   # Minimum to consider
+
+# =============================================================================
+# OUTPUT SETTINGS
+# =============================================================================
 outputs:
   root_dir: "outputs"
+  dated_subdir: true
 
-# -----------------------------------------------------------------------------
-# Alerts Settings (NEW)
-# -----------------------------------------------------------------------------
-alerts:
-  enabled: true
-  # Channels: telegram, desktop, file, email, slack, discord
-  channels: ["telegram", "desktop", "file"]
-  # Send only one consolidated message per run
-  single_message_only: true
+# =============================================================================
+# RUNTIME SETTINGS
+# =============================================================================
+runtime:
+  threads: true
+  yf_auto_adjust: false
+  method_version: "v3.2-CN"
   
-  # Telegram settings (or set via TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID env vars)
-  telegram:
-    bot_token: null   # Get from @BotFather on Telegram
-    chat_id: null     # Get from @userinfobot or similar
-  
-  # Slack webhook URL (set via SLACK_WEBHOOK_URL env var)
-  slack_webhook: null
-  
-  # Discord webhook URL (set via DISCORD_WEBHOOK_URL env var)
-  discord_webhook: null
-  
-  # Email settings
-  email:
-    smtp_host: "smtp.gmail.com"
-    smtp_port: 587
-    from_address: null
-    to_addresses: []
-  
-  # Alert triggers
-  triggers:
-    all_three_overlap: true
-    weekly_pro30_overlap: true
-    high_composite_score: 7.0
-  
-  # Position alerts (drawdown warnings, profit targets, etc.)
-  # Set to false to disable individual position alerts while keeping scan summary
-  position_alerts_enabled: false
+  # China-specific settings
+  china_trading_days: true   # Use CN trading calendar
+  exclude_suspended: true    # Exclude suspended stocks
 
-# -----------------------------------------------------------------------------
-# Cache Settings
-# -----------------------------------------------------------------------------
-# Price data is cached for reproducible backtests and reduced API calls.
-# Historical data (>3 days old) uses longer TTL since prices don't change.
+# =============================================================================
+# CACHE SETTINGS (optional performance optimization)
+# =============================================================================
 cache:
   enabled: true
-  backend: "sqlite"  # sqlite, redis
-  
-  # SQLite cache file
+  backend: "sqlite"          # sqlite or redis
   sqlite_path: "data/price_cache.db"
-  
-  # Redis settings (if using redis backend)
   redis_url: "redis://localhost:6379/0"
-  
-  # Cache TTL (time-to-live) in seconds
-  price_ttl_seconds: 3600        # 1 hour for live/recent data
-  historical_ttl_seconds: 2592000  # 30 days for historical data (it's immutable)
-  news_ttl_seconds: 1800         # 30 minutes
+  price_ttl_seconds: 3600    # 1 hour
+  news_ttl_seconds: 1800     # 30 minutes
 
-# -----------------------------------------------------------------------------
-# Data Reliability (Quarantine + Retries)
-# -----------------------------------------------------------------------------
-data_reliability:
-  quarantine:
-    enabled: true
-    days: 7
-    file: "data/bad_tickers.json"
-  yfinance:
-    max_retries: 4
-    backoff_sec: 1.0
-  polygon:
-    max_retries: 3
-    backoff_sec: 0.75
-
-# -----------------------------------------------------------------------------
-# API Settings (NEW - for dashboard)
-# -----------------------------------------------------------------------------
-api:
+# =============================================================================
+# ALERTS (optional)
+# =============================================================================
+alerts:
   enabled: false
-  host: "0.0.0.0"
-  port: 8000
-  cors_origins: ["http://localhost:3000"]
+  channels: ["file"]         # Options: telegram, desktop, file
+  triggers:
+    high_composite_score: 7.0
+    dragon_tiger_signal: true
+    sector_rotation_leader: true
 
-# -----------------------------------------------------------------------------
-# Phase 3/4 Overlays (Disabled by Default)
-# -----------------------------------------------------------------------------
-phase3:
-  enabled: false
-  movers_filters:
-    enabled: false
-    min_price: 5
-    rsi_min: 45
-    rsi_max: 70
-    atr_pct_max: 0.08
+# =============================================================================
+# DRAGON PULSE (龙脉) - High Win-Rate Multi-Lens Strategy
+# =============================================================================
+dragon_pulse:
+  enabled: true
+  max_daily_picks: 2
+  min_composite_score: 45.0
+  universe_mode: "CHINA_A"
 
-phase4:
-  enabled: false
-  conviction:
-    enabled: false
-  sizing:
-    enabled: false
+  # Regime settings
+  regime:
+    csi300_symbol: "000300"     # CSI 300 index code for AkShare
+    sma_short: 20
+    sma_long: 50
+    bull_sizing: 1.0
+    caution_sizing: 0.6
+    bear_sizing: 0.3
+    bear_action: "WARN"         # "WARN" or "BLOCK"
+    breadth_bullish: 0.60       # % above SMA20 threshold
+    breadth_bearish: 0.30
+    northbound_flow_threshold_cny: -5000000000  # -5B CNY = heavy selling
 
-phase5:
-  enabled: false
-  persist: false
-  summarize: false
+  # Confluence weights
+  confluence:
+    w_lens_a: 0.40
+    w_lens_b: 0.35
+    w_lens_c: 0.25
+    threshold_a: 50.0
+    threshold_b: 50.0
+    high_threshold: 70.0
+    require_dtl_for_breakout: true  # Phase 2: breakout-dominant signals need Dragon Tiger confirmation
 
-phase6:
-  enabled: false
-  data_source: "outcomes_db"
-  min_observations: 20
-  bayesian_prior_weight: 0.3
-  bayesian_prior_hit_rate: 0.25
-  auto_analyze: false
-  auto_apply: false
-  recommendations:
-    output_path: "outputs/phase6/recommendations.json"
-    backup_dir: "outputs/phase6/backups"
-    source_bonus_min: -1.5
-    source_bonus_max: 3.0
-    min_source_samples: 5
+  # Lens A: Institutional Pullback
+  lens_a:
+    high_lookback: 20
+    high_recency: 10
+    pullback_min_pct: 5.0
+    pullback_max_pct: 12.0
+    rsi2_max: 20.0
+    sma_period: 50
+    vol_decline_max: 0.8
+    target_pct: 5.0
+    stop_pct: 3.0
+    trailing_trigger_pct: 2.5
+    max_hold_days: 5
+    w_rsi_depth: 0.30
+    w_pullback_mag: 0.20
+    w_vol_decline: 0.15
+    w_sma_margin: 0.15
+    w_institutional: 0.20
+
+  # Lens B: Volume Breakout
+  lens_b:
+    bb_period: 20
+    bb_width_pctl_max: 20.0
+    volume_expansion_min: 2.0
+    bb_position_min: 1.0
+    rsi14_min: 50.0
+    rsi14_max: 70.0
+    atr_pct_min: 2.0
+    target_pct: 5.0
+    stop_pct: 3.5
+    trailing_trigger_pct: 3.0
+    max_hold_days: 5
+    w_volume: 0.30
+    w_squeeze: 0.20
+    w_trend: 0.20
+    w_rsi: 0.15
+    w_sector: 0.15
+
+  # Lens C: Limit-Up Seal
+  lens_c:
+    limit_pct: 9.5
+    dtl_min_net_buy_cny: 10000000
+    max_consecutive_limits: 1
+    min_adv_20d_cny: 50000000
+    target_pct: 3.0
+    stop_pct: 5.0
+    max_hold_days: 2
+    position_size_mult: 0.5
+    w_inst_magnitude: 0.35
+    w_seal_quality: 0.25
+    w_sector: 0.20
+    w_volume: 0.20
+
+  # Risk Parity Sizing (volatility-adjusted position sizes)
+  risk_parity:
+    target_atr_pct: 3.0          # "Normal" ATR% — stocks with higher ATR get smaller positions
+    max_sector_positions: 2      # Max picks in same sector before penalty
+    sector_excess_penalty: 0.5   # 50% size for excess sector positions
+
+  # Pre-market gap validation thresholds
+  preflight:
+    max_gap_up_pct: 3.0          # Cancel if opening gap > +3%
+    max_gap_down_pct: 5.0        # Cancel if opening gap < -5%
+    min_volume_ratio: 0.10       # First 15-min volume should be >10% of prev day
+
+  # Dead Money Time Stop (exit if no movement within N days)
+  dead_money_days: 3           # Exit after 3 trading days if pick hasn't moved
+  dead_money_min_pct: 2.0      # Minimum +2% high-water-mark required to stay
+
+  # Capital Guardian
+  guardian:
+    max_drawdown_pct: 15.0
+    streak_reduction_after: 2
+    halt_after_consecutive_losses: 5
+    max_portfolio_heat_pct: 10.0
+    halt_portfolio_heat_pct: 15.0
+    max_open_positions: 4
+    per_trade_risk_cap_pct: 2.0
+
+  # Database
+  db_path: "data/dragon_pulse.db"
+
+# =============================================================================
+# EVOLUTION ENGINE
+# =============================================================================
+evolution:
+  population_size: 10
+  generations: 5
+  elite_count: 2
+  mutation_rate: 0.1
+  tournament_size: 3
+  train_months: 6
+  test_months: 1
+  min_win_rate: 0.50
+  min_trades: 10
+  max_drawdown: 25.0
+  parallel_workers: 4
+  backtest_universe_size: 300
