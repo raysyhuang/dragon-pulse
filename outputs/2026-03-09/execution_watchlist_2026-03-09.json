@@ -1,0 +1,48 @@
+{
+  "date": "2026-03-09",
+  "regime": "stress",
+  "generated_utc": "2026-03-10T11:51:33.706011+00:00",
+  "preflight_config": {
+    "max_gap_up_pct": 3.0,
+    "max_gap_down_pct": 5.0,
+    "min_volume_ratio": 0.1
+  },
+  "picks": [
+    {
+      "ticker": "UAL",
+      "name": "",
+      "sources": [
+        "Pro30(r1)"
+      ],
+      "entry_price": 94.52,
+      "target_price": 103.97,
+      "stop_price": 89.79,
+      "hybrid_score": 3.0,
+      "confidence": "SPECULATIVE"
+    },
+    {
+      "ticker": "CCL",
+      "name": "",
+      "sources": [
+        "Pro30(r2)"
+      ],
+      "entry_price": 26.39,
+      "target_price": 29.03,
+      "stop_price": 25.07,
+      "hybrid_score": 2.95,
+      "confidence": "SPECULATIVE"
+    },
+    {
+      "ticker": "DAL",
+      "name": "",
+      "sources": [
+        "Pro30(r3)"
+      ],
+      "entry_price": 60.58,
+      "target_price": 66.64,
+      "stop_price": 57.55,
+      "hybrid_score": 2.9,
+      "confidence": "SPECULATIVE"
+    }
+  ]
+}

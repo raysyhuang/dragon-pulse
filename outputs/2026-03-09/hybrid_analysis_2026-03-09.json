@@ -1,0 +1,163 @@
+{
+  "date": "2026-03-09",
+  "asof_trading_date": "2026-03-09",
+  "summary": {
+    "primary_top5_count": 0,
+    "weekly_top5_count": 0,
+    "pro30_candidates_count": 7,
+    "movers_count": 0,
+    "hybrid_top3_count": 3
+  },
+  "overlaps": {
+    "all_three": [],
+    "primary_pro30": [],
+    "primary_movers": [],
+    "pro30_movers": [],
+    "weekly_pro30": [],
+    "weekly_movers": []
+  },
+  "hybrid_top3": [
+    {
+      "ticker": "UAL",
+      "hybrid_score": 3.0,
+      "sources": [
+        "Pro30(r1)"
+      ],
+      "rank": 1,
+      "name": "",
+      "sector": "",
+      "current_price": 94.52,
+      "composite_score": 3.0,
+      "confidence": "SPECULATIVE",
+      "target": {
+        "target_price_for_10pct": 103.97
+      },
+      "stop": {
+        "stop_price_for_3pct": 89.79
+      }
+    },
+    {
+      "ticker": "CCL",
+      "hybrid_score": 2.95,
+      "sources": [
+        "Pro30(r2)"
+      ],
+      "rank": 2,
+      "name": "",
+      "sector": "",
+      "current_price": 26.39,
+      "composite_score": 2.95,
+      "confidence": "SPECULATIVE",
+      "target": {
+        "target_price_for_10pct": 29.03
+      },
+      "stop": {
+        "stop_price_for_3pct": 25.07
+      }
+    },
+    {
+      "ticker": "DAL",
+      "hybrid_score": 2.9,
+      "sources": [
+        "Pro30(r3)"
+      ],
+      "rank": 3,
+      "name": "",
+      "sector": "",
+      "current_price": 60.58,
+      "composite_score": 2.9,
+      "confidence": "SPECULATIVE",
+      "target": {
+        "target_price_for_10pct": 66.64
+      },
+      "stop": {
+        "stop_price_for_3pct": 57.55
+      }
+    }
+  ],
+  "weighted_picks": [
+    {
+      "ticker": "UAL",
+      "hybrid_score": 3.0,
+      "sources": [
+        "Pro30(r1)"
+      ],
+      "current_price": 94.52,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "CCL",
+      "hybrid_score": 2.95,
+      "sources": [
+        "Pro30(r2)"
+      ],
+      "current_price": 26.39,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "DAL",
+      "hybrid_score": 2.9,
+      "sources": [
+        "Pro30(r3)"
+      ],
+      "current_price": 60.58,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "RCL",
+      "hybrid_score": 2.85,
+      "sources": [
+        "Pro30(r4)"
+      ],
+      "current_price": 290.55,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "IP",
+      "hybrid_score": 2.8,
+      "sources": [
+        "Pro30(r5)"
+      ],
+      "current_price": 38.39,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "CF",
+      "hybrid_score": 2.75,
+      "sources": [
+        "Pro30(r6)"
+      ],
+      "current_price": 111.04,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    },
+    {
+      "ticker": "DOW",
+      "hybrid_score": 2.7,
+      "sources": [
+        "Pro30(r7)"
+      ],
+      "current_price": 34.31,
+      "in_all_three": false,
+      "in_primary_pro30": false
+    }
+  ],
+  "weighting_note": "Primary=Weekly, Pro30, Movers, overlaps (configurable)",
+  "primary_label": "Weekly",
+  "primary_top5": [],
+  "pro30_tickers": [
+    "CCL",
+    "CF",
+    "DAL",
+    "DOW",
+    "IP",
+    "RCL",
+    "UAL"
+  ],
+  "movers_tickers": []
+}
