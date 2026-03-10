@@ -1,7 +1,7 @@
 import logging
 from dataclasses import dataclass, field
 from typing import List, Optional
-from strategy.base import StrategySignal, PickCandidate
+from src.strategy.base import StrategySignal, PickCandidate
 
 logger = logging.getLogger(__name__)
 

@@ -20,18 +20,18 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict
 
-from core.config import load_config, get_config_value
-from core.universe import build_universe
-from core.cn_data import download_daily_range, get_cn_basic_info
-from core.technicals import compute_extended_technicals
-from core.display import format_ticker, load_name_cache
-from strategy.lens_a_pullback import LensAPullback
-from strategy.lens_b_breakout import LensBBreakout
-from strategy.lens_c_limitup import LensCLimitUp
-from strategy.confluence import ConfluenceConfig, run_confluence
-from strategy.regime import classify_regime, RegimeAssessment
-from risk.capital_guardian import compute_guardian_verdict, GuardianVerdict
-from tracking.pick_store import init_db, save_pick, get_open_picks
+from src.core.config import load_config, get_config_value
+from src.core.universe import build_universe
+from src.core.cn_data import download_daily_range, get_cn_basic_info
+from src.core.technicals import compute_extended_technicals
+from src.core.display import format_ticker, load_name_cache
+from src.strategy.lens_a_pullback import LensAPullback
+from src.strategy.lens_b_breakout import LensBBreakout
+from src.strategy.lens_c_limitup import LensCLimitUp
+from src.strategy.confluence import ConfluenceConfig, run_confluence
+from src.strategy.regime import classify_regime, RegimeAssessment
+from src.risk.capital_guardian import compute_guardian_verdict, GuardianVerdict
+from src.tracking.pick_store import init_db, save_pick, get_open_picks
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def run_dragon_pulse(
     logger.info(f"Successfully downloaded data for {len(data_map)} tickers")
     
     # 6. Fetch CSI 300 for Regime
-    from backtest.data_loader import preload_csi300_data
+    from src.backtest.data_loader import preload_csi300_data
     csi300_df = preload_csi300_data(start_date, end_date)
     
     # 7. Classify Regime
@@ -94,7 +94,7 @@ def run_dragon_pulse(
     
     logger.info("Scanning for setup signals...")
     # Mock Dragon Tiger for now (In prod, fetch real DTL for today)
-    from features.dragon_tiger.scanner import get_institutional_net_buy
+    from src.features.dragon_tiger.scanner import get_institutional_net_buy
     dtl_flow = get_institutional_net_buy(list(data_map.keys()))
     
     for ticker, df in data_map.items():
@@ -126,7 +126,7 @@ def run_dragon_pulse(
     # 9. Sector momentum for confluence boost
     hot_sectors, cold_sectors, ticker_sector_map = [], [], {}
     try:
-        from features.sector.rotation import calculate_sector_momentum_cn
+        from src.features.sector.rotation import calculate_sector_momentum_cn
         sector_data = calculate_sector_momentum_cn(top_n=20)
         if sector_data:
             hot_sectors = [s.sector for s in sector_data[:3] if s.momentum_score >= 6.0]
@@ -177,7 +177,7 @@ def run_dragon_pulse(
         # Apply risk-parity volatility-adjusted sizing
         if picks:
             try:
-                from risk.risk_parity import apply_risk_parity_to_picks
+                from src.risk.risk_parity import apply_risk_parity_to_picks
                 # Build technicals cache for ATR lookup
                 tech_cache = {}
                 for ticker in [p.ticker for p in picks]:

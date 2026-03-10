@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pandas as pd
-from strategy.base import StrategyLens, StrategySignal
+from src.strategy.base import StrategyLens, StrategySignal
 
 class LensBBreakout(StrategyLens):
     """Lens B: Volume Breakout from Compression (量能突破)

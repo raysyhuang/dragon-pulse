@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pandas as pd
-from strategy.base import StrategyLens, StrategySignal
+from src.strategy.base import StrategyLens, StrategySignal
 
 class LensCLimitUp(StrategyLens):
     """Lens C: Limit-Up Institutional Seal (涨停封板机构确认)

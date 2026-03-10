@@ -3,12 +3,12 @@ from typing import List, Dict
 from datetime import date
 import copy
 
-from strategy.confluence import ConfluenceConfig, run_confluence
-from strategy.regime import classify_regime
-from risk.capital_guardian import compute_guardian_verdict
-from risk.position_manager import Position, check_exits
-from risk.risk_parity import apply_risk_parity_to_picks
-from core.technicals import compute_extended_technicals
+from src.strategy.confluence import ConfluenceConfig, run_confluence
+from src.strategy.regime import classify_regime
+from src.risk.capital_guardian import compute_guardian_verdict
+from src.risk.position_manager import Position, check_exits
+from src.risk.risk_parity import apply_risk_parity_to_picks
+from src.core.technicals import compute_extended_technicals
 
 def run_backtest(
     start_date: str,

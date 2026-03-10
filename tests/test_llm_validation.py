@@ -1,7 +1,13 @@
-"""Tests for LLM output validation, post-LLM gate, and fallback."""
+"""Tests for LLM output validation, post-LLM gate, fallback, and compatibility wrappers."""
 
 import pytest
-from src.core.llm import validate_llm_ranking, apply_post_llm_gate, _build_fallback_top5
+from src.core.debate import DebateResult
+from src.core.llm import (
+    _build_fallback_top5,
+    apply_post_llm_gate,
+    rank_with_debate,
+    validate_llm_ranking,
+)
 
 
 class TestValidateLlmRanking:
@@ -184,3 +190,56 @@ class TestBuildFallbackTop5:
 
     def test_empty_packets(self):
         assert _build_fallback_top5([]) == []
+
+
+class TestRankWithDebate:
+    """Tests for backward-compatible debate ranking wrapper."""
+
+    def test_rank_with_debate_exists(self):
+        assert callable(rank_with_debate)
+
+    def test_rank_with_debate_enriches_and_reranks(self, monkeypatch):
+        packets = [
+            {"ticker": "600000.SH", "technical_score": 8.0},
+            {"ticker": "000001.SZ", "technical_score": 7.5},
+        ]
+
+        def fake_rank_weekly_candidates(**kwargs):
+            assert kwargs["packets"] == packets
+            return {
+                "top5": [
+                    {"rank": 1, "ticker": "600000.SH", "composite_score": 7.2},
+                    {"rank": 2, "ticker": "000001.SZ", "composite_score": 7.1},
+                ]
+            }
+
+        def fake_run_batch_debate(**kwargs):
+            assert kwargs["packets"] == packets
+            return {
+                "000001.SZ": DebateResult(
+                    ticker="000001.SZ",
+                    bull_arguments=[],
+                    bear_arguments=[],
+                    final_verdict="BUY",
+                    verdict_reasoning="Debate favors upside.",
+                    bull_score=7.0,
+                    bear_score=5.0,
+                    conviction_delta=0.6,
+                    risk_adjusted_score=8.4,
+                    key_risks=["Risk A"],
+                    key_catalysts=["Catalyst A"],
+                    debate_rounds=1,
+                    timestamp="2026-03-10T00:00:00Z",
+                )
+            }
+
+        monkeypatch.setattr("src.core.llm.rank_weekly_candidates", fake_rank_weekly_candidates)
+        monkeypatch.setattr("src.core.debate.run_batch_debate", fake_run_batch_debate)
+
+        result = rank_with_debate(packets=packets, api_key="test-key")
+
+        assert result["top5"][0]["ticker"] == "000001.SZ"
+        assert result["top5"][0]["rank"] == 1
+        assert result["top5"][0]["risk_adjusted_score"] == 8.4
+        assert result["top5"][0]["debate_verdict"] == "BUY"
+        assert result["debate_analysis"]["000001.SZ"]["risk_adjusted_score"] == 8.4

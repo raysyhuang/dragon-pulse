@@ -36,7 +36,7 @@ def preload_historical_data(
     
     if missing_tickers:
         print(f"Downloading historical data for {len(missing_tickers)} missing tickers...")
-        from core.cn_data import download_daily_range
+        from src.core.cn_data import download_daily_range
         # Download in chunks to avoid overwhelming memory/API
         chunk_size = 100
         for i in range(0, len(missing_tickers), chunk_size):

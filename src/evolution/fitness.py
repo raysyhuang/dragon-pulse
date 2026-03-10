@@ -1,6 +1,6 @@
-from backtest.engine import run_backtest
-from evolution.genome import Genome
-from strategy.confluence import ConfluenceConfig
+from src.backtest.engine import run_backtest
+from src.evolution.genome import Genome
+from src.strategy.confluence import ConfluenceConfig
 import math
 
 def evaluate_fitness(genome: Genome, start_date: str, end_date: str, 

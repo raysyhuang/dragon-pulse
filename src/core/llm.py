@@ -526,6 +526,85 @@ def _build_fallback_top5(packets: list[dict]) -> list[dict]:
     return top5
 
 
+def rank_with_debate(
+    packets: list[dict],
+    provider: str = "openai",
+    model: Optional[str] = None,
+    api_key: Optional[str] = None,
+    debate_rounds: int = 1,
+    debate_top_n: int = 10,
+    use_memory: bool = True,
+    min_composite_score: float = 6.5,
+    min_confidence: str = "MEDIUM",
+    method_version: str = "v3.2-CN-debate",
+) -> dict:
+    """
+    Backward-compatible debate ranking entry point used by ``src.commands.all``.
+
+    The base ranking still comes from ``rank_weekly_candidates``. Debate analysis is
+    applied as an enrichment layer so callers can persist the detailed bull/bear
+    output without changing their existing contract.
+    """
+    del use_memory  # Reserved for older callers; debate.py does not use it.
+
+    result = rank_weekly_candidates(
+        packets=packets,
+        provider=provider,
+        model=model,
+        api_key=api_key,
+        min_composite_score=min_composite_score,
+        min_confidence=min_confidence,
+        method_version=method_version,
+    )
+
+    try:
+        from src.core.debate import debate_result_to_dict, run_batch_debate
+    except ImportError:
+        result["debate_analysis"] = {}
+        return result
+
+    debate_results = run_batch_debate(
+        packets=packets,
+        max_rounds=debate_rounds,
+        top_n=debate_top_n,
+        api_key=api_key,
+    )
+    result["debate_analysis"] = {
+        ticker: debate_result_to_dict(debate_result)
+        for ticker, debate_result in debate_results.items()
+    }
+
+    if not result.get("top5"):
+        return result
+
+    enriched_top5 = []
+    for entry in result["top5"]:
+        debate = debate_results.get(entry.get("ticker"))
+        if debate is None:
+            enriched_top5.append(entry)
+            continue
+
+        enriched = dict(entry)
+        enriched["debate_verdict"] = debate.final_verdict
+        enriched["debate_reasoning"] = debate.verdict_reasoning
+        enriched["risk_adjusted_score"] = debate.risk_adjusted_score
+        enriched["key_risks"] = debate.key_risks
+        enriched["key_catalysts"] = debate.key_catalysts
+        enriched_top5.append(enriched)
+
+    if any("risk_adjusted_score" in entry for entry in enriched_top5):
+        enriched_top5 = sorted(
+            enriched_top5,
+            key=lambda item: float(item.get("risk_adjusted_score", item.get("composite_score", 0.0)) or 0.0),
+            reverse=True,
+        )
+        for rank, entry in enumerate(enriched_top5, 1):
+            entry["rank"] = rank
+
+    result["top5"] = enriched_top5
+    return result
+
+
 def rank_weekly_candidates(
     packets: list[dict],
     provider: str = "openai",

@@ -1,7 +1,7 @@
 """
 CLI Command: Dragon Pulse Scan
 """
-from pipelines.dragon_pulse import run_dragon_pulse
+from src.pipelines.dragon_pulse import run_dragon_pulse
 
 def cmd_scan(args):
     """Execute daily Dragon Pulse scan."""

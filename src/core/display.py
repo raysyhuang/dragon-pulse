@@ -19,7 +19,7 @@ def format_ticker(ticker: str, name_cn: Optional[str] = None) -> str:
 def load_name_cache(tickers: list[str], provider_config: Optional[dict] = None) -> None:
     """Bulk load company names from AkShare/Tushare into cache."""
     try:
-        from core.cn_data import get_cn_basic_info
+        from src.core.cn_data import get_cn_basic_info
         info = get_cn_basic_info(tickers, provider_config)
         for ticker, data in info.items():
             _NAME_CACHE[ticker] = data.get("name_cn", ticker)

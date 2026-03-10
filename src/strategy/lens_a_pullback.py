@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pandas as pd
-from strategy.base import StrategyLens, StrategySignal
+from src.strategy.base import StrategyLens, StrategySignal
 
 class LensAPullback(StrategyLens):
     """Lens A: Institutional Pullback Buy (机构回调买入)

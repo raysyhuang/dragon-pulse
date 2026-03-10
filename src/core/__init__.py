@@ -16,7 +16,7 @@ from .technicals import atr, rsi, sma, compute_technicals
 from .universe import build_universe, get_sp500_universe, get_nasdaq100_universe
 from .helpers import get_ny_date, get_trading_date, fetch_news_for_tickers
 from .io import get_run_dir, save_csv, save_json, save_run_metadata
-from .llm import rank_weekly_candidates
+from .llm import rank_weekly_candidates, rank_with_debate
 from .logging_utils import setup_logging
 
 # New modules (v3.1+)
@@ -66,6 +66,7 @@ __all__ = [
     
     # LLM
     "rank_weekly_candidates",
+    "rank_with_debate",
     
     # Logging
     "setup_logging",

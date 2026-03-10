@@ -4,8 +4,8 @@ import copy
 import random
 import logging
 
-from evolution.genome import Genome, random_genome, crossover, mutate
-from evolution.fitness import evaluate_fitness
+from src.evolution.genome import Genome, random_genome, crossover, mutate
+from src.evolution.fitness import evaluate_fitness
 
 logger = logging.getLogger(__name__)
 

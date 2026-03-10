@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import date
 import pandas as pd
-from core.display import format_ticker
+from src.core.display import format_ticker
 
 @dataclass
 class StrategySignal:

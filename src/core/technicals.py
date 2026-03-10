@@ -151,3 +151,12 @@ def compute_technicals(
     
     return results
 
+
+def compute_extended_technicals(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Backward-compatible alias for older Dragon Pulse modules.
+
+    The current codebase only maintains one technical feature builder, so the
+    "extended" API delegates to ``compute_technicals``.
+    """
+    return compute_technicals(df)
