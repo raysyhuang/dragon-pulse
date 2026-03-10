@@ -179,16 +179,41 @@ def get_last_trading_date(check_date: Optional[date] = None) -> date:
     return check_date
 
 
-def get_trading_date(check_date: Optional[date] = None) -> date:
+def get_market_date(timezone: str = "America/New_York") -> date:
+    """
+    Get the current date in the given market timezone.
+
+    Args:
+        timezone: IANA timezone string (e.g. ``"Asia/Shanghai"``,
+                  ``"America/New_York"``).
+
+    Returns:
+        Today's date in the requested timezone.
+    """
+    return pd.Timestamp.now(tz=timezone).date()
+
+
+def get_trading_date(
+    check_date: Optional[date] = None,
+    *,
+    market: Optional[str] = None,
+    close_hour: Optional[int] = None,
+    close_minute: Optional[int] = None,
+    timezone: Optional[str] = None,
+) -> date:
     """
     Get the appropriate trading date for output directories.
-    
+
     This ensures outputs are only created for actual trading days.
     If run on a weekend or before market close, uses the last completed trading day.
-    
+
     Args:
         check_date: Optional date to check (defaults to current NY date)
-    
+        market: Market identifier (currently unused, reserved for CN holiday support)
+        close_hour: Market close hour in local time (defaults to 16 for US)
+        close_minute: Market close minute in local time (defaults to 0)
+        timezone: IANA timezone string (defaults to America/New_York)
+
     Returns:
         date object representing the trading day to use for outputs
     """
@@ -303,6 +328,65 @@ def fetch_news_for_tickers(tickers: list[str], max_items: int, throttle_sec: flo
         df = pd.concat([pd.DataFrame([warn_row]), df], ignore_index=True)
 
     return df
+
+
+def fetch_news_for_tickers_cn(
+    tickers: list[str],
+    max_items: int = 25,
+    throttle_sec: float = 0.0,
+) -> pd.DataFrame:
+    """
+    Fetch news headlines for China A-share tickers via AkShare (best effort).
+
+    Falls back to an empty DataFrame if AkShare is unavailable or fails.
+
+    Args:
+        tickers: List of A-share ticker symbols (e.g. ``"600519.SH"``)
+        max_items: Maximum news items per ticker
+        throttle_sec: Seconds to wait between ticker requests
+
+    Returns:
+        DataFrame with columns matching ``fetch_news_for_tickers`` output.
+    """
+    cols = ["Ticker", "published_utc", "published_local", "title", "publisher", "link", "type"]
+    rows: list[dict] = []
+
+    try:
+        import akshare as ak  # noqa: F811
+    except ImportError:
+        return pd.DataFrame(columns=cols)
+
+    for t in tickers:
+        code = t.split(".")[0]
+        try:
+            df_news = ak.stock_news_em(symbol=code)
+            if df_news is None or df_news.empty:
+                continue
+            for _, row in df_news.head(max_items).iterrows():
+                title = str(row.get("新闻标题", "") or "").strip()
+                if not title:
+                    continue
+                pub_time = pd.to_datetime(row.get("发布时间"), errors="coerce")
+                rows.append({
+                    "Ticker": t,
+                    "published_utc": pub_time,
+                    "published_local": pub_time.strftime("%Y-%m-%d %H:%M") if pd.notna(pub_time) else "",
+                    "title": title,
+                    "publisher": str(row.get("新闻来源", "")) or "",
+                    "link": str(row.get("新闻链接", "")) or "",
+                    "type": "news",
+                })
+        except Exception:
+            continue
+        if throttle_sec and throttle_sec > 0:
+            time.sleep(throttle_sec)
+
+    if not rows:
+        return pd.DataFrame(columns=cols)
+
+    result = pd.DataFrame(rows)
+    result = result.drop_duplicates(subset=["Ticker", "title"], keep="first").reset_index(drop=True)
+    return result
 
 
 def validate_required_columns(df: pd.DataFrame, required_cols: list[str], context: str) -> None:
