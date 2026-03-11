@@ -1,0 +1,22 @@
+{
+  "method_version": "v3.2-CN",
+  "run_timestamp_utc": "2026-03-11T17:55:05.867362Z",
+  "run_timestamp_et": "2026-03-11T13:55:05.867373-04:00",
+  "config_hash": "ffd15ad643e6",
+  "regime_info": {
+    "ok": true,
+    "spy_last": NaN,
+    "spy_ma": NaN,
+    "vix_last": NaN,
+    "spy_above_ma": null,
+    "vix_ok": null,
+    "message": "Regime gate error; skipping gate. (No objects to concatenate)"
+  },
+  "tickers_screened": 0,
+  "candidates_count": 0,
+  "breakout_count": 0,
+  "reversal_count": 0,
+  "dropped_count": 0,
+  "output_date": "2026-03-10",
+  "asof_trading_date": "2026-03-10"
+}
