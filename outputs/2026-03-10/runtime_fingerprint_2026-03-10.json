@@ -4,7 +4,7 @@
   "config_path": "config/default.yaml",
   "config_hash": "ffd15ad643e63921d42baabfa64b95b22bf25ee77603d216fb087c92cf5b8c39",
   "workflow_name": "CN Nightly Analysis",
-  "workflow_run_id": "22963990361",
+  "workflow_run_id": "22968841242",
   "workflow_run_attempt": "1",
   "prices_db_path": "data/prices.db",
   "prices_db_exists": true,

@@ -1,7 +1,7 @@
 {
   "method_version": "v3.2-CN",
-  "run_timestamp_utc": "2026-03-11T17:55:05.867362Z",
-  "run_timestamp_et": "2026-03-11T13:55:05.867373-04:00",
+  "run_timestamp_utc": "2026-03-11T19:48:33.647607Z",
+  "run_timestamp_et": "2026-03-11T15:48:33.647617-04:00",
   "config_hash": "ffd15ad643e6",
   "regime_info": {
     "ok": true,
@@ -10,7 +10,7 @@
     "vix_last": NaN,
     "spy_above_ma": null,
     "vix_ok": null,
-    "message": "Regime gate error; skipping gate. (No objects to concatenate)"
+    "message": "Regime data insufficient; skipping gate."
   },
   "tickers_screened": 0,
   "candidates_count": 0,
