@@ -1,0 +1,2 @@
+ticker,name,exchange,sector,technical_score,technical_evidence,current_price,market_cap_usd,avg_dollar_volume_20d,asof_price_utc,name_cn,trading_number
+300274.SZ,阳光电源,SZ,Unknown,7.5,"{'within_5pct_52w_high': False, 'dist_to_52w_high_pct': 18.56, 'resistance_level': None, 'volume_ratio_3d_to_20d': 1.59, 'volume_signal': 'confirmed', 'rsi14': 66.49, 'rsi_zone': 'acceptable', 'above_ma10_ma20_ma50': True, 'ma10': 151.98, 'ma20': 151.7, 'ma50': 159.64, 'realized_vol_5d_ann_pct': np.float64(64.21)}",170.92,,92195875.28549999,2026-03-11T00:00:00Z,阳光电源,300274.SZ

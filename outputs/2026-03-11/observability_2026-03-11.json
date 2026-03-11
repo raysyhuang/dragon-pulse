@@ -1,0 +1,52 @@
+{
+  "date": "2026-03-11",
+  "asof_trading_date": "2026-03-11",
+  "technical_score_distribution": {
+    "pro30": {
+      "count": 0,
+      "count_gte_6": 0,
+      "count_gte_8": 0
+    },
+    "weekly": {
+      "count": 0,
+      "count_gte_6": 0,
+      "count_gte_8": 0
+    }
+  },
+  "overlap_stats": {
+    "weekly_only": 0,
+    "pro30_only": 0,
+    "movers_only": 0,
+    "weekly_pro30": 0,
+    "weekly_movers": 0,
+    "pro30_movers": 0,
+    "all_three": 0,
+    "any_overlap_count": 0,
+    "overlap_potential": {
+      "weekly_candidates": 0,
+      "pro30_candidates": 0,
+      "movers_candidates": 0,
+      "intersection_possible": false
+    }
+  },
+  "confidence_distribution": {
+    "HIGH": 0,
+    "MEDIUM": 0,
+    "LOW": 0
+  },
+  "confidence_rates": {
+    "high_pct": 0.0,
+    "medium_pct": 0.0,
+    "low_pct": 0.0
+  },
+  "near_misses": [],
+  "model_maturity": {
+    "observations": 0,
+    "min_required": 50,
+    "pct_complete": 0.0,
+    "observations_remaining": 50,
+    "version": 1,
+    "last_trained": null
+  },
+  "regime": "unknown"
+}

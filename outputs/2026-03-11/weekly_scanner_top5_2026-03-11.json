@@ -1,0 +1,56 @@
+{
+  "run_timestamp_utc": "2026-03-11T22:22:47.917417Z",
+  "universe_note": "Universe intended: all SSE/SZSE A-shares with liquidity/price filters and exclusions. However, only 1 packet was provided, so ranking is limited to the provided name(s). Liquidity gate applied using provided avg_dollar_volume_20d (assumed CNY). ST/suspension/5-day +20% exclusion checks unavailable from packet -> not verifiable.",
+  "method_version": "v3.2-CN-debate",
+  "top5": [],
+  "gate_rejections": [
+    "300274.SZ rejected: composite 4.25 < 6.5, confidence SPECULATIVE < MEDIUM"
+  ],
+  "debate_analysis": {
+    "300274.SZ": {
+      "ticker": "300274.SZ",
+      "final_verdict": "BUY",
+      "verdict_reasoning": "Bull evidence is stronger on near-term price action: clear multi-MA breakout with confirmed volume expansion and RSI not yet extreme supports continued momentum over the next 7 sessions. Bear risks (stretch/crowding and catalyst timing) are valid, but they mainly argue for higher volatility and pullback risk rather than negating the trend; net risk/reward remains favorable with disciplined risk control.",
+      "bull_score": 7.8,
+      "bear_score": 6.4,
+      "conviction_delta": 0.3,
+      "risk_adjusted_score": 7.8,
+      "key_risks": [
+        "Crowded momentum trade risk: very high turnover/attention can flip into sharp reversals if incremental buyers fade",
+        "Catalyst-to-earnings translation risk: Poland capacity plan and product feature standardization may not drive near-term earnings, increasing consolidation/pullback probability"
+      ],
+      "key_catalysts": [
+        "Trend continuation signal: price above MA10/20/50 with volume 'confirmed' (3d/20d volume ratio 1.59) supporting follow-through",
+        "Narrative catalysts: ArcDefender technology standardization in PowerTitan and planned European (Poland) manufacturing expansion sustaining sentiment/flows"
+      ],
+      "debate_rounds": 1,
+      "timestamp": "2026-03-11T22:23:26.517520Z",
+      "bull_arguments": [
+        {
+          "argument": "300274.SZ（阳光电源）具备“强趋势+放量确认+事件催化”的短线组合，支持未来7个交易日冲击≥10%涨幅。技术面上，当前价170.92已站上MA10/MA20/MA50（MA10=151.98、MA20=151.7、MA50=159.64），趋势结构偏多；同时近3日量能相对20日放大（volume_ratio=1.59）且量能信号为“confirmed”，说明上涨并非缩量反弹而是资金参与度提升。RSI14=66.49处于“acceptable”区间，偏强但尚未进入极端过热，仍有继续上冲的空间。结合5日年化波动率64.21%，短线实现10%幅度在统计上并不苛刻。\n\n催化层面，3月6日公司披露多条与储能/海外产能相关的信息：ArcDefender储能直流灭弧技术已在PowerTitan产品中“全系标配”（2026-03-06），以及拟在波兰投资建设欧洲制造工厂，规划年产20GW光伏逆变器及12.5GWh储能系统产能（2026-03-06）。这些信息为市场提供了“产品竞争力强化+海外扩张”的叙事支撑。与此同时，3月11日多条市场新闻聚焦其交易活跃度与强势股跟踪（如“300274，成交额",
+          "key_points": [
+            "趋势强：现价170.92高于MA10/MA20/MA50（151.98/151.7/159.64），多头排列确认（technical_evidence: above_ma10_ma20_ma50=true）。",
+            "放量确认：近3日成交量/20日均量=1.59，且volume_signal为“confirmed”，支持上攻的资金面配合（technical_evidence）。",
+            "催化密集且贴近交易窗口：2026-03-06披露ArcDefender技术已在PowerTitan全系标配、拟在波兰建厂规划20GW逆变器+12.5GWh储能产能；2026-03-11多条媒体报道其强势与成交额表现，提升短线关注度与动量延续概率（headlines）。"
+          ],
+          "confidence": 7.5
+        }
+      ],
+      "bear_arguments": [
+        {
+          "argument": "300274.SZ (阳光电源) looks extended in the very short term, making a ≥10% gain over the next 7 trading days harder to achieve without a fresh catalyst. The stock is already well above key moving averages (price 170.92 vs MA10 151.98, MA20 151.70, MA50 159.64) and RSI14 is elevated at 66.49, which increases the odds of consolidation or a pullback rather than another sharp leg up. With 5-day realized annualized volatility at 64.21%, short-horizon swings can be large—meaning downside risk is meaningful",
+          "key_points": [
+            "Momentum may be near exhaustion: RSI14 is 66.49 (elevated) while price is stretched above MA10/MA20/MA50 (170.92 vs 151.98/151.70/159.64), increasing probability of consolidation/pullback rather than another +10% in 7 days.",
+            "High short-term volatility raises downside risk: 5-day realized vol (ann.) is 64.21%, so a normal adverse swing can be large enough to derail a +10% target quickly, especially if momentum fades.",
+            "Crowding/late-cycle risk signals: volume is “confirmed” with 3d/20d volume ratio 1.59 and the stock is highlighted as extremely active (headline: “成交额A股第一”), which can indicate a crowded trade prone to sharp reversals once incremental buyers are exhausted.",
+            "Upside may be harder from here: the stock is still 18.56% below its 52-week high (not within 5%), implying overhead supply could appear as it approaches prior highs; without a defined resistance level in the packet, risk management around supply zones is less clear.",
+            "Catalyst timing risk: corporate items cited (ArcDefender tech standardization; planned Poland factory with 20GW inverter and 12.5GWh storage system capacity) are not clearly near-term revenue/earnings catalysts within a 7-trading-day window, so the next week may lack a forcing function for +10%.",
+            "Material data gaps increase event/valuation risk: earnings date is unknown; market cap and valuation metrics are missing; sector is unknown and sector momentum/hot-sector flags are unavailable; sentiment/龙虎榜/institutional flow and options data are unavailable—reducing confidence in assessing whether upside is already priced in or whether an event is imminent."
+          ],
+          "confidence": 6.0
+        }
+      ]
+    }
+  },
+  "primary_label": "Weekly"
+}
