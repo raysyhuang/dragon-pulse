@@ -180,6 +180,8 @@ def _tushare_fetch_basic_info(token: Optional[str]) -> pd.DataFrame:
             df = df.merge(caps[["ticker", "total_mv"]], on="ticker", how="left")
             df = df.rename(columns={"total_mv": "market_cap"})
     except Exception:
+        pass
+    if "market_cap" not in df.columns:
         df["market_cap"] = None
     return df[["ticker", "name", "exchange", "market_cap"]]
 

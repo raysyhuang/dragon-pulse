@@ -244,20 +244,25 @@ def cmd_all(args) -> int:
     save_json(runtime_fingerprint, runtime_fingerprint_path)
     logger.info(f"  ✓ Runtime fingerprint saved: {runtime_fingerprint_path.name}")
 
-    # Step 2: Swing Strategy (Primary)
-    logger.info("\n[2/7] Swing Strategy (Primary)...")
-    try:
-        swing_result = run_swing(
-            config=config,
-            asof_date=asof_date,
-            output_date=output_date,
-            run_dir=output_dir,
-        )
-        results["swing"] = swing_result
-        logger.info("  ✓ Swing strategy complete")
-    except Exception as e:
-        logger.error(f"  ✗ Swing strategy failed: {e}", exc_info=True)
+    # Step 2: Swing Strategy (Primary) — US-only, skip for CN market
+    market_region = get_config_value(config, "market", "region", default="US").upper()
+    if market_region == "CN":
+        logger.info("\n[2/7] Swing Strategy — skipped (CN market, US-only pipeline)")
         results["swing"] = None
+    else:
+        logger.info("\n[2/7] Swing Strategy (Primary)...")
+        try:
+            swing_result = run_swing(
+                config=config,
+                asof_date=asof_date,
+                output_date=output_date,
+                run_dir=output_dir,
+            )
+            results["swing"] = swing_result
+            logger.info("  ✓ Swing strategy complete")
+        except Exception as e:
+            logger.error(f"  ✗ Swing strategy failed: {e}", exc_info=True)
+            results["swing"] = None
     
     # Step 3: Weekly Scanner (Secondary)
     logger.info("\n[3/7] Weekly Scanner (Secondary)...")
