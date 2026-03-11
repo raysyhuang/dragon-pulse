@@ -13,7 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from datetime import datetime
 import logging
-from src.core.config import load_config
+from src.core.config import load_config, get_config_value
 from src.core.helpers import get_ny_date, get_trading_date
 from src.core.io import get_run_dir, save_json
 from src.core.report import generate_html_report
@@ -164,68 +164,80 @@ def cmd_all(args) -> int:
         config["runtime"]["allow_partial_day_attention"] = True
     
     results = {}
-    
+
     universe_size = None
 
-    # Step 1: Daily Movers
-    logger.info("\n[1/6] Daily Movers Discovery...")
-    try:
-        ucfg = config.get("universe", {})
-        quarantine_cfg = config.get("data_reliability", {}).get("quarantine", {})
-        universe = build_universe(
-            mode=ucfg.get("mode", "SP500+NASDAQ100+R2000"),
-            cache_file=ucfg.get("cache_file"),
-            cache_max_age_days=ucfg.get("cache_max_age_days", 7),
-            manual_include_file=ucfg.get("manual_include_file"),
-            r2000_include_file=ucfg.get("r2000_include_file"),
-            manual_include_mode=ucfg.get("manual_include_mode", "ALWAYS"),
-            quarantine_file=quarantine_cfg.get("file", "data/bad_tickers.json"),
-            quarantine_enabled=bool(quarantine_cfg.get("enabled", True)),
-        )
-        universe_size = len(universe)
-        movers_config = config.get("movers", {})
-        runtime_config = config.get("runtime", {})
-        polygon_api_key = os.environ.get("POLYGON_API_KEY")
-        reliability_cfg = config.get("data_reliability", {})
-        movers_raw = compute_daily_movers_from_universe(
-            universe, 
-            top_n=movers_config.get("top_n", 50), 
-            asof_date=get_trading_date(asof_date),
-            polygon_api_key=polygon_api_key,
-            use_polygon_primary=bool(runtime_config.get("polygon_primary", False) and polygon_api_key),
-            polygon_max_workers=runtime_config.get("polygon_max_workers", 8),
-            quarantine_cfg=reliability_cfg.get("quarantine", {}) if isinstance(reliability_cfg, dict) else {},
-            yf_retry_cfg=reliability_cfg.get("yfinance", {}) if isinstance(reliability_cfg, dict) else {},
-            polygon_retry_cfg=reliability_cfg.get("polygon", {}) if isinstance(reliability_cfg, dict) else {},
-        )
-        # Make movers credibility real: pass adv/avgvol so volume spike + $ADV20 checks can be enforced
-        try:
-            from src.features.movers.mover_filters import build_mover_technicals_df
-            mover_universe = []
-            for k in ("gainers", "losers"):
-                dfm = movers_raw.get(k)
-                if isinstance(dfm, pd.DataFrame) and (not dfm.empty) and "ticker" in dfm.columns:
-                    mover_universe += dfm["ticker"].astype(str).tolist()
-            tech_df = build_mover_technicals_df(
-                mover_universe,
-                lookback_days=25,
-                auto_adjust=bool(config.get("runtime", {}).get("yf_auto_adjust", False)),
-                threads=bool(config.get("runtime", {}).get("threads", True)),
-            )
-        except Exception:
-            tech_df = None
-        movers_filtered = filter_movers(movers_raw, technicals_df=tech_df if tech_df is not None and not tech_df.empty else None, config=movers_config)
-        from src.overlays.phase3_filters import apply_phase3_filters
-        movers_filtered = apply_phase3_filters(movers_filtered, {}, cfg.phase3)
-        queue_df = load_mover_queue()
-        queue_df = update_mover_queue(movers_filtered, utc_now(), movers_config)
-        save_mover_queue(queue_df)
-        eligible_movers = get_eligible_movers(queue_df, utc_now())
-        results["movers"] = {"count": len(eligible_movers), "tickers": eligible_movers}
-        logger.info(f"  ✓ Found {len(eligible_movers)} eligible movers")
-    except Exception as e:
-        logger.error(f"  ✗ Movers failed: {e}", exc_info=True)
+    # Determine market region early — gates US-only pipelines (movers, swing)
+    market_region = get_config_value(config, "market", "region", default="US").upper()
+
+    # Build universe (needed by all pipelines)
+    ucfg = config.get("universe", {})
+    quarantine_cfg = config.get("data_reliability", {}).get("quarantine", {})
+    universe = build_universe(
+        mode=ucfg.get("mode", "SP500+NASDAQ100+R2000"),
+        cache_file=ucfg.get("cache_file"),
+        cache_max_age_days=ucfg.get("cache_max_age_days", 7),
+        manual_include_file=ucfg.get("manual_include_file"),
+        r2000_include_file=ucfg.get("r2000_include_file"),
+        manual_include_mode=ucfg.get("manual_include_mode", "ALWAYS"),
+        quarantine_file=quarantine_cfg.get("file", "data/bad_tickers.json"),
+        quarantine_enabled=bool(quarantine_cfg.get("enabled", True)),
+        china_board_filters=ucfg.get("china_board_filters"),
+        china_source_preference=ucfg.get("china_source_preference"),
+    )
+    universe_size = len(universe)
+    logger.info(f"  Universe: {universe_size} tickers ({market_region})")
+
+    # Step 1: Daily Movers — US-only (yfinance/Polygon), skip for CN
+    if market_region == "CN":
+        logger.info("\n[1/6] Daily Movers — skipped (CN market, US-only pipeline)")
         results["movers"] = {"count": 0, "tickers": []}
+    else:
+        logger.info("\n[1/6] Daily Movers Discovery...")
+        try:
+            movers_config = config.get("movers", {})
+            runtime_config = config.get("runtime", {})
+            polygon_api_key = os.environ.get("POLYGON_API_KEY")
+            reliability_cfg = config.get("data_reliability", {})
+            movers_raw = compute_daily_movers_from_universe(
+                universe,
+                top_n=movers_config.get("top_n", 50),
+                asof_date=get_trading_date(asof_date),
+                polygon_api_key=polygon_api_key,
+                use_polygon_primary=bool(runtime_config.get("polygon_primary", False) and polygon_api_key),
+                polygon_max_workers=runtime_config.get("polygon_max_workers", 8),
+                quarantine_cfg=reliability_cfg.get("quarantine", {}) if isinstance(reliability_cfg, dict) else {},
+                yf_retry_cfg=reliability_cfg.get("yfinance", {}) if isinstance(reliability_cfg, dict) else {},
+                polygon_retry_cfg=reliability_cfg.get("polygon", {}) if isinstance(reliability_cfg, dict) else {},
+            )
+            # Make movers credibility real: pass adv/avgvol so volume spike + $ADV20 checks can be enforced
+            try:
+                from src.features.movers.mover_filters import build_mover_technicals_df
+                mover_universe = []
+                for k in ("gainers", "losers"):
+                    dfm = movers_raw.get(k)
+                    if isinstance(dfm, pd.DataFrame) and (not dfm.empty) and "ticker" in dfm.columns:
+                        mover_universe += dfm["ticker"].astype(str).tolist()
+                tech_df = build_mover_technicals_df(
+                    mover_universe,
+                    lookback_days=25,
+                    auto_adjust=bool(config.get("runtime", {}).get("yf_auto_adjust", False)),
+                    threads=bool(config.get("runtime", {}).get("threads", True)),
+                )
+            except Exception:
+                tech_df = None
+            movers_filtered = filter_movers(movers_raw, technicals_df=tech_df if tech_df is not None and not tech_df.empty else None, config=movers_config)
+            from src.overlays.phase3_filters import apply_phase3_filters
+            movers_filtered = apply_phase3_filters(movers_filtered, {}, cfg.phase3)
+            queue_df = load_mover_queue()
+            queue_df = update_mover_queue(movers_filtered, utc_now(), movers_config)
+            save_mover_queue(queue_df)
+            eligible_movers = get_eligible_movers(queue_df, utc_now())
+            results["movers"] = {"count": len(eligible_movers), "tickers": eligible_movers}
+            logger.info(f"  ✓ Found {len(eligible_movers)} eligible movers")
+        except Exception as e:
+            logger.error(f"  ✗ Movers failed: {e}", exc_info=True)
+            results["movers"] = {"count": 0, "tickers": []}
     
     # Root output dir (configurable)
     outputs_root = Path(config.get("outputs", {}).get("root_dir", "outputs"))
@@ -245,7 +257,6 @@ def cmd_all(args) -> int:
     logger.info(f"  ✓ Runtime fingerprint saved: {runtime_fingerprint_path.name}")
 
     # Step 2: Swing Strategy (Primary) — US-only, skip for CN market
-    market_region = get_config_value(config, "market", "region", default="US").upper()
     if market_region == "CN":
         logger.info("\n[2/7] Swing Strategy — skipped (CN market, US-only pipeline)")
         results["swing"] = None
