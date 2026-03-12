@@ -121,6 +121,10 @@ def _open_browser(file_path: Path) -> None:
 
 def cmd_all(args) -> int:
     """Run all screeners and produce hybrid analysis."""
+    import time as _time
+    _run_t0 = _time.time()
+    _stage_timings: dict[str, dict] = {}
+
     logger.info("=" * 60)
     logger.info("COMPLETE SCAN - All Systems")
     logger.info("=" * 60)
@@ -189,9 +193,11 @@ def cmd_all(args) -> int:
     logger.info(f"  Universe: {universe_size} tickers ({market_region})")
 
     # Step 1: Daily Movers — US-only (yfinance/Polygon), skip for CN
+    _step_t0 = _time.time()
     if market_region == "CN":
         logger.info("\n[1/6] Daily Movers — skipped (CN market, US-only pipeline)")
         results["movers"] = {"count": 0, "tickers": []}
+        _stage_timings["movers"] = {"status": "skipped", "reason": "CN market"}
     else:
         logger.info("\n[1/6] Daily Movers Discovery...")
         try:
@@ -235,10 +241,12 @@ def cmd_all(args) -> int:
             eligible_movers = get_eligible_movers(queue_df, utc_now())
             results["movers"] = {"count": len(eligible_movers), "tickers": eligible_movers}
             logger.info(f"  ✓ Found {len(eligible_movers)} eligible movers")
+            _stage_timings["movers"] = {"status": "ok", "duration_s": round(_time.time() - _step_t0)}
         except Exception as e:
             logger.error(f"  ✗ Movers failed: {e}", exc_info=True)
             results["movers"] = {"count": 0, "tickers": []}
-    
+            _stage_timings["movers"] = {"status": "error", "error": str(e), "duration_s": round(_time.time() - _step_t0)}
+
     # Root output dir (configurable)
     outputs_root = Path(config.get("outputs", {}).get("root_dir", "outputs"))
     output_dir = outputs_root / output_date_str
@@ -257,9 +265,11 @@ def cmd_all(args) -> int:
     logger.info(f"  ✓ Runtime fingerprint saved: {runtime_fingerprint_path.name}")
 
     # Step 2: Swing Strategy (Primary) — US-only, skip for CN market
+    _step_t0 = _time.time()
     if market_region == "CN":
         logger.info("\n[2/7] Swing Strategy — skipped (CN market, US-only pipeline)")
         results["swing"] = None
+        _stage_timings["swing"] = {"status": "skipped", "reason": "CN market"}
     else:
         logger.info("\n[2/7] Swing Strategy (Primary)...")
         try:
@@ -271,11 +281,14 @@ def cmd_all(args) -> int:
             )
             results["swing"] = swing_result
             logger.info("  ✓ Swing strategy complete")
+            _stage_timings["swing"] = {"status": "ok", "duration_s": round(_time.time() - _step_t0)}
         except Exception as e:
             logger.error(f"  ✗ Swing strategy failed: {e}", exc_info=True)
             results["swing"] = None
+            _stage_timings["swing"] = {"status": "error", "error": str(e), "duration_s": round(_time.time() - _step_t0)}
     
     # Step 3: Weekly Scanner (Secondary)
+    _step_t0 = _time.time()
     logger.info("\n[3/7] Weekly Scanner (Secondary)...")
     try:
         # Pass regime from pro30 to weekly so it can widen funnel in bear markets
@@ -289,6 +302,18 @@ def cmd_all(args) -> int:
             regime=_weekly_regime,
         )
         results["weekly"] = weekly_result
+        _weekly_candidates = 0
+        if weekly_result and weekly_result.get("candidates_csv"):
+            try:
+                _weekly_candidates = len(pd.read_csv(weekly_result["candidates_csv"]))
+            except Exception:
+                pass
+        _stage_timings["weekly"] = {
+            "status": "ok",
+            "duration_s": round(_time.time() - _step_t0),
+            "candidates_found": _weekly_candidates,
+            "universe_screened": universe_size,
+        }
         logger.info("  ✓ Weekly scanner complete")
         
         phase4_cfg = cfg.phase4
@@ -306,11 +331,14 @@ def cmd_all(args) -> int:
     except Exception as e:
         logger.error(f"  ✗ Weekly scanner failed: {e}", exc_info=True)
         results["weekly"] = None
-    
+        _stage_timings["weekly"] = {"status": "error", "error": str(e), "duration_s": round(_time.time() - _step_t0)}
+
     # Step 4: 30-Day Screener (Secondary) — US-only (yfinance/Polygon), skip for CN
+    _step_t0 = _time.time()
     if market_region == "CN":
         logger.info("\n[4/7] 30-Day Screener — skipped (CN market, US-only pipeline)")
         results["pro30"] = None
+        _stage_timings["pro30"] = {"status": "skipped", "reason": "CN market"}
     else:
         logger.info("\n[4/7] 30-Day Screener (Secondary)...")
         try:
@@ -337,11 +365,14 @@ def cmd_all(args) -> int:
             )
             results["pro30"] = pro30_result
             logger.info("  ✓ 30-Day screener complete")
+            _stage_timings["pro30"] = {"status": "ok", "duration_s": round(_time.time() - _step_t0)}
         except Exception as e:
             logger.error(f"  ✗ 30-Day screener failed: {e}", exc_info=True)
             results["pro30"] = None
+            _stage_timings["pro30"] = {"status": "error", "error": str(e), "duration_s": round(_time.time() - _step_t0)}
     
     # Step 5: LLM Ranking & Hybrid Analysis (with optional Bull/Bear Debate)
+    _step_t0 = _time.time()
     logger.info("\n[5/7] LLM Ranking & Hybrid Analysis...")
     debate_analysis = {}  # Store debate results for later use
     primary_packet_lookup = {}  # ticker -> source packet with deterministic fields
@@ -443,15 +474,24 @@ def cmd_all(args) -> int:
                 results["llm_primary_source"] = primary_source
                 results["llm_primary_top5_file"] = str(top5_file)
                 logger.info(f"  ✓ LLM ranking complete (source: {primary_source})")
+                _stage_timings["llm_ranking"] = {
+                    "status": "ok",
+                    "duration_s": round(_time.time() - _step_t0),
+                    "input_candidates": len(packets),
+                    "output_picks": len(results.get("llm_primary_top5", [])),
+                }
             else:
                 logger.warning("  ⚠ No packets found for LLM ranking")
                 results["llm_primary_top5"] = []
+                _stage_timings["llm_ranking"] = {"status": "no_packets", "duration_s": round(_time.time() - _step_t0)}
         else:
             logger.warning("  ⚠ Primary packets not available")
             results["llm_primary_top5"] = []
+            _stage_timings["llm_ranking"] = {"status": "no_packets", "duration_s": round(_time.time() - _step_t0)}
     except Exception as e:
         logger.error(f"  ✗ LLM ranking failed: {e}", exc_info=True)
         results["llm_primary_top5"] = []
+        _stage_timings["llm_ranking"] = {"status": "error", "error": str(e), "duration_s": round(_time.time() - _step_t0)}
     
     # Generate Hybrid Analysis
     logger.info("\n" + "=" * 60)
@@ -1544,10 +1584,40 @@ def cmd_all(args) -> int:
     for line in summary_lines:
         logger.info(line)
     
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # RUN SUMMARY ARTIFACT — structured diagnostics for CI observability
+    # ═══════════════════════════════════════════════════════════════════════════════
+    try:
+        _regime_status = "unknown"
+        _regime_benchmark = get_config_value(config, "regime_gate", "spy_symbol", default="")
+        if results.get("weekly") and isinstance(results["weekly"], dict):
+            _ri = results["weekly"].get("regime_info", {})
+            if _ri:
+                _regime_status = "ok" if _ri.get("spy_above_ma") else "below_ma"
+            elif primary_regime:
+                _regime_status = str(primary_regime)
+
+        _final_picks = len(results.get("hybrid_top3", []))
+
+        run_summary = {
+            "date": output_date_str,
+            "market_region": market_region,
+            "universe_size": universe_size,
+            "stages": _stage_timings,
+            "regime": {"status": _regime_status, "benchmark": _regime_benchmark},
+            "final_picks": _final_picks,
+            "total_duration_s": round(_time.time() - _run_t0),
+        }
+        _run_summary_path = output_dir / f"run_summary_{output_date_str}.json"
+        save_json(run_summary, _run_summary_path)
+        logger.info(f"  ✓ Run summary saved: {_run_summary_path.name}")
+    except Exception as e:
+        logger.warning(f"  ⚠ Run summary save failed: {e}")
+
     logger.info("\n" + "=" * 60)
     logger.info("✅ ALL ANALYSIS COMPLETE")
     logger.info("=" * 60)
-    
+
     return 0
 
 

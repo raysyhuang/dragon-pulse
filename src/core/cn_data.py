@@ -53,8 +53,60 @@ def _split_cn_symbol(ticker: str) -> Tuple[str, str]:
     return code, exch
 
 
+_INDEX_CODES = {"000001", "000300", "000016", "000905", "399001", "399006"}
+
+
+def _ak_fetch_index_daily(code: str, exch: str, start: Optional[datetime], end: Optional[datetime]) -> pd.DataFrame:
+    """Fetch daily OHLCV for a Chinese index (e.g. CSI 300) via AkShare."""
+    import akshare as ak  # pyright: ignore[reportMissingModuleSource]
+
+    # AkShare index format: "sh000300" (Shanghai) or "sz399001" (Shenzhen)
+    prefix = "sh" if exch == "SH" else "sz"
+    symbol = f"{prefix}{code}"
+
+    start_str = start.strftime("%Y%m%d") if start else None
+    end_str = end.strftime("%Y%m%d") if end else None
+
+    df = ak.stock_zh_index_daily(symbol=symbol)
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    rename_map = {
+        "date": "Date",
+        "open": "Open",
+        "high": "High",
+        "low": "Low",
+        "close": "Close",
+        "volume": "Volume",
+    }
+    df = df.rename(columns=rename_map)
+    if "Date" not in df.columns:
+        return pd.DataFrame()
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+    df = df.dropna(subset=["Date"])
+
+    # Filter to requested date range
+    if start_str:
+        df = df[df["Date"] >= pd.to_datetime(start_str)]
+    if end_str:
+        df = df[df["Date"] <= pd.to_datetime(end_str)]
+
+    df = df.sort_values("Date")
+    df = df.set_index("Date")
+
+    for col in ("Open", "High", "Low", "Close", "Volume"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df[["Open", "High", "Low", "Close", "Volume"]].dropna(how="any")
+
+
 def _ak_fetch_daily(code: str, exch: str, start: Optional[datetime], end: Optional[datetime], adjust: str) -> pd.DataFrame:
     import akshare as ak  # pyright: ignore[reportMissingModuleSource]
+
+    # Route index codes to the index-specific API
+    if code in _INDEX_CODES:
+        return _ak_fetch_index_daily(code, exch, start, end)
 
     start_str = start.strftime("%Y%m%d") if start else None
     end_str = end.strftime("%Y%m%d") if end else None

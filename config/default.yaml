@@ -88,10 +88,10 @@ quality_filters_30d:
 # WEEKLY SCANNER QUALITY FILTERS
 # =============================================================================
 quality_filters_weekly:
-  # Technical scoring threshold (raised from 6.0 for higher signal quality)
-  min_technical_score: 7.0
+  # Technical scoring threshold (5.5 = 3+ factors firing, e.g. near-high + volume + RSI)
+  min_technical_score: 5.5
   # Composite score threshold (after LLM analysis) — enforced post-LLM
-  min_composite_score: 6.5
+  min_composite_score: 5.5
   # Reject SPECULATIVE confidence picks from final top5
   min_confidence: "MEDIUM"       # Options: "HIGH", "MEDIUM", "SPECULATIVE"
 
