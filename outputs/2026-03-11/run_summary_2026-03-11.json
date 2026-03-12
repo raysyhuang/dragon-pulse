@@ -1,0 +1,37 @@
+{
+  "date": "2026-03-11",
+  "market_region": "CN",
+  "universe_size": 5489,
+  "stages": {
+    "movers": {
+      "status": "skipped",
+      "reason": "CN market"
+    },
+    "swing": {
+      "status": "skipped",
+      "reason": "CN market"
+    },
+    "weekly": {
+      "status": "ok",
+      "duration_s": 7335,
+      "candidates_found": 9,
+      "universe_screened": 5489
+    },
+    "pro30": {
+      "status": "skipped",
+      "reason": "CN market"
+    },
+    "llm_ranking": {
+      "status": "ok",
+      "duration_s": 334,
+      "input_candidates": 9,
+      "output_picks": 0
+    }
+  },
+  "regime": {
+    "status": "unknown",
+    "benchmark": "000300.SH"
+  },
+  "final_picks": 0,
+  "total_duration_s": 7680
+}
