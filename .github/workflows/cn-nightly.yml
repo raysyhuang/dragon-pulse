@@ -122,17 +122,29 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add outputs/
+          git add outputs/ data/bad_tickers.json
           if git diff --cached --quiet; then
             echo "No new outputs to commit"
           else
             TRADE_DATE="${{ steps.date.outputs.trade_date }}"
             git commit -m "auto: CN nightly outputs for ${TRADE_DATE}"
-            git push origin HEAD:main || {
+            # Retry push after rebasing onto latest main if another run wins the race.
+            pushed=false
+            for i in 1 2 3; do
+              if git push origin HEAD:main; then
+                pushed=true
+                break
+              fi
+              echo "Push failed (attempt $i/3), rebasing..."
+              git stash push --include-untracked --message "cn-nightly-rebase-${i}" || true
               git fetch origin main
               git rebase origin/main
-              git push origin HEAD:main
-            }
+              git stash pop || true
+            done
+            if [ "${pushed}" != "true" ]; then
+              echo "Failed to push CN nightly outputs after 3 attempts"
+              exit 1
+            fi
           fi
 
       - name: Upload outputs artifact
