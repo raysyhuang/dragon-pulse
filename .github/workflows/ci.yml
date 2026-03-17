@@ -156,17 +156,16 @@ jobs:
       
       - name: Verify imports work
         run: |
-          python -c "from src.core import config, filters, scoring, technicals"
-          python -c "from src.pipelines import weekly, pro30"
-          python -c "from src.commands import all, weekly, pro30, movers"
+          python -c "from src.core import config"
+          python -c "from src.pipelines.scanner import run_scan"
+          python -c "from src.signals.mean_reversion import score_mean_reversion"
+          python -c "from src.core.acceptance import run_acceptance"
           echo "All imports successful!"
-      
+
       - name: Test CLI help
         run: |
           python main.py --help
-          python main.py all --help
-          python main.py weekly --help
-          python main.py pro30 --help
+          python main.py scan --help
       
       - name: Build check
         run: |

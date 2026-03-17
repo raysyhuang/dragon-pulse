@@ -208,28 +208,32 @@ main {
     margin-top: 6px;
     flex-wrap: wrap;
 }
-.source-tag {
-    padding: 1px 7px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
+.acceptance-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
 }
-.source-tag.weekly { background: var(--purple-bg); color: var(--purple); }
-.source-tag.pro30 { background: var(--accent-bg); color: var(--accent); }
-.source-tag.movers { background: var(--yellow-bg); color: var(--yellow); }
+.acceptance-badge {
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.acc-full { background: var(--green-bg); color: var(--green); }
+.acc-selective { background: var(--yellow-bg); color: var(--yellow); }
+.acc-abstain { background: var(--red-bg); color: var(--red); }
+.acc-suppressed { background: var(--red-bg); color: var(--red); }
+.acc-off { background: var(--surface); color: var(--text-muted); }
 
-.confidence-tag {
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    padding: 1px 7px;
-    border-radius: 4px;
+.pick-reason {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
 }
-.conf-high { background: var(--green-bg); color: var(--green); }
-.conf-medium { background: var(--yellow-bg); color: var(--yellow); }
-.conf-speculative { background: var(--red-bg); color: var(--red); }
 
 .pick-right {
     text-align: right;

@@ -1,4 +1,4 @@
-/* Dragon Pulse — Vanilla JS Dashboard */
+/* Dragon Pulse v4 — Dashboard */
 
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
@@ -21,44 +21,24 @@ function tickerDisplay(ticker, name) {
     return ticker;
 }
 
-function buildNameMap(...groups) {
-    const entries = groups.flat().filter(item => item?.ticker && item?.name);
-    return Object.fromEntries(entries.map(item => [item.ticker, item.name]));
-}
-
-function uniqueTickers(...groups) {
-    return [...new Set(groups.flat().filter(Boolean))];
-}
-
-function overlapChip(ticker, nameMap) {
-    const name = nameMap[ticker];
-    if (name) return `<span class="overlap-chip">${name} <span class="ticker-code">${ticker}</span></span>`;
-    return `<span class="overlap-chip">${ticker}</span>`;
-}
-
 function regimeBadge(regime) {
     if (!regime) return '';
     const r = regime.toLowerCase();
-    const emoji = { bull: '\u{1F7E2}', bear: '\u{1F534}', choppy: '\u{1F7E1}', caution: '\u{1F7E1}' }[r] || '\u26AA';
-    const cls = `regime-${r.includes('caution') ? 'caution' : r}`;
+    const emoji = { bull: '\u{1F7E2}', bear: '\u{1F534}', choppy: '\u{1F7E1}' }[r] || '\u26AA';
+    const cls = `regime-${r}`;
     return `<span class="regime-badge ${cls}">${emoji} ${regime.toUpperCase()}</span>`;
 }
 
-function sourceTag(src) {
-    const s = src.toLowerCase();
-    let cls = 'weekly';
-    if (s.includes('pro30') || s.includes('30d')) cls = 'pro30';
-    else if (s.includes('mover')) cls = 'movers';
-    return `<span class="source-tag ${cls}">${src}</span>`;
-}
-
-function confidenceTag(conf) {
-    if (!conf) return '';
-    const c = conf.toLowerCase();
-    let cls = 'conf-medium';
-    if (c === 'high') cls = 'conf-high';
-    else if (c === 'speculative') cls = 'conf-speculative';
-    return `<span class="confidence-tag ${cls}">${conf}</span>`;
+function acceptanceBadge(mode) {
+    if (!mode) return '';
+    const m = mode.toLowerCase();
+    const cls = {
+        full: 'acc-full',
+        selective: 'acc-selective',
+        abstain: 'acc-abstain',
+        breadth_suppressed: 'acc-suppressed',
+    }[m] || 'acc-off';
+    return `<span class="acceptance-badge ${cls}">${mode.toUpperCase()}</span>`;
 }
 
 function miniBar(value, max) {
@@ -115,70 +95,67 @@ async function loadPicksView() {
         cache.picks = renderPicks(data);
         html(el, cache.picks);
     } catch {
-        html(el, '<div class="empty">No scan data yet.<br>Run <code>python main.py all</code> to generate picks.</div>');
+        html(el, '<div class="empty">No scan data yet.<br>Run <code>python main.py scan</code> to generate picks.</div>');
     }
 }
 
 function renderPicks(data) {
-    const summary = data.summary || {};
-    const overlaps = data.overlaps || {};
-    const hybrid = data.hybrid_top3 || [];
-    const weekly = data.weekly_top5 || data.primary_top5 || [];
-    const nameMap = {
-        ...(data.overlap_name_map || {}),
-        ...buildNameMap(hybrid, weekly),
-    };
-    const regime = data.regime || summary.regime || '';
-    const date = data.date || data.asof || '';
-    const label = data.primary_label || 'Weekly';
+    const picks = data.picks || [];
+    const rd = data.regime_detail || {};
+    const regime = data.regime || '';
+    const date = data.date || '';
+    const signalsTotal = data.signals_total || 0;
+    const eligible = rd.acceptance_eligible_count || 0;
+    const dqScore = rd.day_quality_score || 0;
+    const accMode = rd.acceptance_mode || '';
+    const breadth = rd.market_breadth_pct_above_sma20;
 
     let out = '';
 
-    // ── Header: date + regime + counts
+    // ── Header
     out += '<div class="page-header">';
     out += `<div class="page-date">${date || 'Latest Scan'}</div>`;
     out += '<div class="page-subtitle">';
     if (regime) out += regimeBadge(regime);
-    out += `<div class="stat-pills">
-        <span class="stat-pill">${label} <b>${summary.weekly_top5_count ?? weekly.length}</b></span>
-        <span class="stat-pill">Pro30 <b>${summary.pro30_candidates_count ?? 0}</b></span>
-        <span class="stat-pill">Movers <b>${summary.movers_count ?? 0}</b></span>
-    </div>`;
+    if (breadth != null) out += `<span class="stat-pill">Breadth ${(breadth * 100).toFixed(0)}%</span>`;
     out += '</div></div>';
 
-    // ── Overlaps callout (most important — show first)
-    const allThree = uniqueTickers(overlaps.all_three || []);
-    const overlapTickers = uniqueTickers(
-        (overlaps.weekly_pro30 || overlaps.primary_pro30 || []).filter(t => !allThree.includes(t)),
-        (overlaps.weekly_movers || overlaps.primary_movers || []).filter(t => !allThree.includes(t)),
-        (overlaps.pro30_movers || []).filter(t => !allThree.includes(t)),
-    );
+    // ── Acceptance stats
+    out += '<div class="acceptance-stats">';
+    out += `<span class="stat-pill">MR Signals <b>${signalsTotal}</b></span>`;
+    out += `<span class="stat-pill">Eligible <b>${eligible}</b></span>`;
+    out += `<span class="stat-pill">DQ <b>${dqScore.toFixed(0)}</b>/100</span>`;
+    out += acceptanceBadge(accMode);
+    out += `<span class="stat-pill">Picks <b>${picks.length}</b></span>`;
+    out += '</div>';
 
-    if (allThree.length) {
-        out += `<div class="overlap-callout">
-            <div class="overlap-header">\u2B50 All Three Systems Agree</div>
-            <div class="overlap-items">${allThree.map(t => overlapChip(t, nameMap)).join('')}</div>
-        </div>`;
-    }
-    if (overlapTickers.length) {
-        out += `<div class="overlap-callout overlap-callout-green">
-            <div class="overlap-header">\u{1F3AF} Overlaps</div>
-            <div class="overlap-items">${overlapTickers.map(t => overlapChip(t, nameMap)).join('')}</div>
-        </div>`;
-    }
-
-    // ── Hybrid Top 3
-    if (hybrid.length) {
-        out += `<div class="section-title">\u{1F3C6} Hybrid Top ${Math.min(3, hybrid.length)}</div>`;
-        for (const p of hybrid.slice(0, 3)) {
-            const score = p.hybrid_score ?? p.composite_score ?? 0;
-            const sources = (p.sources || []).map(sourceTag).join(' ');
-            const conf = p.confidence || '';
+    // ── Picks
+    if (!picks.length) {
+        if (accMode === 'breadth_suppressed') {
+            out += '<div class="empty">\u{1F4C9} Breadth suppressed — no picks today.</div>';
+        } else if (accMode === 'abstain') {
+            out += '<div class="empty">\u23F8 Day quality too low — abstained.</div>';
+        } else {
+            out += '<div class="empty">No picks for this date.</div>';
+        }
+    } else {
+        out += `<div class="section-title">Mean Reversion Picks</div>`;
+        for (let i = 0; i < picks.length; i++) {
+            const p = picks[i];
+            const name = p.name_cn || p.name || '';
+            const score = p.score || 0;
+            const maxEntry = p.max_entry_price ? ` max=\u00A5${p.max_entry_price.toFixed(2)}` : '';
             out += `<div class="pick-card">
-                <div class="pick-rank">${p.rank ?? ''}</div>
+                <div class="pick-rank">${i + 1}</div>
                 <div class="pick-body">
-                    <div class="pick-name">${tickerDisplay(p.ticker, p.name)}</div>
-                    <div class="pick-meta">${sources} ${confidenceTag(conf)}</div>
+                    <div class="pick-name">${tickerDisplay(p.ticker, name)}</div>
+                    <div class="pick-meta">
+                        Entry: \u00A5${p.entry_price?.toFixed(2) || '—'}${maxEntry} |
+                        Stop: \u00A5${p.stop_loss?.toFixed(2) || '—'} |
+                        T1: \u00A5${p.target_1?.toFixed(2) || '—'} |
+                        Hold: ${p.holding_period || 3}d
+                    </div>
+                    ${p.reason_summary ? `<div class="pick-reason">${p.reason_summary}</div>` : ''}
                 </div>
                 <div class="pick-right">
                     <div class="pick-score-value">${Number(score).toFixed(0)}<span class="pick-score-max">/100</span></div>
@@ -186,30 +163,6 @@ function renderPicks(data) {
                 </div>
             </div>`;
         }
-    }
-
-    // ── Weekly/Primary Top 5
-    if (weekly.length) {
-        out += `<div class="section-title">${label} Top ${Math.min(5, weekly.length)}</div>`;
-        for (const p of weekly.slice(0, 5)) {
-            const score = p.composite_score ?? p.swing_score ?? 0;
-            const conf = p.confidence || '';
-            out += `<div class="pick-card">
-                <div class="pick-rank">${p.rank ?? ''}</div>
-                <div class="pick-body">
-                    <div class="pick-name">${tickerDisplay(p.ticker, p.name)}</div>
-                    <div class="pick-meta">${confidenceTag(conf)}</div>
-                </div>
-                <div class="pick-right">
-                    <div class="pick-score-value">${Number(score).toFixed(1)}<span class="pick-score-max">/10</span></div>
-                    ${miniBar(score, 10)}
-                </div>
-            </div>`;
-        }
-    }
-
-    if (!hybrid.length && !weekly.length) {
-        out += '<div class="empty">No picks for this date.</div>';
     }
 
     return out;
@@ -235,13 +188,13 @@ function renderPerformance(data) {
     if (!runs.length) return '<div class="empty">No runs found.</div>';
 
     const total = runs.length;
-    const withOverlaps = runs.filter(r => r.has_overlaps).length;
-    const overlapPct = total ? ((withOverlaps / total) * 100).toFixed(0) : 0;
+    const avgPicks = (runs.reduce((s, r) => s + r.picks_count, 0) / total).toFixed(1);
+    const avgDQ = (runs.reduce((s, r) => s + r.day_quality_score, 0) / total).toFixed(0);
 
     let out = `<div class="kpi-row">
         <div class="kpi"><div class="kpi-value">${total}</div><div class="kpi-label">Runs</div></div>
-        <div class="kpi"><div class="kpi-value">${withOverlaps}</div><div class="kpi-label">With Overlaps</div></div>
-        <div class="kpi"><div class="kpi-value">${overlapPct}%</div><div class="kpi-label">Overlap Rate</div></div>
+        <div class="kpi"><div class="kpi-value">${avgPicks}</div><div class="kpi-label">Avg Picks/Day</div></div>
+        <div class="kpi"><div class="kpi-value">${avgDQ}</div><div class="kpi-label">Avg Day Quality</div></div>
     </div>`;
 
     out += '<div class="section-title">Run History</div>';
@@ -249,12 +202,12 @@ function renderPerformance(data) {
         out += `<div class="run-item" onclick="window.open('/runs/${r.date}','_blank')">
             <div class="run-date">${r.date}</div>
             <div class="run-counts">
-                <span>Weekly <b>${r.weekly_top5_count}</b></span>
-                <span>Pro30 <b>${r.pro30_candidates_count}</b></span>
-                <span>Movers <b>${r.movers_count}</b></span>
+                ${regimeBadge(r.regime)}
+                ${acceptanceBadge(r.acceptance_mode)}
+                <span>Picks <b>${r.picks_count}</b></span>
+                <span>Signals <b>${r.signals_total}</b></span>
+                <span>DQ <b>${r.day_quality_score.toFixed(0)}</b></span>
             </div>
-            <div class="run-summary">${r.weekly_top5_count}W • ${r.pro30_candidates_count}P • ${r.movers_count}M</div>
-            ${r.has_overlaps ? '<span class="run-overlap-badge">OVERLAP</span>' : ''}
         </div>`;
     }
 
@@ -282,10 +235,13 @@ async function loadSystemView() {
 function renderSystem(health, runs) {
     const dates = (runs.runs || []).map(r => r.date);
 
-    let out = '<div class="card"><div class="card-title">Health</div>';
+    let out = '<div class="card"><div class="card-title">System</div>';
     out += `<div class="info-row"><span class="info-key">Status</span><span class="info-val">${health.status}</span></div>`;
-    out += `<div class="info-row"><span class="info-key">Timestamp</span><span class="info-val">${health.timestamp}</span></div>`;
     out += `<div class="info-row"><span class="info-key">Version</span><span class="info-val">${health.version}</span></div>`;
+    out += `<div class="info-row"><span class="info-key">Engine</span><span class="info-val">Mean Reversion (MR-only)</span></div>`;
+    out += `<div class="info-row"><span class="info-key">Stop</span><span class="info-val">0.95\u00D7 ATR</span></div>`;
+    out += `<div class="info-row"><span class="info-key">Sniper</span><span class="info-val">Quarantined</span></div>`;
+    out += `<div class="info-row"><span class="info-key">Acceptance</span><span class="info-val">Live Equivalent</span></div>`;
     out += '</div>';
 
     out += '<div class="card"><div class="card-title">Last Run</div>';
@@ -294,7 +250,7 @@ function renderSystem(health, runs) {
         out += `<div class="info-row"><span class="info-key">Date</span><span class="info-val">${latest}</span></div>`;
         out += `<a class="api-link" href="/runs/${latest}" target="_blank"><span>Open raw JSON</span><span class="api-path">/runs/${latest}</span></a>`;
     } else {
-        out += '<div class="info-row"><span class="info-key">Status</span><span class="info-val">No runs available</span></div>';
+        out += '<div class="info-row"><span class="info-key">Status</span><span class="info-val">No runs</span></div>';
     }
     out += '</div>';
 
