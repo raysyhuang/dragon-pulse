@@ -1,179 +1,140 @@
-# Momentum Trading System v3.1 - China A-Shares Configuration
-# This is the single source of truth for all parameters
-# Optimized for China A-share market characteristics
+# Dragon Pulse — Deterministic A-Share Scanner Configuration
+# Two engines: mean_reversion + sniper, top 1000 by market cap
 
 market:
-  region: "CN"               # Options: "US", "CN"
-  timezone: "Asia/Shanghai"  # Trading timezone for outputs/calendars
-  close_hour_local: 15       # Local market close hour (A-shares close at 15:00)
+  region: "CN"
+  timezone: "Asia/Shanghai"
+  close_hour_local: 15
   close_minute_local: 0
 
 data:
-  provider: "AUTO"           # AUTO selects by market
+  provider: "AUTO"
   china:
-    primary: "akshare"       # Primary data source
-    backup: "tushare"        # Backup if AkShare fails
-    adjust: "qfq"            # qfq (前复权) recommended for technical analysis
+    primary: "akshare"
+    backup: "tushare"
+    adjust: "qfq"
     tushare_token_env: "TUSHARE_TOKEN"
   us:
     provider: "yahoo"
 
 universe:
-  mode: "CHINA_A"  # Options: "CHINA_A", "SP500", "SP500+NASDAQ100", "SP500+NASDAQ100+R2000"
+  mode: "CHINA_A"
   cache_file: "universe_cache_CHINA_A.csv"
   cache_max_age_days: 7
-  manual_include_file: "tickers/manual_include_tickers.txt"
-  r2000_include_file: "tickers/r2000.txt"
-  manual_include_mode: "ALWAYS"  # Options: "ALWAYS", "ONLY_IF_IN_UNIVERSE"
-  china_board_filters: []  # Optional: ["SSE", "SZSE"] or leave empty for all
-  # ST stock handling
-  exclude_st: true           # Exclude ST and *ST stocks (higher risk)
-  exclude_delisting_warning: true  # Exclude stocks with delisting warnings
+  exclude_st: true
+  exclude_delisting_warning: true
 
-# =============================================================================
-# LIQUIDITY FILTERS - Adjusted for China A-share market
-# =============================================================================
-# Note: A-shares typically have higher average volumes than US small caps
-# CNY values (not USD)
+# Required by config validator (legacy compat)
 liquidity:
-  min_price: 5.0             # CNY - avoid penny stocks (≤5 CNY often speculative)
-  min_avg_dollar_volume_20d: 50000000  # 50M CNY - institutional-grade liquidity
-  min_avg_volume: 1000000    # 1M shares minimum
-  max_5d_return: 0.25        # 25% max 5-day return (adjusted for 10% daily limit)
-  # A-shares have 10% daily limit, so 20%+ in 5 days = already hot
+  min_price: 5.0
+  min_avg_dollar_volume_20d: 100000000
+  min_avg_volume: 1000000
 
-# =============================================================================
-# ATTENTION POOL - Dynamic universe filter
-# =============================================================================
-attention_pool:
-  enabled: true  # Only for 30D screener
-  rvol_min: 1.5              # Lower than US (A-shares have natural volume spikes)
-  atr_pct_min: 2.5           # ATR% tends to be lower due to limit-up/down
-  min_abs_day_move_pct: 2.0  # 2% move is significant for A-shares
-  lookback_days: 120
-  chunk_size: 300            # Larger chunks for A-share universe (5000+ stocks)
-  enable_intraday: false     # Intraday not available for A-shares via AkShare
-  intraday_interval: "5m"
-  intraday_lookback_days: 5
-  market_open_buffer_min: 20
-  intraday_rvol_min: 2.0
-
-# =============================================================================
-# TECHNICAL SETTINGS
-# =============================================================================
 technicals:
   rsi_period: 14
   ma_windows: [10, 20, 50]
   atr_period: 14
-  lookback_days: 300         # For 52W high + MA50
-  realized_vol_window: 5
-  realized_vol_threshold_ann_pct: 25.0  # Annualized vol threshold (20% too easy for A-shares)
-  price_min: 8.0             # CNY - For 30D screener (higher quality)
+  lookback_days: 300
 
 # =============================================================================
-# 30-DAY SCREENER QUALITY FILTERS - Adjusted for A-shares
+# MEAN REVERSION ENGINE — RSI(2) oversold bounces
 # =============================================================================
-quality_filters_30d:
-  rvol_min: 1.5              # Lower threshold (A-shares naturally volatile)
-  atr_pct_min: 2.5           # Lower (10% limit constrains volatility)
-  near_high_max_pct: 10.0    # Within 10% of 52W high for breakouts
-  rsi_reversal_max: 35.0
-  breakout_rsi_min: 50.0     # Lower threshold (momentum starts earlier)
-  reversal_dist_to_high_min_pct: 15.0
-  reversal_rsi_max: 35.0
-  # Backtest-calibrated minimum score
-  min_score: 20.0            # Lower threshold for initial screening
+# Active in ALL regimes (bull, choppy, bear)
+mean_reversion:
+  # Weights (must sum to 1.0)
+  w_rsi2: 0.40
+  w_trend: 0.25
+  w_streak: 0.15
+  w_proximity: 0.10
+  w_volume: 0.10
+
+  # Gates
+  min_bars: 60
+  adv_min_cny: 100000000       # 100M CNY floor
+  max_single_day_move: 0.11    # reject split/bad-data artifacts
+  rsi2_max: 5                  # deeply oversold only
+  score_floor: 65              # min composite to emit signal
+
+  # Targets
+  stop_atr_mult: 0.95
+  target_1_atr_mult: 1.5
+  target_2_atr_mult: 2.0
+  max_entry_atr_mult: 0.2
+  holding_period: 3
+
+  # Regime
+  regime:
+    csi300_symbol: "000300.SH"
+    sma_short: 20
+    sma_long: 50
 
 # =============================================================================
-# WEEKLY SCANNER QUALITY FILTERS
+# SNIPER ENGINE — BB squeeze + volume compression breakouts
 # =============================================================================
-quality_filters_weekly:
-  # Technical scoring threshold (5.5 = 3+ factors firing, e.g. near-high + volume + RSI)
-  min_technical_score: 5.5
-  # Composite score threshold (after LLM analysis) — enforced post-LLM
-  min_composite_score: 5.5
-  # Reject SPECULATIVE confidence picks from final top5
-  min_confidence: "MEDIUM"       # Options: "HIGH", "MEDIUM", "SPECULATIVE"
+# Bear regime → hard block. Score floors: 60 bull, 65 choppy
+sniper:
+  enabled: false  # quarantined — 21% win rate, -0.42% exp across all tests
+  # Weights (must sum to 1.0)
+  w_bb_squeeze: 0.30
+  w_vol_compression: 0.25
+  w_relative_strength: 0.20
+  w_trend: 0.15
+  w_momentum: 0.10
+
+  # Hard gates
+  atr_pct_floor: 3.5
+  min_avg_volume: 1000000      # 1M shares floor
+  bear_block: true
+
+  # Score floors per regime
+  score_floor_bull: 65
+  score_floor_choppy: 70
+
+  # Targets
+  stop_atr_mult: 2.0
+  target_atr_mult: 3.0
+  target_2_atr_mult: 5.0
+  holding_period: 7
+
+  regime:
+    csi300_symbol: "000300.SH"
 
 # =============================================================================
-# OUTPUT CONTROLS
+# PORTFOLIO & RISK SETTINGS — Variable Book Size
 # =============================================================================
-outputs_30d:
-  top_n_breakout: 20         # More candidates (larger universe)
-  top_n_reversal: 20
-  top_n_total: 30
+book_size:
+  breadth_floor: 0.35  # % of universe above SMA20 to allow any picks
+  max_per_sector: 1    # max picks from same industry per day
+
+  # Regime-specific constraints
+  bull:
+    max_picks: 5
+    min_score: 65
+  choppy:
+    max_picks: 3
+    min_score: 75
+  bear:
+    max_picks: 1
+    min_score: 85  # Only the absolute best setup survives in a bear market
 
 # =============================================================================
-# REGIME GATE - Market conditions check
+# ACCEPTANCE LAYER — app-level precision filter above engines
 # =============================================================================
-# Uses CSI 300 as the benchmark index for A-shares
-regime_gate:
+acceptance:
   enabled: true
-  spy_symbol: "000300.SH"    # CSI 300 Index (沪深300)
-  vix_symbol: ""             # No VIX equivalent for A-shares (leave blank)
-  spy_ma_days: 20
-  vix_max: 30.0              # Not used for CN
-  action: "BLOCK"             # Options: "WARN", "BLOCK" — changed from WARN to prevent picks in downtrends
-
-# =============================================================================
-# NEWS SETTINGS
-# =============================================================================
-news:
-  max_items: 30              # More items for CN (news is important driver)
-  packet_headlines: 15       # Include more headlines in packets
-  throttle_sec: 0.2          # Slightly longer throttle for AkShare
-
-# =============================================================================
-# DAILY MOVERS - Disabled by default (use Dragon Tiger List instead)
-# =============================================================================
-movers:
-  enabled: false             # Recommend using Dragon Tiger List instead
-  top_n: 50
-  gainers_pct_range: [0.05, 0.10]  # 5-10% (respect daily limits)
-  losers_pct_range: [-0.10, -0.05]
-  gainers_volume_spike: 1.5  # Lower threshold for A-shares
-  losers_volume_spike: 1.5
-  close_position_min: 0.70
-  price_min: 5.0
-  adv_20d_min: 50000000      # 50M CNY
-  cooling_days_required: 1
-  max_age_days: 5
-
-# =============================================================================
-# DRAGON TIGER LIST (龙虎榜) - Replaces options flow for A-shares
-# =============================================================================
-dragon_tiger:
-  enabled: true
-  min_flow_score: 5.0        # Minimum score to consider
-  min_net_buy_cny: 20000000  # 20M CNY minimum net institutional buy (raised from 10M)
-  top_n: 20
-  lookback_days: 5           # Days of Dragon Tiger data to analyze
-
-# =============================================================================
-# SECTOR ROTATION
-# =============================================================================
-sector_rotation:
-  enabled: true
-  top_n_sectors: 5           # Number of hot sectors to track
-  stocks_per_sector: 5       # Leaders per sector
-  min_sector_score: 6.0      # Minimum sector momentum score
-
-# =============================================================================
-# SENTIMENT (Chinese platforms)
-# =============================================================================
-sentiment_cn:
-  enabled: true
-  platforms:
-    - eastmoney_guba         # 东方财富股吧
-    - hot_rank               # 人气榜
-  min_sentiment_score: 4.0   # Minimum to consider
+  dq_full_threshold: 55       # day quality ≥ this → full mode (A+B tiers)
+  dq_selective_threshold: 35  # day quality ≥ this → selective (A-tier only)
+  max_full: 5                 # max picks in full mode
+  max_selective: 2            # max picks in selective mode
+  # Below dq_selective_threshold → abstain (0 picks)
 
 # =============================================================================
 # OUTPUT SETTINGS
 # =============================================================================
 outputs:
-  root_dir: "outputs"
-  dated_subdir: true
+  root: "outputs"
+  save_json: true
+  save_csv: true
 
 # =============================================================================
 # RUNTIME SETTINGS
@@ -181,161 +142,31 @@ outputs:
 runtime:
   threads: true
   yf_auto_adjust: false
-  method_version: "v3.2-CN"
-  
-  # China-specific settings
-  china_trading_days: true   # Use CN trading calendar
-  exclude_suspended: true    # Exclude suspended stocks
+  method_version: "v4.0-scan"
+  china_trading_days: true
+  exclude_suspended: true
 
 # =============================================================================
-# CACHE SETTINGS (optional performance optimization)
+# CACHE SETTINGS
 # =============================================================================
 cache:
   enabled: true
-  backend: "sqlite"          # sqlite or redis
+  backend: "sqlite"
   sqlite_path: "data/price_cache.db"
-  redis_url: "redis://localhost:6379/0"
-  price_ttl_seconds: 3600    # 1 hour
-  news_ttl_seconds: 1800     # 30 minutes
+  price_ttl_seconds: 3600
+  news_ttl_seconds: 1800
 
 # =============================================================================
-# ALERTS (optional)
+# ALERTS
 # =============================================================================
 alerts:
   enabled: true
-  channels: ["telegram", "file"]   # Options: telegram, desktop, file
-  triggers:
-    high_composite_score: 7.0
-    dragon_tiger_signal: true
-    sector_rotation_leader: true
+  channels: ["telegram", "file"]
 
 # =============================================================================
-# DRAGON PULSE (龙脉) - High Win-Rate Multi-Lens Strategy
+# PREFLIGHT (morning check thresholds)
 # =============================================================================
-dragon_pulse:
-  enabled: true
-  max_daily_picks: 2
-  min_composite_score: 45.0
-  universe_mode: "CHINA_A"
-
-  # Regime settings
-  regime:
-    csi300_symbol: "000300"     # CSI 300 index code for AkShare
-    sma_short: 20
-    sma_long: 50
-    bull_sizing: 1.0
-    caution_sizing: 0.6
-    bear_sizing: 0.3
-    bear_action: "WARN"         # "WARN" or "BLOCK"
-    breadth_bullish: 0.60       # % above SMA20 threshold
-    breadth_bearish: 0.30
-    northbound_flow_threshold_cny: -5000000000  # -5B CNY = heavy selling
-
-  # Confluence weights
-  confluence:
-    w_lens_a: 0.40
-    w_lens_b: 0.35
-    w_lens_c: 0.25
-    threshold_a: 50.0
-    threshold_b: 50.0
-    high_threshold: 70.0
-    require_dtl_for_breakout: true  # Phase 2: breakout-dominant signals need Dragon Tiger confirmation
-
-  # Lens A: Institutional Pullback
-  lens_a:
-    high_lookback: 20
-    high_recency: 10
-    pullback_min_pct: 5.0
-    pullback_max_pct: 12.0
-    rsi2_max: 20.0
-    sma_period: 50
-    vol_decline_max: 0.8
-    target_pct: 5.0
-    stop_pct: 3.0
-    trailing_trigger_pct: 2.5
-    max_hold_days: 5
-    w_rsi_depth: 0.30
-    w_pullback_mag: 0.20
-    w_vol_decline: 0.15
-    w_sma_margin: 0.15
-    w_institutional: 0.20
-
-  # Lens B: Volume Breakout
-  lens_b:
-    bb_period: 20
-    bb_width_pctl_max: 20.0
-    volume_expansion_min: 2.0
-    bb_position_min: 1.0
-    rsi14_min: 50.0
-    rsi14_max: 70.0
-    atr_pct_min: 2.0
-    target_pct: 5.0
-    stop_pct: 3.5
-    trailing_trigger_pct: 3.0
-    max_hold_days: 5
-    w_volume: 0.30
-    w_squeeze: 0.20
-    w_trend: 0.20
-    w_rsi: 0.15
-    w_sector: 0.15
-
-  # Lens C: Limit-Up Seal
-  lens_c:
-    limit_pct: 9.5
-    dtl_min_net_buy_cny: 10000000
-    max_consecutive_limits: 1
-    min_adv_20d_cny: 50000000
-    target_pct: 3.0
-    stop_pct: 5.0
-    max_hold_days: 2
-    position_size_mult: 0.5
-    w_inst_magnitude: 0.35
-    w_seal_quality: 0.25
-    w_sector: 0.20
-    w_volume: 0.20
-
-  # Risk Parity Sizing (volatility-adjusted position sizes)
-  risk_parity:
-    target_atr_pct: 3.0          # "Normal" ATR% — stocks with higher ATR get smaller positions
-    max_sector_positions: 2      # Max picks in same sector before penalty
-    sector_excess_penalty: 0.5   # 50% size for excess sector positions
-
-  # Pre-market gap validation thresholds
-  preflight:
-    max_gap_up_pct: 3.0          # Cancel if opening gap > +3%
-    max_gap_down_pct: 5.0        # Cancel if opening gap < -5%
-    min_volume_ratio: 0.10       # First 15-min volume should be >10% of prev day
-
-  # Dead Money Time Stop (exit if no movement within N days)
-  dead_money_days: 3           # Exit after 3 trading days if pick hasn't moved
-  dead_money_min_pct: 2.0      # Minimum +2% high-water-mark required to stay
-
-  # Capital Guardian
-  guardian:
-    max_drawdown_pct: 15.0
-    streak_reduction_after: 2
-    halt_after_consecutive_losses: 5
-    max_portfolio_heat_pct: 10.0
-    halt_portfolio_heat_pct: 15.0
-    max_open_positions: 4
-    per_trade_risk_cap_pct: 2.0
-
-  # Database
-  db_path: "data/dragon_pulse.db"
-
-# =============================================================================
-# EVOLUTION ENGINE
-# =============================================================================
-evolution:
-  population_size: 10
-  generations: 5
-  elite_count: 2
-  mutation_rate: 0.1
-  tournament_size: 3
-  train_months: 6
-  test_months: 1
-  min_win_rate: 0.50
-  min_trades: 10
-  max_drawdown: 25.0
-  parallel_workers: 4
-  backtest_universe_size: 300
+preflight:
+  max_gap_up_pct: 3.0
+  max_gap_down_pct: 5.0
+  min_volume_ratio: 0.10

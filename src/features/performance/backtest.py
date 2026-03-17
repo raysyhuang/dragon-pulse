@@ -11,9 +11,15 @@ from typing import Any, Iterable, Optional
 import pandas as pd
 import yfinance as yf
 
-# PR4: Execution model and metrics
-from src.backtest.execution import ExecutionModel, entry_price
-from src.backtest.metrics import compute_path_metrics, compute_expectancy
+# PR4: Execution model and metrics (legacy — graceful fallback)
+try:
+    from src.backtest.execution import ExecutionModel, entry_price
+    from src.backtest.metrics import compute_path_metrics, compute_expectancy
+except ImportError:
+    ExecutionModel = None  # type: ignore[assignment,misc]
+    entry_price = None  # type: ignore[assignment]
+    compute_path_metrics = None  # type: ignore[assignment]
+    compute_expectancy = None  # type: ignore[assignment]
 
 logger = logging.getLogger(__name__)
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

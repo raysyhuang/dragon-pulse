@@ -405,3 +405,66 @@ def build_universe(
     rng.shuffle(all_tickers)
 
     return all_tickers
+
+
+def get_top_n_cn_by_market_cap(
+    n: int = 1000,
+    provider_config: dict | None = None,
+) -> list[str]:
+    """Return the top *n* China A-share tickers ranked by total market cap.
+
+    Uses Tushare ``daily_basic`` (``total_mv``) as the ranking source.
+
+    Raises
+    ------
+    RuntimeError
+        If Tushare ranking cannot be obtained.
+    """
+    import os
+
+    cfg = provider_config or {}
+    tushare_token = cfg.get("tushare_token") or os.environ.get(
+        cfg.get("tushare_token_env", "TUSHARE_TOKEN"), ""
+    )
+
+    if not tushare_token:
+        raise RuntimeError(
+            "Cannot build market-cap-ranked universe: TUSHARE_TOKEN is not set."
+        )
+
+    # --- Tushare daily_basic for market-cap ranking ---
+    try:
+        import tushare as ts  # pyright: ignore[reportMissingModuleSource]
+
+        pro = ts.pro_api(token=tushare_token)
+
+        # Fetch the most recent trading day's basic metrics
+        from datetime import datetime, timedelta
+
+        # Try today first, then step back up to 5 days
+        df = None
+        for offset in range(6):
+            try_date = (datetime.utcnow() - timedelta(days=offset)).strftime("%Y%m%d")
+            df = pro.daily_basic(
+                trade_date=try_date,
+                fields="ts_code,total_mv",
+            )
+            if df is not None and not df.empty:
+                break
+
+        if df is not None and not df.empty:
+            df = df.dropna(subset=["total_mv"])
+            df = df.sort_values("total_mv", ascending=False)
+            tickers = df["ts_code"].astype(str).str.upper().head(n).tolist()
+            if tickers:
+                return tickers
+    except Exception as e:
+        raise RuntimeError(
+            "Cannot build market-cap-ranked universe: "
+            f"Tushare daily_basic failed: {e}"
+        ) from e
+
+    raise RuntimeError(
+        "Cannot build market-cap-ranked universe: "
+        "Tushare daily_basic returned no market-cap data."
+    )

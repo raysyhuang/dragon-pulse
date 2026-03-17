@@ -155,9 +155,7 @@ def _tushare_fetch_daily(
 ) -> pd.DataFrame:
     import tushare as ts  # pyright: ignore[reportMissingModuleSource]
 
-    if token:
-        ts.set_token(token)
-    pro = ts.pro_api()
+    pro = ts.pro_api(token=token)
 
     ts_code = ticker.upper()
     start_str = start.strftime("%Y%m%d") if start else None
@@ -205,23 +203,24 @@ def _ak_fetch_basic_info() -> pd.DataFrame:
     df["code"] = df["code"].astype(str).str.zfill(6)
     df["exchange"] = df["code"].str[0].map(lambda x: "SH" if x == "6" else "SZ")
     df["ticker"] = df["code"] + "." + df["exchange"]
-    # AkShare basic info does not include market cap; add placeholder
+    # AkShare basic info does not include market cap or industry; add placeholders
     df["market_cap"] = None
-    return df[["ticker", "name", "exchange", "market_cap"]]
+    df["industry"] = None
+    return df[["ticker", "name", "exchange", "market_cap", "industry"]]
 
 
 def _tushare_fetch_basic_info(token: Optional[str]) -> pd.DataFrame:
     import tushare as ts  # pyright: ignore[reportMissingModuleSource]
 
-    if token:
-        ts.set_token(token)
-    pro = ts.pro_api()
-    df = pro.stock_basic(exchange="", list_status="L", fields="ts_code,name,market")
+    pro = ts.pro_api(token=token)
+    df = pro.stock_basic(exchange="", list_status="L", fields="ts_code,name,market,industry")
     if df is None or df.empty:
         return pd.DataFrame()
     df = df.rename(columns={"ts_code": "ticker"})
     df["ticker"] = df["ticker"].astype(str).str.upper()
-    df["exchange"] = df["market"].astype(str).str.upper()
+    # Derive exchange from ticker suffix (600519.SH → SH), not from
+    # Tushare's 'market' column which returns Chinese labels like 主板/创业板.
+    df["exchange"] = df["ticker"].str.split(".").str[-1]
     # Try to fetch market cap (total_mv) from daily_basic for today as enrichment
     try:
         today_str = datetime.utcnow().strftime("%Y%m%d")
@@ -235,17 +234,21 @@ def _tushare_fetch_basic_info(token: Optional[str]) -> pd.DataFrame:
         pass
     if "market_cap" not in df.columns:
         df["market_cap"] = None
-    return df[["ticker", "name", "exchange", "market_cap"]]
+    if "industry" not in df.columns:
+        df["industry"] = None
+    return df[["ticker", "name", "exchange", "market_cap", "industry"]]
 
 
 def get_cn_basic_info(tickers: list[str], provider_config: Optional[dict] = None) -> dict[str, dict]:
     """
-    Best-effort company info (Chinese name, exchange) for CN tickers.
-    Returns mapping: ticker -> {"name_cn": str, "exchange": str, "market_cap": float|None}
+    Best-effort company info (Chinese name, exchange, industry) for CN tickers.
+    Returns mapping: ticker -> {"name_cn": str, "exchange": str, "market_cap": float|None, "industry": str|None}
     """
     if not tickers:
         return {}
-    providers = list(_provider_sequence(provider_config))
+    
+    # For basic info, we prefer Tushare because it has richer metadata (industry, market cap)
+    providers = ["tushare", "akshare"]
     tushare_token_env = (provider_config or {}).get("tushare_token_env", "TUSHARE_TOKEN")
     tushare_token = (provider_config or {}).get("tushare_token") or os.environ.get(tushare_token_env)
 
@@ -272,10 +275,13 @@ def get_cn_basic_info(tickers: list[str], provider_config: Optional[dict] = None
     df["ticker"] = df["ticker"].astype(str).str.upper()
     df = df.drop_duplicates(subset=["ticker"])
     for _, row in df.iterrows():
+        name = str(row.get("name", "")) if pd.notna(row.get("name", "")) else ""
         lookup[row["ticker"]] = {
-            "name_cn": str(row.get("name", "")) if pd.notna(row.get("name", "")) else "",
+            "name_cn": name,
             "exchange": str(row.get("exchange", "")).upper() if pd.notna(row.get("exchange", "")) else "",
             "market_cap": float(row["market_cap"]) if "market_cap" in row and pd.notna(row["market_cap"]) else None,
+            "industry": str(row.get("industry", "")) if pd.notna(row.get("industry", "")) else None,
+            "is_st": "ST" in name.upper() or "*ST" in name.upper(),
         }
 
     out: dict[str, dict] = {}
@@ -604,4 +610,3 @@ def download_daily_range(
         data_map[ticker] = df_out
 
     return data_map, {"bad_tickers": bad_tickers, "reasons": reasons}
-

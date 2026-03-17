@@ -4,9 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Multi-strategy momentum screener for China A-shares (with US market fallback) that identifies stocks with high probability of significant moves. Combines technical screening, LLM-powered ranking, and cross-system hybrid analysis.
-
-Three core systems: **Weekly Scanner** (7-day aggressive momentum), **30-Day Screener** (conservative positions), and **Daily Movers** (quarantined idea funnel). The `all` command runs all three plus hybrid cross-referencing.
+Deterministic A-share scanner with two MAS-derived engines: **Mean Reversion** (RSI(2) oversold bounces, 3-day hold) and **Sniper** (BB squeeze + volume compression breakouts, 7-day hold). No LLM, no debate/confluence. Top 1000 A-shares by market cap.
 
 ## Commands
 
@@ -14,28 +12,19 @@ Three core systems: **Weekly Scanner** (7-day aggressive momentum), **30-Day Scr
 # Install
 pip install -r requirements.txt
 
-# Run everything (recommended)
-python main.py all
+# Run scan (primary command)
+python main.py scan
+python main.py scan --date 2026-03-13    # Specific date
+python main.py scan --config config/default.yaml --debug
 
-# Individual components
-python main.py weekly          # Weekly scanner only
-python main.py pro30           # 30-day screener only
-python main.py llm             # LLM ranking only (needs weekly packets first)
-python main.py movers          # Daily movers discovery
-python main.py performance     # Backtest historical picks
-python main.py replay          # Regenerate past outputs
+# Alias
+python main.py all                       # Same as scan
 
-# Useful flags
-python main.py all --debug                    # Debug logging
-python main.py all --date 2025-12-28          # Specific date
-python main.py all --provider anthropic       # Use Claude instead of GPT
-python main.py all --model gpt-5.2            # Explicit model
-python main.py all --log-file logs/app.log    # Log to file
-python main.py all --open                     # Open HTML report in browser
+# Backtest
+python main.py performance              # Backtest picks from outputs/
 
 # Tests
 pytest tests/ -v
-pytest tests/test_filters.py -v    # Single test file
 ```
 
 ## Architecture
@@ -44,60 +33,62 @@ pytest tests/test_filters.py -v    # Single test file
 
 ```
 main.py (CLI dispatcher)
-  -> src/commands/*.py (command handlers)
-    -> src/pipelines/*.py (orchestration)
-      -> src/core/*.py (business logic)
-      -> src/features/*.py (optional features)
-      -> src/reporting/*.py (HTML/artifact generation)
+  -> src/commands/scan.py (command handler)
+    -> src/pipelines/scanner.py (unified pipeline)
+      -> src/core/universe.py (top 1000 by market cap)
+      -> src/core/cn_data.py (OHLCV download)
+      -> src/features/technical.py (pandas_ta indicators)
+      -> src/signals/mean_reversion.py (RSI(2) engine)
+      -> src/signals/sniper.py (BB squeeze engine)
+      -> src/core/alerts.py (Telegram notification)
 ```
 
 ### Key Directories
 
-- **src/core/**: Foundation — config loading, data fetching, filtering, scoring, LLM integration, I/O
-- **src/commands/**: CLI command handlers (thin wrappers around pipelines)
-- **src/pipelines/**: Orchestration workflows for weekly and pro30 scanners
-- **src/features/**: Optional modules — daily movers, dragon tiger list, sector rotation, backtesting
-- **src/reporting/**: HTML report generation with dark theme, plus CSV/JSON/Markdown artifacts
-- **config/default.yaml**: Single source of truth for all parameters (market, universe, liquidity, technicals, etc.)
-- **outputs/YYYY-MM-DD/**: Date-stamped output directories (trading days only)
+- **src/core/**: Foundation — config, data fetching, universe, regime, alerts, I/O
+- **src/commands/**: CLI command handlers (`scan.py`, `performance.py`)
+- **src/pipelines/**: `scanner.py` — unified scan pipeline
+- **src/signals/**: `mean_reversion.py`, `sniper.py` — scoring engines
+- **src/features/**: `technical.py` — pandas_ta feature engineering
+- **config/default.yaml**: All parameters for both engines
+- **outputs/YYYY-MM-DD/**: Date-stamped output directories
 
-### Market Abstraction
+### Engines
 
-The system supports both China A-shares and US markets via a market abstraction layer:
+**Mean Reversion** — active in ALL regimes (bull, choppy, bear)
+- RSI(2) ≤ 10 trigger, weights: RSI(2) 40%, trend 25%, streak 15%, 5d-low 10%, volume 10%
+- Stop: entry - 0.75×ATR, targets capped at entry×1.10 (A-share limit)
+- Gates: ≥60 bars, ADV ≥50M CNY, no >11% single-day moves
 
-- `src/core/data.py` routes to the correct data provider based on config (`market.region`)
-- `src/core/cn_data.py` handles China data (AkShare primary, Tushare backup)
-- `src/core/yf.py` handles US data via Yahoo Finance
-- `src/core/universe.py` manages ticker universes (`CHINA_A`, `SP500`, `SP500+NASDAQ100`, etc.)
-- `get_data_functions(config)` returns the appropriate download/provider functions for the configured market
+**Sniper** — bear regime hard block, score floors: 60 bull, 65 choppy
+- BB squeeze + volume compression + CSI 300 relative strength
+- Stop: entry - 2.0×ATR, targets capped at entry×1.10
+- Gates: ATR% ≥3.5, avg volume ≥500K shares
 
-### Pipeline Pattern
+### Output Artifacts
 
-All pipelines follow the same structure: load config -> build universe -> download data -> apply hard filters -> compute scores -> build LLM packets -> save outputs. The `src/pipelines/weekly.py` and `src/pipelines/pro30.py` are the main orchestrators.
-
-### Scoring
-
-Technical scores (0-10) are computed in `src/core/scoring.py` using 5 factors: proximity to 52W high, volume spike, RSI range, moving average alignment, and realized volatility. The LLM then applies a 3-factor model: Technical (40%, locked from pre-computation), Catalyst/News (40%), Market Activity (20%).
+- `scan_results_{date}.json` — full ranked picks + metadata
+- `execution_watchlist_{date}.json` — execution-ready top picks
+- `regime_{date}.json` — regime decision + evidence
 
 ### Configuration Pattern
 
 ```python
 from src.core.config import load_config, get_config_value
 config = load_config("config/default.yaml")
-value = get_config_value(config, "universe", "mode", default="SP500")
+value = get_config_value(config, "mean_reversion", "holding_period", default=3)
 ```
 
 ## Environment Variables
 
-- `OPENAI_API_KEY` — required for OpenAI models (default provider)
-- `ANTHROPIC_API_KEY` — required for Anthropic models
-- `TUSHARE_TOKEN` — required for Tushare backup data provider (China)
+- `TUSHARE_TOKEN` — required for Tushare market-cap ranking and backup data
+- `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — for scan alerts
 
 ## China A-Share Specifics
 
-- 10% daily price limit (涨跌停) constrains realistic targets
-- ST stocks (退市警示) excluded via `universe.exclude_st` config
-- CSI 300 (`000300.SH`) used as market regime benchmark
-- Dragon Tiger List (龙虎榜) tracks institutional activity in `src/features/dragon_tiger/`
-- Trading calendar follows Shanghai timezone with CN holidays
+- 10% daily price limit (涨跌停) — all targets capped at entry×1.10
+- T+1 constraint — no same-day exits after entry
+- ST stocks (退市警示) excluded
+- CSI 300 (`000300.SH`) used for regime classification and sniper relative strength
+- Trading calendar follows Shanghai timezone
 - Liquidity thresholds in CNY (default: 50M avg daily volume)

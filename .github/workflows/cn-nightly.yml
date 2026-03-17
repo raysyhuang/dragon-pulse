@@ -30,7 +30,6 @@ jobs:
       - name: Compute trading date
         id: date
         run: |
-          # Use Shanghai timezone for trading date
           TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
           echo "trade_date=${TRADE_DATE}" >> "$GITHUB_OUTPUT"
           echo "Trading date: ${TRADE_DATE}"
@@ -68,18 +67,16 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run full analysis
+      - name: Run scan
         if: steps.check.outputs.skip != 'true'
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MAS_TELEGRAM_LOG_URL: ${{ secrets.MAS_TELEGRAM_LOG_URL }}
           MAS_API_SECRET_KEY: ${{ secrets.MAS_API_SECRET_KEY }}
         run: |
-          python main.py all --config config/default.yaml
+          python main.py scan --config config/default.yaml
 
       - name: Verify watchlist artifact
         if: steps.check.outputs.skip != 'true'
@@ -88,34 +85,10 @@ jobs:
           WL_FILE="outputs/${TRADE_DATE}/execution_watchlist_${TRADE_DATE}.json"
           if [ ! -f "${WL_FILE}" ]; then
             echo "WARNING: execution_watchlist not generated for ${TRADE_DATE}"
-            # Don't fail — hybrid_analysis may still exist without picks
           else
             echo "Watchlist artifact verified: ${WL_FILE}"
             cat "${WL_FILE}" | python -m json.tool | head -30
           fi
-
-      - name: Push results to Heroku API
-        if: steps.check.outputs.skip != 'true' && success()
-        env:
-          KOOCORE_HEROKU_URL: ${{ secrets.KOOCORE_HEROKU_URL }}
-          ENGINE_API_KEY: ${{ secrets.ENGINE_API_KEY }}
-        run: |
-          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
-          HYBRID_FILE="outputs/${TRADE_DATE}/hybrid_analysis_${TRADE_DATE}.json"
-          if [ ! -f "${HYBRID_FILE}" ]; then
-            echo "No hybrid_analysis file, skipping Heroku push"
-            exit 0
-          fi
-          PAYLOAD=$(python -c "
-          import json
-          with open('${HYBRID_FILE}') as f:
-              h = json.load(f)
-          print(json.dumps({'hybrid_analysis': h, 'run_date': '${TRADE_DATE}', 'pipeline_duration_s': None}))
-          ")
-          curl -sS -X POST "${KOOCORE_HEROKU_URL}/api/engine/ingest" \
-            -H "Content-Type: application/json" \
-            -H "X-Engine-Key: ${ENGINE_API_KEY}" \
-            -d "${PAYLOAD}" --max-time 30
 
       - name: Commit outputs
         if: steps.check.outputs.skip != 'true' && success()
@@ -128,7 +101,6 @@ jobs:
           else
             TRADE_DATE="${{ steps.date.outputs.trade_date }}"
             git commit -m "auto: CN nightly outputs for ${TRADE_DATE}"
-            # Retry push after rebasing onto latest main if another run wins the race.
             pushed=false
             for i in 1 2 3; do
               if git push origin HEAD:main; then

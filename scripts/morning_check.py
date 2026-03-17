@@ -56,9 +56,13 @@ def check_gap(
     open_price: float,
     max_gap_up_pct: float = 3.0,
     max_gap_down_pct: float = 5.0,
+    stop_loss: float | None = None,
 ) -> tuple[str, list[str]]:
     """
     Check if the opening gap invalidates the entry.
+
+    If stop_loss is provided, cancel when open < stop_loss (per-pick precision).
+    Otherwise fall back to flat max_gap_down_pct threshold.
 
     Returns (action, reasons).
     """
@@ -69,6 +73,14 @@ def check_gap(
         reasons.append(
             f"Gap up +{gap_pct:.1f}% exceeds {max_gap_up_pct}% limit — "
             f"entry invalidated (chasing risk)"
+        )
+        return "CANCEL", reasons
+
+    # Per-pick stop check: if open is below the stop_loss, cancel immediately
+    if stop_loss is not None and open_price < stop_loss:
+        reasons.append(
+            f"Open ¥{open_price:.2f} < stop ¥{stop_loss:.2f} — "
+            f"stop already breached at open"
         )
         return "CANCEL", reasons
 
@@ -165,9 +177,13 @@ def run_preflight(
 
         gap_pct = (open_price / entry_price - 1) * 100
 
-        # Check gap
+        # Check gap (with per-pick stop_loss if available)
+        pick_stop_loss = pick.get("stop_loss")
+        if pick_stop_loss is not None:
+            pick_stop_loss = float(pick_stop_loss)
         gap_action, gap_reasons = check_gap(
             entry_price, open_price, max_gap_up, max_gap_down,
+            stop_loss=pick_stop_loss,
         )
 
         # Check volume
@@ -232,21 +248,15 @@ def main():
     date_str = args.date or datetime.now().strftime("%Y-%m-%d")
     output_dir = Path("outputs") / date_str
 
-    # Priority: load from execution watchlist artifact (Phase 5.3 contract)
+    # Priority: load from execution watchlist artifact (new scan schema)
     watchlist_path = output_dir / f"execution_watchlist_{date_str}.json"
     picks = None
     if not args.picks_file and watchlist_path.exists():
         wl_data = json.loads(watchlist_path.read_text(encoding="utf-8"))
         picks = wl_data.get("picks", [])
-        # Map watchlist fields to morning check expected fields
+        # Map new watchlist fields to morning check expected fields
         for p in picks:
-            p.setdefault("name_cn", p.get("name", p.get("ticker", "")))
-        preflight_config = wl_data.get("preflight_config", {})
-        if preflight_config:
-            if "max_gap_up_pct" in preflight_config:
-                args.max_gap_up = preflight_config["max_gap_up_pct"]
-            if "max_gap_down_pct" in preflight_config:
-                args.max_gap_down = preflight_config["max_gap_down_pct"]
+            p.setdefault("name_cn", p.get("name_cn", p.get("name", p.get("ticker", ""))))
         logger.info(f"Loaded {len(picks)} picks from execution watchlist: {watchlist_path}")
 
     # Fallback: load picks from explicit file or glob

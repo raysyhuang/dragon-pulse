@@ -135,49 +135,10 @@ def check_regime(params: dict, asof_date: Optional[str] = None, **kwargs) -> dic
         msg += "."
         out["message"] = msg
 
-        # Enrich with FRED macro data (yield curve, credit spreads)
-        fred_data = _fetch_fred_macro()
-        out["fred"] = fred_data
-
-        # Use FRED VIX as fallback when yfinance VIX is stale/missing
-        if np.isnan(out["vix_last"]) and fred_data.get("vix") is not None:
-            out["vix_last"] = fred_data["vix"]
-            out["vix_ok"] = out["vix_last"] <= vix_max
-            out["ok"] = bool(out["spy_above_ma"] and out["vix_ok"])
-            logger.info("Using FRED VIX fallback: %.1f", fred_data["vix"])
-
-        # Additional stress signals from FRED
-        stress_factors = []
-        if fred_data.get("yield_curve_inverted"):
-            stress_factors.append(f"yield curve inverted (spread={fred_data['yield_spread']:.2f})")
-        if fred_data.get("credit_stress"):
-            stress_factors.append(f"credit spreads wide ({fred_data['credit_spread']:.2f}%)")
-
-        if stress_factors:
-            stress_msg = "; ".join(stress_factors)
-            out["message"] += f" FRED stress: {stress_msg}."
-            # If both yield curve inverted AND credit stress, force risk-off
-            if fred_data.get("yield_curve_inverted") and fred_data.get("credit_stress"):
-                out["ok"] = False
-                out["message"] += " RISK-OFF override: dual FRED stress signals."
-                logger.warning("Regime RISK-OFF override: %s", stress_msg)
-
         return out
     except Exception as e:
         out["message"] = f"Regime gate error; skipping gate. ({e})"
         return out
 
 
-def _fetch_fred_macro() -> dict:
-    """Fetch FRED macro snapshot. Returns empty-ish dict on failure."""
-    try:
-        from src.core.fred import get_macro_snapshot
-        return get_macro_snapshot()
-    except Exception as e:
-        logger.debug("FRED macro fetch skipped: %s", e)
-        return {
-            "vix": None, "yield_spread": None,
-            "fed_funds": None, "credit_spread": None,
-            "yield_curve_inverted": False, "credit_stress": False,
-        }
 
