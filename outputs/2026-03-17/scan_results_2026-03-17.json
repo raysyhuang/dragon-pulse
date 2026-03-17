@@ -1,0 +1,22 @@
+{
+  "date": "2026-03-17",
+  "generated_utc": "2026-03-17T09:45:10.723722",
+  "regime": "bear",
+  "regime_detail": {
+    "csi300_last": 4637.44,
+    "csi300_sma_short": 4682.74,
+    "csi300_sma_long": 4699.64,
+    "market_breadth_pct_above_sma20": 0.3183,
+    "acceptance_mode": "breadth_suppressed",
+    "acceptance_eligible_count": 0,
+    "day_quality_score": 0,
+    "day_quality_components": {}
+  },
+  "universe_size": 996,
+  "downloaded": 996,
+  "signals_total": 0,
+  "picks": [],
+  "errors": [
+    "601112.SH: unsupported operand type(s) for -: 'float' and 'NoneType'"
+  ]
+}
