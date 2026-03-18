@@ -244,8 +244,10 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
-    # Calendar date for the message header (the day the trader reads it)
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    # Calendar date for the message header (the day the trader reads it).
+    # Always use Shanghai timezone regardless of process TZ setting.
+    from zoneinfo import ZoneInfo
+    today_str = datetime.now(tz=ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
 
     # Resolve date and output directory
     # When no --date given, find the most recent watchlist (nightly runs
