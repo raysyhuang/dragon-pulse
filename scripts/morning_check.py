@@ -244,6 +244,9 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
+    # Calendar date for the message header (the day the trader reads it)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
     # Resolve date and output directory
     # When no --date given, find the most recent watchlist (nightly runs
     # the evening before, so "today" at 09:26 has no watchlist yet).
@@ -305,15 +308,16 @@ def main():
                     wl_data = json.loads(watchlist_path.read_text(encoding="utf-8"))
                 regime = wl_data.get("regime", "unknown")
                 emoji = _regime_emoji(regime)
+                scan_label = f" (scan: {date_str})" if date_str != today_str else ""
                 lines = [
-                    f"<b>\U0001f409 Dragon Pulse — {date_str}</b>",
+                    f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
                     f"Regime: {emoji} <b>{regime.upper()}</b>",
                     "",
                     "No picks today — nothing passed the selection funnel.",
                 ]
                 mgr = AlertManager(alert_config)
                 mgr.send_alert(
-                    title=f"Dragon Pulse — {date_str}",
+                    title=f"Dragon Pulse — {today_str} Open",
                     message="\n".join(lines),
                     data={"asof": date_str},
                     priority="low",
@@ -405,8 +409,9 @@ def main():
             pick_map = {p.get("ticker"): p for p in wl_picks}
 
             emoji = _regime_emoji(regime)
+            scan_label = f" (scan: {date_str})" if date_str != today_str else ""
             lines = [
-                f"<b>\U0001f409 Dragon Pulse — {date_str}</b>",
+                f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
                 f"Regime: {emoji} <b>{regime.upper()}</b> | Picks: <b>{len(wl_picks)}</b> | Universe: {universe_size}",
                 "",
             ]
@@ -461,7 +466,7 @@ def main():
 
             mgr = AlertManager(alert_config)
             mgr.send_alert(
-                title=f"Dragon Pulse — {date_str}",
+                title=f"Dragon Pulse — {today_str} Open",
                 message="\n".join(lines),
                 data={"asof": date_str},
                 priority="high" if go_picks else "low",
