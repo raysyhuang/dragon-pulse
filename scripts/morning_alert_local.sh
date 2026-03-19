@@ -37,11 +37,10 @@ fi
 TRADE_DATE=$(basename "${LATEST_WL}" | sed 's/execution_watchlist_//;s/\.json//')
 echo "Latest watchlist: ${LATEST_WL} (trade date: ${TRADE_DATE})"
 
-# Check if GitHub Actions already sent today's alert (marker file from CI)
-# The marker pattern is .telegram_sent_<run_id>_<attempt>.txt
-MARKER_COUNT=$(find "outputs/${TRADE_DATE}" -name ".telegram_sent_*.txt" 2>/dev/null | wc -l | tr -d ' ')
-if [ "${MARKER_COUNT}" -gt 0 ]; then
-    echo "GitHub Actions already sent alert for ${TRADE_DATE}. Skipping."
+# Check shared dedup marker (written by morning_check.py from any runner)
+MORNING_MARKER="outputs/${TRADE_DATE}/.morning_alert_sent"
+if [ -f "${MORNING_MARKER}" ]; then
+    echo "Morning alert already sent for ${TRADE_DATE} (marker exists). Skipping."
     exit 0
 fi
 

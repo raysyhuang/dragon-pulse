@@ -268,6 +268,10 @@ def main():
 
     # Priority: load from execution watchlist artifact (new scan schema)
     watchlist_path = output_dir / f"execution_watchlist_{date_str}.json"
+
+    # Shared dedup marker — prevents duplicate Telegram sends from CI + local fallback
+    morning_marker = output_dir / ".morning_alert_sent"
+
     picks = None
     if not args.picks_file and watchlist_path.exists():
         wl_data = json.loads(watchlist_path.read_text(encoding="utf-8"))
@@ -301,6 +305,9 @@ def main():
     if not picks:
         logger.info("No picks to validate.")
         # Still send a compact Telegram message for zero-picks days
+        if morning_marker.exists():
+            logger.info(f"Morning alert already sent (marker: {morning_marker}). Skipping.")
+            return 0
         try:
             from src.core.alerts import AlertConfig, AlertManager, _regime_emoji
             alert_config = AlertConfig(enabled=True, channels=["telegram"])
@@ -324,6 +331,7 @@ def main():
                     data={"asof": date_str},
                     priority="low",
                 )
+                morning_marker.write_text(f"sent={today_str}\n", encoding="utf-8")
                 logger.info("No-picks morning alert sent to Telegram")
         except Exception as e:
             logger.warning(f"Failed to send no-picks alert: {e}")
@@ -396,6 +404,9 @@ def main():
     logger.info(f"Saved execution check to {check_file}")
 
     # Send combined Telegram alert (watchlist details + execution verdicts)
+    if morning_marker.exists():
+        logger.info(f"Morning alert already sent (marker: {morning_marker}). Skipping Telegram.")
+        return 0
     try:
         from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji
 
@@ -473,6 +484,7 @@ def main():
                 data={"asof": date_str},
                 priority="high" if go_picks else "low",
             )
+            morning_marker.write_text(f"sent={today_str}\n", encoding="utf-8")
             logger.info("Combined morning alert sent to Telegram")
     except Exception as e:
         logger.warning(f"Failed to send morning alert: {e}")
