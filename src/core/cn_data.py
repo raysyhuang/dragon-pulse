@@ -583,11 +583,13 @@ def download_daily_range(
     bad_tickers: list[str] = []
     reasons: dict[str, str] = {}
 
-    # Circuit breaker: abort early if most downloads fail consecutively.
-    # After processing WINDOW tickers, if failure rate > THRESHOLD, stop.
-    _CB_WINDOW = 50
-    _CB_THRESHOLD = 0.90  # 90% failure rate
-    consecutive_fails = 0
+    # Circuit breaker: abort early on systemic data failure.
+    # Checks overall failure rate every CB_INTERVAL tickers after the
+    # initial CB_WINDOW. Catches both total outages and intermittent
+    # failures where occasional successes reset a consecutive counter.
+    _CB_WINDOW = 50       # min tickers before first check
+    _CB_INTERVAL = 25     # re-check every N tickers after window
+    _CB_THRESHOLD = 0.90  # abort if ≥90% failed overall
     processed = 0
 
     for ticker in tickers:
@@ -615,24 +617,12 @@ def download_daily_range(
         if not _validate_df(df_out):
             bad_tickers.append(ticker)
             reasons.setdefault(ticker, last_err or "No valid data returned")
-            consecutive_fails += 1
         else:
             data_map[ticker] = df_out
-            consecutive_fails = 0
 
-        # Check circuit breaker after initial window
-        if processed == _CB_WINDOW and len(data_map) == 0:
-            logger.error(
-                "Circuit breaker: 0/%d downloads succeeded. "
-                "Aborting — data provider likely down. Last error: %s",
-                _CB_WINDOW, last_err or "empty response",
-            )
-            reasons["__circuit_breaker__"] = (
-                f"Aborted after {_CB_WINDOW} consecutive failures"
-            )
-            break
-
-        if processed >= _CB_WINDOW and consecutive_fails >= _CB_WINDOW:
+        # Circuit breaker: check overall failure rate periodically
+        if (processed >= _CB_WINDOW
+                and (processed == _CB_WINDOW or processed % _CB_INTERVAL == 0)):
             fail_rate = len(bad_tickers) / processed
             if fail_rate >= _CB_THRESHOLD:
                 logger.error(
