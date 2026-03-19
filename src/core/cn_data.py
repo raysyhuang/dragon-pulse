@@ -583,9 +583,17 @@ def download_daily_range(
     bad_tickers: list[str] = []
     reasons: dict[str, str] = {}
 
+    # Circuit breaker: abort early if most downloads fail consecutively.
+    # After processing WINDOW tickers, if failure rate > THRESHOLD, stop.
+    _CB_WINDOW = 50
+    _CB_THRESHOLD = 0.90  # 90% failure rate
+    consecutive_fails = 0
+    processed = 0
+
     for ticker in tickers:
         code, exch = _split_cn_symbol(ticker)
         df_out = pd.DataFrame()
+        last_err = ""
         for provider in providers:
             try:
                 if provider.lower() == "akshare":
@@ -602,11 +610,51 @@ def download_daily_range(
                 reasons[ticker] = f"{provider} error: {last_err}"
                 continue
 
+        processed += 1
+
         if not _validate_df(df_out):
             bad_tickers.append(ticker)
-            reasons.setdefault(ticker, "No valid data returned")
-            continue
+            reasons.setdefault(ticker, last_err or "No valid data returned")
+            consecutive_fails += 1
+        else:
+            data_map[ticker] = df_out
+            consecutive_fails = 0
 
-        data_map[ticker] = df_out
+        # Check circuit breaker after initial window
+        if processed == _CB_WINDOW and len(data_map) == 0:
+            logger.error(
+                "Circuit breaker: 0/%d downloads succeeded. "
+                "Aborting — data provider likely down. Last error: %s",
+                _CB_WINDOW, last_err or "empty response",
+            )
+            reasons["__circuit_breaker__"] = (
+                f"Aborted after {_CB_WINDOW} consecutive failures"
+            )
+            break
+
+        if processed >= _CB_WINDOW and consecutive_fails >= _CB_WINDOW:
+            fail_rate = len(bad_tickers) / processed
+            if fail_rate >= _CB_THRESHOLD:
+                logger.error(
+                    "Circuit breaker: %d/%d failed (%.0f%%). "
+                    "Aborting — systemic data failure. Last error: %s",
+                    len(bad_tickers), processed, fail_rate * 100,
+                    last_err or "empty response",
+                )
+                reasons["__circuit_breaker__"] = (
+                    f"Aborted at {processed}/{len(tickers)} tickers, "
+                    f"{fail_rate:.0%} failure rate"
+                )
+                break
+
+    # Log summary of failures for operator visibility
+    if bad_tickers:
+        sample = bad_tickers[:5]
+        sample_reasons = [reasons.get(t, "unknown") for t in sample]
+        logger.warning(
+            "Download failures: %d/%d tickers failed. Sample: %s",
+            len(bad_tickers), len(tickers),
+            "; ".join(f"{t}: {r}" for t, r in zip(sample, sample_reasons)),
+        )
 
     return data_map, {"bad_tickers": bad_tickers, "reasons": reasons}

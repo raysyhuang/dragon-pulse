@@ -134,7 +134,19 @@ def run_scan(config: dict, asof_date: Optional[str] = None) -> dict:
         tickers=universe, start=start_str, end=end_str,
         provider_config=provider_config,
     )
-    logger.info("Downloaded: %d OK, %d failed", len(data_map), len(report.get("bad_tickers", [])))
+    n_ok = len(data_map)
+    n_fail = len(report.get("bad_tickers", []))
+    logger.info("Downloaded: %d OK, %d failed", n_ok, n_fail)
+
+    # Warn loudly if download success rate is critically low
+    if n_ok + n_fail > 0:
+        success_rate = n_ok / (n_ok + n_fail)
+        if success_rate < 0.50:
+            logger.error(
+                "DATA QUALITY ALERT: Only %.0f%% of tickers downloaded "
+                "(%d/%d). Results are unreliable.",
+                success_rate * 100, n_ok, n_ok + n_fail,
+            )
 
     # --- Compute features + score candidates ---
     feat_items = []
@@ -221,12 +233,20 @@ def run_scan(config: dict, asof_date: Optional[str] = None) -> dict:
                      p["name_cn"], p["ticker"], p["engine"],
                      p["score"], p["entry_price"], p["stop_loss"], p["target_1"])
 
+    # Surface download health in results
+    bad_tickers_list = report.get("bad_tickers", [])
+    download_reasons = report.get("reasons", {})
+    circuit_breaker_msg = download_reasons.get("__circuit_breaker__")
+
     return {
         "date": scan_date,
         "regime": regime,
         "regime_detail": regime_detail,
         "universe_size": len(universe),
         "downloaded": len(data_map),
+        "download_failed": len(bad_tickers_list),
+        "download_health": "critical" if len(data_map) < len(universe) * 0.5 else "ok",
+        "circuit_breaker": circuit_breaker_msg,
         "signals_total": len(candidates),
         "picks": picks_out,
         "errors": errors[:20],
