@@ -11,8 +11,11 @@ Returns the same shape as yfinance helpers:
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import datetime, timedelta
+
+logger = logging.getLogger(__name__)
 from typing import Optional, Iterable, Tuple
 
 import pandas as pd
