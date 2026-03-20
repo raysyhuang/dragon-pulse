@@ -20,6 +20,8 @@ jobs:
     name: Pre-Flight Gap Check
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
