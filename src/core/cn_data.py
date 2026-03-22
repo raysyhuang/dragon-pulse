@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 from datetime import datetime, timedelta
+from typing import Optional, Iterable, Tuple
 
 logger = logging.getLogger(__name__)
-from typing import Optional, Iterable, Tuple
 
 import pandas as pd
 
@@ -595,7 +596,15 @@ def download_daily_range(
     _CB_THRESHOLD = 0.90  # abort if ≥90% failed overall
     processed = 0
 
-    for ticker in tickers:
+    # Throttle between API calls to avoid provider rate limits.
+    # AkShare (Eastmoney) aggressively rate-limits rapid-fire requests;
+    # without a delay, bulk downloads trigger IP bans after ~50 calls.
+    _THROTTLE_SEC = 0.15
+
+    for i, ticker in enumerate(tickers):
+        if i > 0:
+            time.sleep(_THROTTLE_SEC)
+
         code, exch = _split_cn_symbol(ticker)
         df_out = pd.DataFrame()
         last_err = ""

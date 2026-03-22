@@ -308,6 +308,22 @@ def main():
         if morning_marker.exists():
             logger.info(f"Morning alert already sent (marker: {morning_marker}). Skipping.")
             return 0
+
+        # Check scan health to distinguish "quiet market" from "broken scan"
+        scan_results_path = output_dir / f"scan_results_{date_str}.json"
+        scan_health = None
+        if scan_results_path.exists():
+            scan_data = json.loads(scan_results_path.read_text(encoding="utf-8"))
+            dl_health = scan_data.get("download_health", "ok")
+            circuit_breaker = scan_data.get("circuit_breaker")
+            downloaded = scan_data.get("downloaded", 0)
+            universe = scan_data.get("universe_size", 0)
+            signals = scan_data.get("signals_total", 0)
+            if dl_health != "ok" or circuit_breaker:
+                scan_health = "degraded"
+            else:
+                scan_health = "healthy"
+
         try:
             from src.core.alerts import AlertConfig, AlertManager, _regime_emoji
             alert_config = AlertConfig(enabled=True, channels=["telegram"])
@@ -322,17 +338,45 @@ def main():
                     f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
                     f"Regime: {emoji} <b>{regime.upper()}</b>",
                     "",
-                    "No picks today — nothing passed the selection funnel.",
                 ]
+
+                if scan_health == "degraded":
+                    lines.append(
+                        f"\u26a0\ufe0f <b>DATA ISSUE</b> — scan degraded "
+                        f"(downloaded {downloaded}/{universe}, "
+                        f"health: {dl_health})"
+                    )
+                    if circuit_breaker:
+                        lines.append(f"Circuit breaker: {circuit_breaker}")
+                    lines.append("")
+                    lines.append("No picks — scan data was incomplete. Check provider status.")
+                    priority = "high"
+                else:
+                    regime_detail = {}
+                    if scan_results_path.exists():
+                        regime_detail = scan_data.get("regime_detail", {})
+                    acceptance_mode = regime_detail.get("acceptance_mode", "")
+                    breadth = regime_detail.get("market_breadth_pct_above_sma20")
+
+                    if acceptance_mode == "breadth_suppressed" and breadth is not None:
+                        lines.append(
+                            f"No picks — breadth suppressed "
+                            f"({breadth:.1%} below floor). "
+                            f"{signals} signals found but filtered."
+                        )
+                    else:
+                        lines.append("No picks today — nothing passed the selection funnel.")
+                    priority = "low"
+
                 mgr = AlertManager(alert_config)
                 mgr.send_alert(
                     title=f"Dragon Pulse — {today_str} Open",
                     message="\n".join(lines),
                     data={"asof": date_str},
-                    priority="low",
+                    priority=priority,
                 )
                 morning_marker.write_text(f"sent={today_str}\n", encoding="utf-8")
-                logger.info("No-picks morning alert sent to Telegram")
+                logger.info("No-picks morning alert sent to Telegram (health=%s)", scan_health)
         except Exception as e:
             logger.warning(f"Failed to send no-picks alert: {e}")
         return 0

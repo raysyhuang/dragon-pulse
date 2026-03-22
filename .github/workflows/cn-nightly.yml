@@ -67,6 +67,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: CN provider smoke test
+        if: steps.check.outputs.skip != 'true'
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python scripts/smoke_cn_provider.py --config config/default.yaml
+
       - name: Run scan
         if: steps.check.outputs.skip != 'true'
         env:
