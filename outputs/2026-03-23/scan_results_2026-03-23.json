@@ -1,0 +1,23 @@
+{
+  "date": "2026-03-23",
+  "generated_utc": "2026-03-23T09:25:11.346513",
+  "regime": "bear",
+  "regime_detail": {
+    "csi300_last": 4567.02,
+    "csi300_sma_short": 4665.28,
+    "csi300_sma_long": 4696.85,
+    "market_breadth_pct_above_sma20": 0.1376,
+    "acceptance_mode": "breadth_suppressed",
+    "acceptance_eligible_count": 133,
+    "day_quality_score": 0,
+    "day_quality_components": {}
+  },
+  "universe_size": 996,
+  "downloaded": 996,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 133,
+  "picks": [],
+  "errors": []
+}

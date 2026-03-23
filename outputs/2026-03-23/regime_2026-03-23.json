@@ -1,0 +1,12 @@
+{
+  "date": "2026-03-23",
+  "regime": "bear",
+  "csi300_last": 4567.02,
+  "csi300_sma_short": 4665.28,
+  "csi300_sma_long": 4696.85,
+  "market_breadth_pct_above_sma20": 0.1376,
+  "acceptance_mode": "breadth_suppressed",
+  "acceptance_eligible_count": 133,
+  "day_quality_score": 0,
+  "day_quality_components": {}
+}
