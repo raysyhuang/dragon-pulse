@@ -361,7 +361,7 @@ def main():
                     if acceptance_mode == "breadth_suppressed" and breadth is not None:
                         lines.append(
                             f"No picks — breadth suppressed "
-                            f"({breadth:.1%} below floor). "
+                            f"(breadth {breadth:.1%}). "
                             f"{signals} signals found but filtered."
                         )
                     else:

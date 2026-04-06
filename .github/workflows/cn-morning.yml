@@ -2,8 +2,8 @@ name: CN Morning Check
 
 on:
   schedule:
-    # 09:26 Shanghai = 01:26 UTC (weekdays)
-    - cron: "26 1 * * 1-5"
+    # 07:15 Shanghai = 23:15 UTC-1day (weekdays)
+    - cron: "15 23 * * 0-4"
   workflow_dispatch:
 
 env:
