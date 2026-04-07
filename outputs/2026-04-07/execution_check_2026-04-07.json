@@ -1,0 +1,24 @@
+{
+  "date": "2026-04-07",
+  "generated_utc": "2026-04-07T23:31:18.468747",
+  "results": [
+    {
+      "ticker": "600089.SH",
+      "name": "特变电工",
+      "action": "GO",
+      "entry_price": 25.35,
+      "open_price": 25.5,
+      "gap_pct": 0.59,
+      "reasons": []
+    },
+    {
+      "ticker": "000962.SZ",
+      "name": "东方钽业",
+      "action": "GO",
+      "entry_price": 40.46,
+      "open_price": 40.51,
+      "gap_pct": 0.12,
+      "reasons": []
+    }
+  ]
+}
