@@ -1,0 +1,120 @@
+# Dragon Pulse — Frozen Baseline Config for Attribution Backtests
+#
+# This config locks the v4.0 thresholds so Track 1 runs isolate ONLY
+# the variables under test (gap filter, target mode, exit mode, trailing).
+# Do NOT modify this file during attribution runs.
+
+market:
+  region: "CN"
+  timezone: "Asia/Shanghai"
+  close_hour_local: 15
+  close_minute_local: 0
+
+data:
+  provider: "AUTO"
+  china:
+    primary: "akshare"
+    backup: "tushare"
+    adjust: "qfq"
+    tushare_token_env: "TUSHARE_TOKEN"
+  us:
+    provider: "yahoo"
+
+universe:
+  mode: "CHINA_A"
+  cache_file: "universe_cache_CHINA_A.csv"
+  cache_max_age_days: 7
+  exclude_st: true
+  exclude_delisting_warning: true
+
+liquidity:
+  min_price: 5.0
+  min_avg_dollar_volume_20d: 50000000
+  min_avg_volume: 1000000
+
+technicals:
+  rsi_period: 14
+  ma_windows: [10, 20, 50]
+  atr_period: 14
+  lookback_days: 300
+
+# =============================================================================
+# MEAN REVERSION ENGINE — v4.0 baseline thresholds
+# =============================================================================
+mean_reversion:
+  w_rsi2: 0.40
+  w_trend: 0.25
+  w_streak: 0.15
+  w_proximity: 0.10
+  w_volume: 0.10
+
+  min_bars: 60
+  adv_min_cny: 50000000        # 50M CNY (v4.0 original)
+  max_single_day_move: 0.11
+  rsi2_max: 10                 # v4.0 original — now honored by code
+  score_floor: 65              # minimum composite score to emit signal
+
+  stop_atr_mult: 0.75
+  target_1_atr_mult: 1.5
+  target_2_atr_mult: 2.0
+  max_entry_atr_mult: 0.2
+  holding_period: 3
+
+  regime:
+    csi300_symbol: "000300.SH"
+    sma_short: 20
+    sma_long: 50
+
+# =============================================================================
+# SNIPER ENGINE — v4.0 baseline thresholds
+# =============================================================================
+sniper:
+  w_bb_squeeze: 0.30
+  w_vol_compression: 0.25
+  w_relative_strength: 0.20
+  w_trend: 0.15
+  w_momentum: 0.10
+
+  atr_pct_floor: 3.5
+  min_avg_volume: 500000       # 500K shares (v4.0 original)
+  bear_block: true
+
+  score_floor_bull: 60         # v4.0 original
+  score_floor_choppy: 65       # v4.0 original
+
+  stop_atr_mult: 2.0
+  target_atr_mult: 3.0
+  target_2_atr_mult: 5.0
+  holding_period: 7
+
+  regime:
+    csi300_symbol: "000300.SH"
+
+# =============================================================================
+# OUTPUT / RUNTIME / CACHE (unchanged from default)
+# =============================================================================
+outputs:
+  root_dir: "outputs"
+  dated_subdir: true
+
+runtime:
+  threads: true
+  yf_auto_adjust: false
+  method_version: "v4.0-baseline"
+  china_trading_days: true
+  exclude_suspended: true
+
+cache:
+  enabled: true
+  backend: "sqlite"
+  sqlite_path: "data/price_cache.db"
+  price_ttl_seconds: 3600
+  news_ttl_seconds: 1800
+
+alerts:
+  enabled: false
+
+preflight:
+  max_gap_up_pct: 3.0
+  max_gap_down_pct: 5.0
+  min_volume_ratio: 0.10

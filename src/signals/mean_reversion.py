@@ -38,6 +38,33 @@ class MeanReversionSignal:
     holding_period: int
     components: dict
     max_entry_price: float | None = None
+    subtype: str = "default"
+
+
+def classify_mean_reversion_subtype(
+    features: dict,
+    *,
+    rsi2_bounce_max: float = 3.0,
+    streak_bounce_max: int = -3,
+    dist_from_5d_low_bounce_max: float = 0.75,
+) -> str:
+    """Classify MR setups into fast bounce vs slower drift profiles.
+
+    v1 heuristic intentionally stays simple and point-in-time safe:
+    extreme dislocations are treated as fast snapback candidates; the rest
+    of the valid MR universe is treated as slower drift.
+    """
+    rsi_2 = features.get("rsi_2")
+    streak = features.get("streak")
+    dist = features.get("dist_from_5d_low")
+
+    if _valid(rsi_2) and float(rsi_2) <= float(rsi2_bounce_max):
+        return "bounce"
+    if _valid(streak) and int(float(streak)) <= int(streak_bounce_max):
+        return "bounce"
+    if _valid(dist) and float(dist) <= float(dist_from_5d_low_bounce_max):
+        return "bounce"
+    return "drift"
 
 
 def score_mean_reversion(
@@ -59,6 +86,7 @@ def score_mean_reversion(
     target_2_atr_mult: float = 2.0,
     max_entry_atr_mult: float = 0.2,
     holding_period: int = 3,
+    subtype: str = "default",
 ) -> MeanReversionSignal | None:
     """Score a ticker for RSI(2) mean-reversion potential.
 
@@ -235,4 +263,5 @@ def score_mean_reversion(
         holding_period=holding_period,
         components=scores,
         max_entry_price=max_entry,
+        subtype=subtype,
     )

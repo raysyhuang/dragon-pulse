@@ -41,7 +41,10 @@ from src.features.technical import (
 from src.core.acceptance import run_acceptance, score_day_quality
 from src.core.cn_limits import get_daily_limit
 from src.pipelines.scanner import _classify_regime
-from src.signals.mean_reversion import score_mean_reversion
+from src.signals.mean_reversion import (
+    classify_mean_reversion_subtype,
+    score_mean_reversion,
+)
 from src.signals.sniper import score_sniper
 
 logger = logging.getLogger(__name__)
@@ -177,6 +180,40 @@ def _slice_from(df: pd.DataFrame, scan_date: date) -> pd.DataFrame:
     else:
         mask = pd.to_datetime(idx).date >= scan_date
     return df.loc[mask]
+
+
+def resolve_mr_subtype_and_exit_params(mr_config: dict, features: dict) -> tuple[str, dict]:
+    """Resolve MR subtype and exit settings from config using signal-time features."""
+    params = {
+        "stop_atr_mult": float(mr_config.get("stop_atr_mult", 0.95)),
+        "target_1_atr_mult": float(mr_config.get("target_1_atr_mult", 1.5)),
+        "target_2_atr_mult": float(mr_config.get("target_2_atr_mult", 2.0)),
+        "max_entry_atr_mult": float(mr_config.get("max_entry_atr_mult", 0.2)),
+        "holding_period": int(mr_config.get("holding_period", 3)),
+    }
+
+    subtype_cfg = mr_config.get("subtype_split", {}) or {}
+    if not subtype_cfg.get("enabled", False):
+        return "default", params
+
+    subtype = classify_mean_reversion_subtype(
+        features,
+        rsi2_bounce_max=float(subtype_cfg.get("rsi2_bounce_max", 3.0)),
+        streak_bounce_max=int(subtype_cfg.get("streak_bounce_max", -3)),
+        dist_from_5d_low_bounce_max=float(subtype_cfg.get("dist_from_5d_low_bounce_max", 0.75)),
+    )
+    if subtype != "drift":
+        return subtype, params
+
+    drift_cfg = subtype_cfg.get("drift", {}) or {}
+    drift_params = {
+        "stop_atr_mult": float(drift_cfg.get("stop_atr_mult", params["stop_atr_mult"])),
+        "target_1_atr_mult": float(drift_cfg.get("target_1_atr_mult", params["target_1_atr_mult"])),
+        "target_2_atr_mult": float(drift_cfg.get("target_2_atr_mult", params["target_2_atr_mult"])),
+        "max_entry_atr_mult": float(drift_cfg.get("max_entry_atr_mult", params["max_entry_atr_mult"])),
+        "holding_period": int(drift_cfg.get("holding_period", params["holding_period"])),
+    }
+    return subtype, drift_params
 
 
 def main():
@@ -373,6 +410,7 @@ def main():
 
                 mr_signal = None
                 if run_mr:
+                    mr_subtype, mr_exit_params = resolve_mr_subtype_and_exit_params(mr_config, feats)
                     mr_signal = score_mean_reversion(
                         ticker=ticker, df=feat_df, features=feats, regime=regime,
                         disable_gap_filter=args.disable_gap_filter,
@@ -382,11 +420,12 @@ def main():
                         score_floor=float(mr_config.get("score_floor", 65)),
                         min_bars=int(mr_config.get("min_bars", 60)),
                         max_single_day_move=float(mr_config.get("max_single_day_move", 0.11)),
-                        stop_atr_mult=float(mr_config.get("stop_atr_mult", 0.75)),
-                        target_1_atr_mult=float(mr_config.get("target_1_atr_mult", 1.5)),
-                        target_2_atr_mult=float(mr_config.get("target_2_atr_mult", 2.0)),
-                        max_entry_atr_mult=float(mr_config.get("max_entry_atr_mult", 0.2)),
-                        holding_period=int(mr_config.get("holding_period", 3)),
+                        stop_atr_mult=mr_exit_params["stop_atr_mult"],
+                        target_1_atr_mult=mr_exit_params["target_1_atr_mult"],
+                        target_2_atr_mult=mr_exit_params["target_2_atr_mult"],
+                        max_entry_atr_mult=mr_exit_params["max_entry_atr_mult"],
+                        holding_period=mr_exit_params["holding_period"],
+                        subtype=mr_subtype,
                     )
                 if mr_signal:
                     all_signals.append(("mean_reversion", mr_signal))
@@ -567,6 +606,7 @@ def main():
             eval_result["engine"] = engine
             eval_result["score"] = sig.score
             eval_result["regime"] = regime
+            eval_result["subtype"] = getattr(sig, "subtype", None) if engine == "mean_reversion" else None
             all_results.append(eval_result)
 
             if eval_result["exit_reason"] == "target_hit":
@@ -702,6 +742,24 @@ def main():
             "day1_stop_count": r_day1_stops,
         }
 
+    # Per-subtype breakdown (MR only)
+    subtype_stats = {}
+    subtype_df = df_valid[df_valid["subtype"].notna()].copy()
+    for subtype in subtype_df["subtype"].unique():
+        sdf = subtype_df[subtype_df["subtype"] == subtype]
+        s_total = len(sdf)
+        s_pnl_wins = int((sdf["pnl_pct"] > 0).sum())
+        s_pnl_wr = s_pnl_wins / s_total if s_total > 0 else 0
+        s_true_exp = float(sdf["pnl_pct"].mean()) if s_total > 0 else 0
+        s_day1_stops = int(((sdf["exit_reason"] == "stop_hit") & (sdf["exit_day"] == 1)).sum())
+        subtype_stats[subtype] = {
+            "total": s_total,
+            "pnl_wins": s_pnl_wins,
+            "pnl_win_rate": round(s_pnl_wr, 4),
+            "true_expectancy_pct": round(s_true_exp, 2),
+            "day1_stop_count": s_day1_stops,
+        }
+
     # Equity curve (compounded daily equal-weighted returns)
     # Group trades by date and compute daily mean PnL (as decimal)
     daily_returns = df_valid.groupby("date")["pnl_pct"].mean() / 100.0
@@ -757,6 +815,7 @@ def main():
         "acceptance_mode_counts": acceptance_mode_counts,
         "per_engine": engine_stats,
         "per_regime": regime_stats,
+        "per_subtype": subtype_stats,
     }
 
     # Print summary
@@ -786,6 +845,12 @@ def main():
         logger.info("  %s: n=%d WR=%.1f%% trueExp=%.2f%% d1stops=%d",
                      regime_name, stats["total"], stats["pnl_win_rate"] * 100,
                      stats["true_expectancy_pct"], stats["day1_stop_count"])
+    if subtype_stats:
+        logger.info("")
+        for subtype, stats in subtype_stats.items():
+            logger.info("  subtype=%s: n=%d WR=%.1f%% trueExp=%.2f%% d1stops=%d",
+                        subtype, stats["total"], stats["pnl_win_rate"] * 100,
+                        stats["true_expectancy_pct"], stats["day1_stop_count"])
 
     # Save artifacts
     summary_path = out_dir / f"backtest_summary{suffix}.json"
