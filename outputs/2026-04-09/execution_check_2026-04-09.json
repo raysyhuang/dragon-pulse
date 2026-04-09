@@ -1,0 +1,15 @@
+{
+  "date": "2026-04-09",
+  "generated_utc": "2026-04-09T23:30:48.710707",
+  "results": [
+    {
+      "ticker": "600803.SH",
+      "name": "新奥股份",
+      "action": "GO",
+      "entry_price": 21.0,
+      "open_price": 21.01,
+      "gap_pct": 0.05,
+      "reasons": []
+    }
+  ]
+}
