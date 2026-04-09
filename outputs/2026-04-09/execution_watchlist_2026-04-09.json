@@ -1,0 +1,29 @@
+{
+  "date": "2026-04-09",
+  "regime": "bear",
+  "universe_size": 996,
+  "picks": [
+    {
+      "ticker": "600803.SH",
+      "name_cn": "新奥股份",
+      "engine": "mean_reversion",
+      "score": 82.94,
+      "entry_price": 21.0,
+      "max_entry_price": 21.18,
+      "stop_loss": 20.15,
+      "target_1": 21.7,
+      "target_2": 22.79,
+      "holding_period": 3,
+      "adv_cny": 402196710.0,
+      "market_cap_cny": null,
+      "reason_summary": "trend_intact=100, down_streak=100, rsi2_oversold=77",
+      "components": {
+        "rsi2_oversold": 77.35854582551504,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 50.0,
+        "volume": 70.0
+      }
+    }
+  ]
+}
