@@ -1,0 +1,26 @@
+{
+  "date": "2026-04-10",
+  "generated_utc": "2026-04-12T23:30:43.363197",
+  "results": [
+    {
+      "ticker": "600803.SH",
+      "name": "新奥股份",
+      "action": "GO",
+      "entry_price": 20.8,
+      "open_price": 20.97,
+      "gap_pct": 0.82,
+      "reasons": []
+    },
+    {
+      "ticker": "603301.SH",
+      "name": "振德医疗",
+      "action": "CANCEL",
+      "entry_price": 81.77,
+      "open_price": 87.99,
+      "gap_pct": 7.61,
+      "reasons": [
+        "Gap up +7.6% exceeds 3.0% limit — entry invalidated (chasing risk)"
+      ]
+    }
+  ]
+}
