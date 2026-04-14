@@ -51,6 +51,46 @@ def _regime_cn(regime: str) -> str:
     )
 
 
+_FACTOR_CN: dict[str, str] = {
+    # Mean reversion
+    "rsi2_oversold": "RSI2超卖",
+    "trend_intact": "趋势完整",
+    "down_streak": "连跌",
+    "consecutive_down": "连跌",
+    "proximity_to_low": "接近低点",
+    "volume": "成交量",
+    # Sniper
+    "bb_squeeze": "布林收窄",
+    "vol_compression": "量能压缩",
+    "relative_strength": "相对强度",
+    "trend_alignment": "趋势对齐",
+    "momentum_base": "动量底部",
+}
+
+
+def _translate_reason_summary(reason_summary: str) -> str:
+    """Translate factor key=value pairs in reason_summary to Chinese display labels.
+
+    Input:  "rsi2_oversold=100, trend_intact=80"
+    Output: "RSI2超卖=100, 趋势完整=80"
+
+    Unknown keys pass through unchanged.
+    """
+    if not reason_summary:
+        return reason_summary
+    parts = []
+    for fragment in reason_summary.split(","):
+        fragment = fragment.strip()
+        if "=" in fragment:
+            key, sep, val = fragment.partition("=")
+            label = _FACTOR_CN.get(key.strip(), key.strip())
+            parts.append(f"{label}{sep}{val}")
+        else:
+            # Not a key=value pair — pass through as-is
+            parts.append(fragment)
+    return ", ".join(parts)
+
+
 def _section_line() -> str:
     return "\u2500" * 28
 

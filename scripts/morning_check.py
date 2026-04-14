@@ -259,7 +259,7 @@ def send_open_pending_alert(
         return True
 
     try:
-        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn
+        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn, _translate_reason_summary
 
         alert_config = AlertConfig(enabled=True, channels=["telegram"])
         if not alert_config.telegram_bot_token or not alert_config.telegram_chat_id:
@@ -321,7 +321,7 @@ def send_open_pending_alert(
             )
             reason = pick.get("reason_summary")
             if reason:
-                lines.append(f"   {reason}")
+                lines.append(f"   {_translate_reason_summary(reason)}")
             lines.append("")
 
         lines.append(
@@ -575,7 +575,7 @@ def main():
         logger.info(f"Morning alert already sent (marker: {morning_marker}). Skipping Telegram.")
         return 0
     try:
-        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn
+        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn, _translate_reason_summary
 
         alert_config = AlertConfig(enabled=True, channels=["telegram"])
         if alert_config.telegram_bot_token and alert_config.telegram_chat_id:
@@ -638,7 +638,7 @@ def main():
 
                 # Reason summary from watchlist
                 if wp.get("reason_summary") and r.action == "GO":
-                    lines.append(f"   {wp['reason_summary']}")
+                    lines.append(f"   {_translate_reason_summary(wp['reason_summary'])}")
 
                 lines.append("")
 

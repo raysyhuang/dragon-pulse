@@ -81,8 +81,38 @@ def test_send_open_pending_alert_writes_marker_and_sends_message(tmp_path, monke
     assert "评分: 92" in msg
     assert "止损:" in msg
     assert "目标:" in msg
-    assert "rsi2_oversold=100" in msg
+    assert "RSI2超卖=100" in msg
     assert "开盘价尚未公布" in msg
+
+
+def test_translate_reason_summary_mean_reversion_keys():
+    from src.core.alerts import _translate_reason_summary
+    result = _translate_reason_summary("rsi2_oversold=100, trend_intact=80, down_streak=60")
+    assert result == "RSI2超卖=100, 趋势完整=80, 连跌=60"
+
+
+def test_translate_reason_summary_sniper_keys():
+    from src.core.alerts import _translate_reason_summary
+    result = _translate_reason_summary("bb_squeeze=90, vol_compression=75, relative_strength=60")
+    assert result == "布林收窄=90, 量能压缩=75, 相对强度=60"
+
+
+def test_translate_reason_summary_unknown_keys_pass_through():
+    from src.core.alerts import _translate_reason_summary
+    result = _translate_reason_summary("rsi2_oversold=100, some_new_factor=50")
+    assert result == "RSI2超卖=100, some_new_factor=50"
+
+
+def test_translate_reason_summary_empty_and_none():
+    from src.core.alerts import _translate_reason_summary
+    assert _translate_reason_summary("") == ""
+    assert _translate_reason_summary(None) is None
+
+
+def test_translate_reason_summary_no_equals():
+    from src.core.alerts import _translate_reason_summary
+    result = _translate_reason_summary("just a plain reason")
+    assert result == "just a plain reason"
 
 
 def test_main_returns_zero_when_open_prices_are_missing(tmp_path, monkeypatch):

@@ -78,7 +78,7 @@ def cmd_scan(args) -> int:
 def _send_scan_alert(result: dict) -> None:
     """Send Telegram alert with scan results."""
     try:
-        from src.core.alerts import AlertConfig, AlertManager, _regime_emoji, _regime_cn, _ticker_display
+        from src.core.alerts import AlertConfig, AlertManager, _regime_emoji, _regime_cn, _ticker_display, _translate_reason_summary
 
         alert_config = AlertConfig(enabled=True, channels=["telegram"])
         if not alert_config.telegram_bot_token or not alert_config.telegram_chat_id:
@@ -132,7 +132,7 @@ def _send_scan_alert(result: dict) -> None:
                     f"持仓: {p['holding_period']}天"
                 )
                 if p.get("reason_summary"):
-                    lines.append(f"   {p['reason_summary']}")
+                    lines.append(f"   {_translate_reason_summary(p['reason_summary'])}")
                 lines.append("")
 
         mgr = AlertManager(alert_config)
