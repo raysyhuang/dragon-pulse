@@ -51,8 +51,11 @@ def test_send_open_pending_alert_writes_marker_and_sends_message(tmp_path, monke
         "regime": "bull",
         "universe_size": 996,
         "picks": [
-            {"ticker": "600000.SH", "name_cn": "浦发银行", "entry_price": 10.2},
-            {"ticker": "000001.SZ", "name_cn": "平安银行", "entry_price": 12.3},
+            {"ticker": "600000.SH", "name_cn": "浦发银行", "entry_price": 10.2,
+             "max_entry_price": 10.35, "stop_loss": 9.8, "target_1": 10.9,
+             "holding_period": 3, "score": 92, "reason_summary": "rsi2_oversold=100"},
+            {"ticker": "000001.SZ", "name_cn": "平安银行", "entry_price": 12.3,
+             "stop_loss": 11.5, "target_1": 13.1, "holding_period": 3, "score": 85},
         ],
     }), encoding="utf-8")
     pending_marker = out_dir / ".morning_open_pending_sent"
@@ -73,7 +76,13 @@ def test_send_open_pending_alert_writes_marker_and_sends_message(tmp_path, monke
     assert pending_marker.exists()
     send_alert.assert_called_once()
     kwargs = send_alert.call_args.kwargs
-    assert "Opening prices are not available yet." in kwargs["message"]
+    msg = kwargs["message"]
+    assert "[PENDING]" in msg
+    assert "Score: 92" in msg
+    assert "Stop:" in msg
+    assert "T1:" in msg
+    assert "rsi2_oversold=100" in msg
+    assert "Opening prices not yet available" in msg
 
 
 def test_main_returns_zero_when_open_prices_are_missing(tmp_path, monkeypatch):

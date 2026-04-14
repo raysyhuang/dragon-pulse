@@ -283,27 +283,53 @@ def send_open_pending_alert(
             f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
             f"Regime: {emoji} <b>{regime.upper()}</b> | Picks: <b>{len(wl_picks)}</b> | Universe: {universe_size}",
             "",
-            "\u26a0\ufe0f Opening prices are not available yet.",
-            "This check needs live auction/open data from 09:25-09:35 Shanghai time.",
-            "",
         ]
 
         for i, pick in enumerate(wl_picks, 1):
             ticker = pick.get("ticker", "?")
             name_cn = pick.get("name_cn", pick.get("name", ticker))
             display = _ticker_display(ticker, name_cn)
-            entry_price = pick.get("entry_price")
+            score = pick.get("score", 0)
+            entry = pick.get("entry_price", 0)
+            max_entry = pick.get("max_entry_price")
+            stop = pick.get("stop_loss", 0)
+            t1 = pick.get("target_1", 0)
+            hold = pick.get("holding_period", "?")
+
             try:
-                entry_text = f"\u00a5{float(entry_price):.2f}"
+                entry_val = float(entry)
+                entry_text = f"\u00a5{entry_val:.2f}"
             except (TypeError, ValueError):
                 entry_text = "n/a"
+            max_str = ""
+            if max_entry is not None:
+                try:
+                    max_str = f" max=\u00a5{float(max_entry):.2f}"
+                except (TypeError, ValueError):
+                    pass
+            try:
+                stop_text = f"\u00a5{float(stop):.2f}"
+            except (TypeError, ValueError):
+                stop_text = "n/a"
+            try:
+                t1_text = f"\u00a5{float(t1):.2f}"
+            except (TypeError, ValueError):
+                t1_text = "n/a"
 
-            lines.append(f"{i}. <b>{display}</b> | Entry: {entry_text}")
+            lines.append(f"\u23f3 <b>{i}. {display}</b>  [PENDING]")
+            lines.append(
+                f"   Score: {score:.0f} | Entry: {entry_text}{max_str} | "
+                f"Stop: {stop_text} | T1: {t1_text} | Hold: {hold}d"
+            )
+            reason = pick.get("reason_summary")
+            if reason:
+                lines.append(f"   {reason}")
+            lines.append("")
 
-        lines.extend([
-            "",
-            "Watchlist loaded successfully. Re-run after the open to validate gaps.",
-        ])
+        lines.append(
+            "\u26a0\ufe0f Opening prices not yet available — "
+            "gap check will run after 09:25 Shanghai."
+        )
 
         mgr = AlertManager(alert_config)
         mgr.send_alert(
