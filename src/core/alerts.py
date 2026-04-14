@@ -44,6 +44,13 @@ def _regime_emoji(regime: str) -> str:
     )
 
 
+def _regime_cn(regime: str) -> str:
+    """Translate regime key to Chinese display label."""
+    return {"bull": "牛市", "bear": "熊市", "choppy": "震荡", "caution": "震荡"}.get(
+        (regime or "").lower(), "未知"
+    )
+
+
 def _section_line() -> str:
     return "\u2500" * 28
 

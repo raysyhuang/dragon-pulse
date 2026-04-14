@@ -71,29 +71,26 @@ def check_gap(
 
     if gap_pct > max_gap_up_pct:
         reasons.append(
-            f"Gap up +{gap_pct:.1f}% exceeds {max_gap_up_pct}% limit — "
-            f"entry invalidated (chasing risk)"
+            f"高开 +{gap_pct:.1f}% 超过{max_gap_up_pct}%上限 — 追高风险，取消入场"
         )
         return "CANCEL", reasons
 
     # Per-pick stop check: if open is below the stop_loss, cancel immediately
     if stop_loss is not None and open_price < stop_loss:
         reasons.append(
-            f"Open ¥{open_price:.2f} < stop ¥{stop_loss:.2f} — "
-            f"stop already breached at open"
+            f"开盘 ¥{open_price:.2f} < 止损 ¥{stop_loss:.2f} — 开盘即触发止损"
         )
         return "CANCEL", reasons
 
     if gap_pct < -max_gap_down_pct:
         reasons.append(
-            f"Gap down {gap_pct:.1f}% exceeds {max_gap_down_pct}% limit — "
-            f"stop already breached"
+            f"低开 {gap_pct:.1f}% 超过{max_gap_down_pct}%下限 — 止损已触发"
         )
         return "CANCEL", reasons
 
     if gap_pct > max_gap_up_pct * 0.6:
         reasons.append(
-            f"Gap up +{gap_pct:.1f}% is elevated — consider reduced size"
+            f"高开 +{gap_pct:.1f}% 偏高 — 建议减仓"
         )
         return "WARN", reasons
 
@@ -118,8 +115,8 @@ def check_volume_confirmation(
 
     if ratio < min_volume_ratio:
         return "WARN", [
-            f"Low opening volume: {first_15m_volume:,} = {ratio:.1%} of prev day "
-            f"(need >{min_volume_ratio:.0%}) — weak conviction"
+            f"开盘量不足: {first_15m_volume:,} = 前日{ratio:.1%}"
+            f"(需>{min_volume_ratio:.0%}) — 动能偏弱"
         ]
 
     return "GO", []
@@ -171,7 +168,7 @@ def run_preflight(
                 entry_price=entry_price, open_price=0,
                 gap_pct=0, prev_volume=prev_vol,
                 open_volume_15m=0, volume_ratio=0,
-                action="WARN", reasons=["No opening price available"],
+                action="WARN", reasons=["无开盘价"],
             ))
             continue
 
@@ -262,7 +259,7 @@ def send_open_pending_alert(
         return True
 
     try:
-        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji
+        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn
 
         alert_config = AlertConfig(enabled=True, channels=["telegram"])
         if not alert_config.telegram_bot_token or not alert_config.telegram_chat_id:
@@ -275,13 +272,14 @@ def send_open_pending_alert(
 
         wl_picks = wl_data.get("picks") or picks
         regime = wl_data.get("regime", "unknown")
+        regime_label = _regime_cn(regime)
         universe_size = wl_data.get("universe_size", 0)
         emoji = _regime_emoji(regime)
-        scan_label = f" (scan: {date_str})" if date_str != today_str else ""
+        scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
 
         lines = [
-            f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
-            f"Regime: {emoji} <b>{regime.upper()}</b> | Picks: <b>{len(wl_picks)}</b> | Universe: {universe_size}",
+            f"<b>\U0001f409 龙脉扫描 — {today_str} 开盘检查</b>{scan_label}",
+            f"市场状态: {emoji} <b>{regime_label}</b> | 选股: <b>{len(wl_picks)}</b> | 股池: {universe_size}",
             "",
         ]
 
@@ -304,7 +302,7 @@ def send_open_pending_alert(
             max_str = ""
             if max_entry is not None:
                 try:
-                    max_str = f" max=\u00a5{float(max_entry):.2f}"
+                    max_str = f" 上限=\u00a5{float(max_entry):.2f}"
                 except (TypeError, ValueError):
                     pass
             try:
@@ -316,10 +314,10 @@ def send_open_pending_alert(
             except (TypeError, ValueError):
                 t1_text = "n/a"
 
-            lines.append(f"\u23f3 <b>{i}. {display}</b>  [PENDING]")
+            lines.append(f"\u23f3 <b>{i}. {display}</b>  [待定]")
             lines.append(
-                f"   Score: {score:.0f} | Entry: {entry_text}{max_str} | "
-                f"Stop: {stop_text} | T1: {t1_text} | Hold: {hold}d"
+                f"   评分: {score:.0f} | 入场: {entry_text}{max_str} | "
+                f"止损: {stop_text} | 目标: {t1_text} | 持仓: {hold}天"
             )
             reason = pick.get("reason_summary")
             if reason:
@@ -327,13 +325,12 @@ def send_open_pending_alert(
             lines.append("")
 
         lines.append(
-            "\u26a0\ufe0f Opening prices not yet available — "
-            "gap check will run after 09:25 Shanghai."
+            "\u26a0\ufe0f 开盘价尚未公布 — 跳空检查将在09:25上海时间后执行"
         )
 
         mgr = AlertManager(alert_config)
         mgr.send_alert(
-            title=f"Dragon Pulse — {today_str} Open",
+            title=f"龙脉扫描 — {today_str} 开盘检查",
             message="\n".join(lines),
             data={"asof": date_str},
             priority="low",
@@ -448,22 +445,24 @@ def main():
                 regime = wl_data.get("regime", "unknown")
                 emoji = _regime_emoji(regime)
                 scan_label = f" (scan: {date_str})" if date_str != today_str else ""
+                from src.core.alerts import _regime_cn
+                regime_label = _regime_cn(regime)
                 lines = [
-                    f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
-                    f"Regime: {emoji} <b>{regime.upper()}</b>",
+                    f"<b>\U0001f409 龙脉扫描 — {today_str} 开盘检查</b>{scan_label}",
+                    f"市场状态: {emoji} <b>{regime_label}</b>",
                     "",
                 ]
 
                 if scan_health == "degraded":
                     lines.append(
-                        f"\u26a0\ufe0f <b>DATA ISSUE</b> — scan degraded "
-                        f"(downloaded {downloaded}/{universe}, "
-                        f"health: {dl_health})"
+                        f"\u26a0\ufe0f <b>数据异常</b> — 扫描不完整 "
+                        f"(已下载 {downloaded}/{universe}, "
+                        f"状态: {dl_health})"
                     )
                     if circuit_breaker:
-                        lines.append(f"Circuit breaker: {circuit_breaker}")
+                        lines.append(f"熔断: {circuit_breaker}")
                     lines.append("")
-                    lines.append("No picks — scan data was incomplete. Check provider status.")
+                    lines.append("无选股 — 扫描数据不完整，请检查数据源。")
                     priority = "high"
                 else:
                     regime_detail = {}
@@ -474,17 +473,17 @@ def main():
 
                     if acceptance_mode == "breadth_suppressed" and breadth is not None:
                         lines.append(
-                            f"No picks — breadth suppressed "
-                            f"(breadth {breadth:.1%}). "
-                            f"{signals} signals found but filtered."
+                            f"无选股 — 市场宽度受限 "
+                            f"(宽度 {breadth:.1%})，"
+                            f"{signals} 个信号已被过滤。"
                         )
                     else:
-                        lines.append("No picks today — nothing passed the selection funnel.")
+                        lines.append("今日无选股 — 未通过筛选。")
                     priority = "low"
 
                 mgr = AlertManager(alert_config)
                 mgr.send_alert(
-                    title=f"Dragon Pulse — {today_str} Open",
+                    title=f"龙脉扫描 — {today_str} 开盘检查",
                     message="\n".join(lines),
                     data={"asof": date_str},
                     priority=priority,
@@ -576,7 +575,7 @@ def main():
         logger.info(f"Morning alert already sent (marker: {morning_marker}). Skipping Telegram.")
         return 0
     try:
-        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji
+        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn
 
         alert_config = AlertConfig(enabled=True, channels=["telegram"])
         if alert_config.telegram_bot_token and alert_config.telegram_chat_id:
@@ -585,18 +584,20 @@ def main():
             if watchlist_path.exists():
                 wl_data = json.loads(watchlist_path.read_text(encoding="utf-8"))
             regime = wl_data.get("regime", "unknown")
+            regime_label = _regime_cn(regime)
             universe_size = wl_data.get("universe_size", 0)
             wl_picks = wl_data.get("picks", [])
             pick_map = {p.get("ticker"): p for p in wl_picks}
 
             emoji = _regime_emoji(regime)
-            scan_label = f" (scan: {date_str})" if date_str != today_str else ""
+            scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
             lines = [
-                f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
-                f"Regime: {emoji} <b>{regime.upper()}</b> | Picks: <b>{len(wl_picks)}</b> | Universe: {universe_size}",
+                f"<b>\U0001f409 龙脉扫描 — {today_str} 开盘检查</b>{scan_label}",
+                f"市场状态: {emoji} <b>{regime_label}</b> | 选股: <b>{len(wl_picks)}</b> | 股池: {universe_size}",
                 "",
             ]
 
+            ACTION_CN = {"GO": "执行", "WARN": "注意", "CANCEL": "取消"}
             go_picks = [r for r in results if r.action == "GO"]
             warn_picks = [r for r in results if r.action == "WARN"]
             cancel_picks = [r for r in results if r.action == "CANCEL"]
@@ -607,7 +608,8 @@ def main():
                     "GO": "\u2705", "WARN": "\u26a0\ufe0f", "CANCEL": "\u274c"
                 }.get(r.action, "?")
                 display = _ticker_display(r.ticker, r.name_cn)
-                lines.append(f"{icon} <b>{i}. {display}</b>  [{r.action}]")
+                action_label = ACTION_CN.get(r.action, r.action)
+                lines.append(f"{icon} <b>{i}. {display}</b>  [{action_label}]")
 
                 # Full pick details from watchlist
                 wp = pick_map.get(r.ticker, {})
@@ -617,16 +619,16 @@ def main():
                 t1 = wp.get("target_1", 0)
                 hold = wp.get("holding_period", "?")
                 max_entry = wp.get("max_entry_price")
-                max_str = f" max=\u00a5{max_entry:.2f}" if max_entry else ""
+                max_str = f" 上限=\u00a5{max_entry:.2f}" if max_entry else ""
                 lines.append(
-                    f"   Score: {score:.0f} | Entry: \u00a5{entry:.2f}{max_str} | "
-                    f"Stop: \u00a5{stop:.2f} | T1: \u00a5{t1:.2f} | Hold: {hold}d"
+                    f"   评分: {score:.0f} | 入场: \u00a5{entry:.2f}{max_str} | "
+                    f"止损: \u00a5{stop:.2f} | 目标: \u00a5{t1:.2f} | 持仓: {hold}天"
                 )
 
                 # Open price + gap
                 if r.open_price:
                     lines.append(
-                        f"   Open: \u00a5{r.open_price:.2f} (gap: {r.gap_pct:+.1f}%)"
+                        f"   开盘: \u00a5{r.open_price:.2f} (跳空: {r.gap_pct:+.1f}%)"
                     )
 
                 # Reasons (warnings/cancellations)
@@ -642,12 +644,12 @@ def main():
 
             # Summary line
             lines.append(
-                f"\U0001f4ca GO: {len(go_picks)} | WARN: {len(warn_picks)} | CANCEL: {len(cancel_picks)}"
+                f"\U0001f4ca 执行: {len(go_picks)} | 注意: {len(warn_picks)} | 取消: {len(cancel_picks)}"
             )
 
             mgr = AlertManager(alert_config)
             mgr.send_alert(
-                title=f"Dragon Pulse — {today_str} Open",
+                title=f"龙脉扫描 — {today_str} 开盘检查",
                 message="\n".join(lines),
                 data={"asof": date_str},
                 priority="high" if go_picks else "low",

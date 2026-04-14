@@ -77,12 +77,12 @@ def test_send_open_pending_alert_writes_marker_and_sends_message(tmp_path, monke
     send_alert.assert_called_once()
     kwargs = send_alert.call_args.kwargs
     msg = kwargs["message"]
-    assert "[PENDING]" in msg
-    assert "Score: 92" in msg
-    assert "Stop:" in msg
-    assert "T1:" in msg
+    assert "[待定]" in msg
+    assert "评分: 92" in msg
+    assert "止损:" in msg
+    assert "目标:" in msg
     assert "rsi2_oversold=100" in msg
-    assert "Opening prices not yet available" in msg
+    assert "开盘价尚未公布" in msg
 
 
 def test_main_returns_zero_when_open_prices_are_missing(tmp_path, monkeypatch):

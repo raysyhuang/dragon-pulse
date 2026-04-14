@@ -78,7 +78,7 @@ def cmd_scan(args) -> int:
 def _send_scan_alert(result: dict) -> None:
     """Send Telegram alert with scan results."""
     try:
-        from src.core.alerts import AlertConfig, AlertManager, _regime_emoji, _ticker_display
+        from src.core.alerts import AlertConfig, AlertManager, _regime_emoji, _regime_cn, _ticker_display
 
         alert_config = AlertConfig(enabled=True, channels=["telegram"])
         if not alert_config.telegram_bot_token or not alert_config.telegram_chat_id:
@@ -86,6 +86,7 @@ def _send_scan_alert(result: dict) -> None:
 
         scan_date = result["date"]
         regime = result["regime"]
+        regime_label = _regime_cn(regime)
         picks = result["picks"]
 
         emoji = _regime_emoji(regime)
@@ -95,32 +96,40 @@ def _send_scan_alert(result: dict) -> None:
         eligible = rd.get("acceptance_eligible_count", 0)
         breadth = rd.get("market_breadth_pct_above_sma20", 0)
 
+        ACC_MODE_CN = {
+            "breadth_suppressed": "宽度受限",
+            "abstain": "放弃",
+            "normal": "正常",
+            "relaxed": "宽松",
+        }
+        acc_label = ACC_MODE_CN.get(acc_mode, acc_mode.upper())
+
         lines = [
-            f"<b>🐉 Dragon Pulse — {scan_date}</b>",
-            f"Regime: {emoji} <b>{regime.upper()}</b> | Breadth: {breadth:.0%}",
-            f"Signals: {result.get('signals_total', 0)} MR | Eligible: {eligible} | DQ: {dq_score:.0f}/100 → <b>{acc_mode.upper()}</b>",
+            f"<b>\U0001f409 龙脉扫描 — {scan_date}</b>",
+            f"市场状态: {emoji} <b>{regime_label}</b> | 宽度: {breadth:.0%}",
+            f"信号: {result.get('signals_total', 0)} MR | 入选: {eligible} | 日质量: {dq_score:.0f}/100 → <b>{acc_label}</b>",
             "",
         ]
 
         if not picks:
             if acc_mode == "breadth_suppressed":
-                lines.append("📉 Breadth suppressed — no picks today.")
+                lines.append("\U0001f4c9 市场宽度受限 — 今日无选股。")
             elif acc_mode == "abstain":
-                lines.append("⏸ Day quality too low — abstained.")
+                lines.append("\u23f8 日质量过低 — 放弃选股。")
             else:
-                lines.append("No picks today.")
+                lines.append("今日无选股。")
         else:
             for i, p in enumerate(picks, 1):
                 display = _ticker_display(p["ticker"], p.get("name_cn", ""))
                 lines.append(
                     f"<b>{i}. {display}</b> "
-                    f"Score: {p['score']:.0f}"
+                    f"评分: {p['score']:.0f}"
                 )
-                max_entry_str = f" max=¥{p['max_entry_price']:.2f}" if p.get("max_entry_price") else ""
+                max_entry_str = f" 上限=\u00a5{p['max_entry_price']:.2f}" if p.get("max_entry_price") else ""
                 lines.append(
-                    f"   Entry: ¥{p['entry_price']:.2f}{max_entry_str} | "
-                    f"Stop: ¥{p['stop_loss']:.2f} | T1: ¥{p['target_1']:.2f} | "
-                    f"Hold: {p['holding_period']}d"
+                    f"   入场: \u00a5{p['entry_price']:.2f}{max_entry_str} | "
+                    f"止损: \u00a5{p['stop_loss']:.2f} | 目标: \u00a5{p['target_1']:.2f} | "
+                    f"持仓: {p['holding_period']}天"
                 )
                 if p.get("reason_summary"):
                     lines.append(f"   {p['reason_summary']}")
@@ -128,7 +137,7 @@ def _send_scan_alert(result: dict) -> None:
 
         mgr = AlertManager(alert_config)
         mgr.send_alert(
-            title=f"Dragon Pulse Scan: {scan_date}",
+            title=f"龙脉扫描: {scan_date}",
             message="\n".join(lines),
             data={"asof": scan_date},
             priority="high" if picks else "low",
