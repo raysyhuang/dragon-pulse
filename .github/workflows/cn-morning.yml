@@ -2,8 +2,8 @@ name: CN Morning Check
 
 on:
   schedule:
-    # 07:15 Shanghai = 23:15 UTC-1day (weekdays)
-    - cron: "15 23 * * 0-4"
+    # 09:26 Shanghai = 01:26 UTC (weekdays)
+    - cron: "26 1 * * 1-5"
   workflow_dispatch:
 
 env:
@@ -80,6 +80,7 @@ jobs:
           TRADE_DATE="${{ steps.check.outputs.trade_date }}"
           git add "outputs/${TRADE_DATE}/execution_check_${TRADE_DATE}.json" 2>/dev/null || true
           git add "outputs/${TRADE_DATE}/.morning_alert_sent" 2>/dev/null || true
+          git add "outputs/${TRADE_DATE}/.morning_open_pending_sent" 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No check results to commit"
           else

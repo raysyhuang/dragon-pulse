@@ -216,21 +216,108 @@ def run_preflight(
 def fetch_open_prices(tickers: list[str]) -> dict[str, float]:
     """Fetch real-time opening prices from AkShare (best effort)."""
     prices = {}
+    code_map = {
+        ticker.split(".")[0]: ticker
+        for ticker in tickers
+        if ticker and "." in ticker
+    }
+    if not code_map:
+        return prices
+
     try:
         import akshare as ak
-        for ticker in tickers:
+        df = ak.stock_zh_a_spot_em()
+        if df is None or df.empty:
+            return prices
+
+        snapshot = df[df["代码"].isin(code_map)]
+        for _, row in snapshot.iterrows():
+            code = str(row.get("代码", "") or "")
             try:
-                code = ticker.split(".")[0]
-                df = ak.stock_zh_a_spot_em()
-                if df is not None and not df.empty:
-                    row = df[df["代码"] == code]
-                    if not row.empty:
-                        prices[ticker] = float(row.iloc[0].get("今开", 0) or 0)
-            except Exception:
+                open_price = float(row.get("今开", 0) or 0)
+            except (TypeError, ValueError):
                 continue
+
+            # AkShare commonly reports 0 before the live auction/open.
+            if open_price > 0 and code in code_map:
+                prices[code_map[code]] = open_price
     except ImportError:
         logger.warning("AkShare not installed — cannot fetch live prices")
+    except Exception as exc:
+        logger.warning(f"Failed to fetch live opening prices: {exc}")
     return prices
+
+
+def send_open_pending_alert(
+    *,
+    today_str: str,
+    date_str: str,
+    watchlist_path: Path,
+    picks: list[dict],
+    pending_marker: Path,
+) -> bool:
+    """Send a watchlist-only alert when opening prices are not live yet."""
+    if pending_marker.exists():
+        logger.info(f"Waiting-for-open alert already sent (marker: {pending_marker}). Skipping.")
+        return True
+
+    try:
+        from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji
+
+        alert_config = AlertConfig(enabled=True, channels=["telegram"])
+        if not alert_config.telegram_bot_token or not alert_config.telegram_chat_id:
+            logger.info("Telegram not configured — skipping waiting-for-open alert.")
+            return False
+
+        wl_data = {}
+        if watchlist_path.exists():
+            wl_data = json.loads(watchlist_path.read_text(encoding="utf-8"))
+
+        wl_picks = wl_data.get("picks") or picks
+        regime = wl_data.get("regime", "unknown")
+        universe_size = wl_data.get("universe_size", 0)
+        emoji = _regime_emoji(regime)
+        scan_label = f" (scan: {date_str})" if date_str != today_str else ""
+
+        lines = [
+            f"<b>\U0001f409 Dragon Pulse — {today_str} Open</b>{scan_label}",
+            f"Regime: {emoji} <b>{regime.upper()}</b> | Picks: <b>{len(wl_picks)}</b> | Universe: {universe_size}",
+            "",
+            "\u26a0\ufe0f Opening prices are not available yet.",
+            "This check needs live auction/open data from 09:25-09:35 Shanghai time.",
+            "",
+        ]
+
+        for i, pick in enumerate(wl_picks, 1):
+            ticker = pick.get("ticker", "?")
+            name_cn = pick.get("name_cn", pick.get("name", ticker))
+            display = _ticker_display(ticker, name_cn)
+            entry_price = pick.get("entry_price")
+            try:
+                entry_text = f"\u00a5{float(entry_price):.2f}"
+            except (TypeError, ValueError):
+                entry_text = "n/a"
+
+            lines.append(f"{i}. <b>{display}</b> | Entry: {entry_text}")
+
+        lines.extend([
+            "",
+            "Watchlist loaded successfully. Re-run after the open to validate gaps.",
+        ])
+
+        mgr = AlertManager(alert_config)
+        mgr.send_alert(
+            title=f"Dragon Pulse — {today_str} Open",
+            message="\n".join(lines),
+            data={"asof": date_str},
+            priority="low",
+        )
+        pending_marker.write_text(f"sent={today_str}\n", encoding="utf-8")
+        logger.info("Waiting-for-open alert sent to Telegram")
+        return True
+    except Exception as exc:
+        logger.warning(f"Failed to send waiting-for-open alert: {exc}")
+        return False
 
 
 def main():
@@ -271,6 +358,7 @@ def main():
 
     # Shared dedup marker — prevents duplicate Telegram sends from CI + local fallback
     morning_marker = output_dir / ".morning_alert_sent"
+    pending_marker = output_dir / ".morning_open_pending_sent"
 
     picks = None
     if not args.picks_file and watchlist_path.exists():
@@ -396,8 +484,18 @@ def main():
     open_prices = fetch_open_prices(tickers)
 
     if not open_prices:
-        logger.warning("Could not fetch opening prices. Run this during market hours (9:25-9:35 AM).")
-        return 1
+        logger.warning(
+            "Could not fetch opening prices yet. Waiting for live auction/open data "
+            "(9:25-9:35 AM Shanghai)."
+        )
+        send_open_pending_alert(
+            today_str=today_str,
+            date_str=date_str,
+            watchlist_path=watchlist_path,
+            picks=picks,
+            pending_marker=pending_marker,
+        )
+        return 0
 
     # Run checks
     results = run_preflight(
@@ -529,6 +627,7 @@ def main():
                 priority="high" if go_picks else "low",
             )
             morning_marker.write_text(f"sent={today_str}\n", encoding="utf-8")
+            pending_marker.unlink(missing_ok=True)
             logger.info("Combined morning alert sent to Telegram")
     except Exception as e:
         logger.warning(f"Failed to send morning alert: {e}")
