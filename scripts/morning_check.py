@@ -245,6 +245,18 @@ def fetch_open_prices(tickers: list[str]) -> dict[str, float]:
     return prices
 
 
+def _marker_is_for_today(marker: Path, today_str: str) -> bool:
+    """Check if a dedup marker was written for today's session."""
+    if not marker.exists():
+        return False
+    try:
+        content = marker.read_text(encoding="utf-8").strip()
+        # Marker format: "sent=YYYY-MM-DD"
+        return content == f"sent={today_str}"
+    except Exception:
+        return False
+
+
 def send_open_pending_alert(
     *,
     today_str: str,
@@ -254,8 +266,8 @@ def send_open_pending_alert(
     pending_marker: Path,
 ) -> bool:
     """Send a watchlist-only alert when opening prices are not live yet."""
-    if pending_marker.exists():
-        logger.info(f"Waiting-for-open alert already sent (marker: {pending_marker}). Skipping.")
+    if _marker_is_for_today(pending_marker, today_str):
+        logger.info(f"Waiting-for-open alert already sent for {today_str} (marker: {pending_marker}). Skipping.")
         return True
 
     try:
@@ -416,8 +428,8 @@ def main():
     if not picks:
         logger.info("No picks to validate.")
         # Still send a compact Telegram message for zero-picks days
-        if morning_marker.exists():
-            logger.info(f"Morning alert already sent (marker: {morning_marker}). Skipping.")
+        if _marker_is_for_today(morning_marker, today_str):
+            logger.info(f"Morning alert already sent for {today_str} (marker: {morning_marker}). Skipping.")
             return 0
 
         # Check scan health to distinguish "quiet market" from "broken scan"
@@ -571,8 +583,8 @@ def main():
     logger.info(f"Saved execution check to {check_file}")
 
     # Send combined Telegram alert (watchlist details + execution verdicts)
-    if morning_marker.exists():
-        logger.info(f"Morning alert already sent (marker: {morning_marker}). Skipping Telegram.")
+    if _marker_is_for_today(morning_marker, today_str):
+        logger.info(f"Morning alert already sent for {today_str} (marker: {morning_marker}). Skipping Telegram.")
         return 0
     try:
         from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn, _translate_reason_summary
