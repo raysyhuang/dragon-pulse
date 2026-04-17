@@ -1,25 +1,23 @@
 {
   "date": "2026-04-16",
-  "generated_utc": "2026-04-16T23:50:34.891323",
+  "generated_utc": "2026-04-17T02:27:20.728106",
   "results": [
     {
       "ticker": "600026.SH",
       "name": "中远海能",
-      "action": "WARN",
+      "action": "GO",
       "entry_price": 21.99,
-      "open_price": 22.45,
-      "gap_pct": 2.09,
-      "reasons": [
-        "高开 +2.1% 偏高 — 建议减仓"
-      ]
+      "open_price": 21.88,
+      "gap_pct": -0.5,
+      "reasons": []
     },
     {
       "ticker": "601117.SH",
       "name": "中国化学",
       "action": "GO",
       "entry_price": 8.66,
-      "open_price": 8.68,
-      "gap_pct": 0.23,
+      "open_price": 8.64,
+      "gap_pct": -0.23,
       "reasons": []
     }
   ]
