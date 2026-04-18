@@ -40,9 +40,10 @@ from src.features.technical import (
 )
 from src.core.acceptance import run_acceptance, score_day_quality
 from src.core.cn_limits import get_daily_limit
+from src.features.performance.backtest import load_execution_watchlist_tickers_in_range
 from src.pipelines.scanner import _classify_regime
 from src.signals.mean_reversion import (
-    classify_mean_reversion_subtype,
+    resolve_mr_subtype_and_exit_params,
     score_mean_reversion,
 )
 from src.signals.sniper import score_sniper
@@ -181,41 +182,6 @@ def _slice_from(df: pd.DataFrame, scan_date: date) -> pd.DataFrame:
         mask = pd.to_datetime(idx).date >= scan_date
     return df.loc[mask]
 
-
-def resolve_mr_subtype_and_exit_params(mr_config: dict, features: dict) -> tuple[str, dict]:
-    """Resolve MR subtype and exit settings from config using signal-time features."""
-    params = {
-        "stop_atr_mult": float(mr_config.get("stop_atr_mult", 0.95)),
-        "target_1_atr_mult": float(mr_config.get("target_1_atr_mult", 1.5)),
-        "target_2_atr_mult": float(mr_config.get("target_2_atr_mult", 2.0)),
-        "max_entry_atr_mult": float(mr_config.get("max_entry_atr_mult", 0.2)),
-        "holding_period": int(mr_config.get("holding_period", 3)),
-    }
-
-    subtype_cfg = mr_config.get("subtype_split", {}) or {}
-    if not subtype_cfg.get("enabled", False):
-        return "default", params
-
-    subtype = classify_mean_reversion_subtype(
-        features,
-        rsi2_bounce_max=float(subtype_cfg.get("rsi2_bounce_max", 3.0)),
-        streak_bounce_max=int(subtype_cfg.get("streak_bounce_max", -3)),
-        dist_from_5d_low_bounce_max=float(subtype_cfg.get("dist_from_5d_low_bounce_max", 0.75)),
-    )
-    if subtype != "drift":
-        return subtype, params
-
-    drift_cfg = subtype_cfg.get("drift", {}) or {}
-    drift_params = {
-        "stop_atr_mult": float(drift_cfg.get("stop_atr_mult", params["stop_atr_mult"])),
-        "target_1_atr_mult": float(drift_cfg.get("target_1_atr_mult", params["target_1_atr_mult"])),
-        "target_2_atr_mult": float(drift_cfg.get("target_2_atr_mult", params["target_2_atr_mult"])),
-        "max_entry_atr_mult": float(drift_cfg.get("max_entry_atr_mult", params["max_entry_atr_mult"])),
-        "holding_period": int(drift_cfg.get("holding_period", params["holding_period"])),
-    }
-    return subtype, drift_params
-
-
 def main():
     parser = argparse.ArgumentParser(description="Dragon Pulse Backtest (bulk download)")
     parser.add_argument("--start", default="2025-03-14", help="Start date YYYY-MM-DD")
@@ -239,6 +205,11 @@ def main():
     parser.add_argument("--acceptance-mode", default="off",
                         choices=["off", "engine_only", "live_equivalent"],
                         help="Acceptance: off, engine_only (raw deduped), live_equivalent (full funnel)")
+    parser.add_argument("--universe-source", default="market_cap",
+                        choices=["market_cap", "watchlist"],
+                        help="Universe source: market_cap (default) or tickers seen in execution watchlists")
+    parser.add_argument("--outputs-root", default="outputs",
+                        help="Outputs root used when universe-source=watchlist")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -267,9 +238,31 @@ def main():
     _, download_daily_range_fn, provider_config, _ = get_data_functions(config)
 
     # Build universe once
-    logger.info("Building universe: top 1000 A-shares by market cap...")
-    universe = get_top_n_cn_by_market_cap(n=1000, provider_config=provider_config)
-    logger.info("Universe: %d tickers", len(universe))
+    if args.universe_source == "watchlist":
+        logger.info(
+            "Building universe from execution watchlists in %s for %s to %s...",
+            args.outputs_root,
+            args.start,
+            args.end,
+        )
+        universe = load_execution_watchlist_tickers_in_range(
+            args.outputs_root,
+            start_date=args.start,
+            end_date=args.end,
+        )
+        if not universe:
+            logger.error(
+                "No execution watchlist tickers found under %s for %s to %s",
+                args.outputs_root,
+                args.start,
+                args.end,
+            )
+            return 1
+        logger.info("Universe: %d tickers from execution watchlists", len(universe))
+    else:
+        logger.info("Building universe: top 1000 A-shares by market cap...")
+        universe = get_top_n_cn_by_market_cap(n=1000, provider_config=provider_config)
+        logger.info("Universe: %d tickers", len(universe))
 
     # Download date range: lookback before start through end + max holding buffer
     max_hold = max(
@@ -788,6 +781,8 @@ def main():
         "gap_filter_disabled": args.disable_gap_filter,
         "sniper_trailing_disabled": args.no_sniper_trailing,
         "acceptance_mode": args.acceptance_mode,
+        "universe_source": args.universe_source,
+        "outputs_root": args.outputs_root if args.universe_source == "watchlist" else None,
         "trading_days_scanned": len(trading_days),
         "days_with_picks": days_with_picks,
         "zero_pick_days": zero_pick_days,

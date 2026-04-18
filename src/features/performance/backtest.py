@@ -385,6 +385,445 @@ def load_picks_in_range(
     return [load_picks_for_date(d, outputs_root=outputs_root) for d in dates]
 
 
+def has_execution_watchlists_in_range(
+    outputs_root: str | Path = "outputs",
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> bool:
+    root = Path(outputs_root)
+    for date_str in iter_output_dates(root):
+        if not _date_in_range(date_str, start_date, end_date):
+            continue
+        if (root / date_str / f"execution_watchlist_{date_str}.json").exists():
+            return True
+    return False
+
+
+def _coerce_float(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except Exception:
+        return None
+
+
+def _coerce_int(value: Any, default: int) -> int:
+    try:
+        out = int(value)
+        return out if out > 0 else default
+    except Exception:
+        return default
+
+
+def _normalize_watchlist_pick(
+    *,
+    date_str: str,
+    regime: str | None,
+    pick_index: int,
+    pick: dict[str, Any],
+    source_path: Path,
+) -> dict[str, Any]:
+    planned_entry = _coerce_float(pick.get("entry_price"))
+    max_entry = _coerce_float(pick.get("max_entry_price"))
+    stop_loss = _coerce_float(pick.get("stop_loss"))
+    target_1 = _coerce_float(pick.get("target_1"))
+    target_2 = _coerce_float(pick.get("target_2"))
+
+    schema = "modern"
+    if stop_loss is None and _coerce_float(pick.get("stop_price")) is not None:
+        stop_loss = _coerce_float(pick.get("stop_price"))
+        schema = "legacy"
+    if target_1 is None and _coerce_float(pick.get("target_price")) is not None:
+        target_1 = _coerce_float(pick.get("target_price"))
+        schema = "legacy"
+    if target_2 is None:
+        target_2 = target_1
+
+    score = _coerce_float(pick.get("score"))
+    if score is None:
+        score = _coerce_float(pick.get("hybrid_score"))
+
+    return {
+        "baseline_date": date_str,
+        "regime": regime or "unknown",
+        "pick_index": pick_index,
+        "ticker": str(pick.get("ticker") or "").strip().upper(),
+        "name_cn": pick.get("name_cn") or pick.get("name"),
+        "engine": str(pick.get("engine") or "unknown").strip().lower(),
+        "score": score,
+        "planned_entry_price": planned_entry,
+        "max_entry_price": max_entry if max_entry is not None else planned_entry,
+        "stop_loss": stop_loss,
+        "target_1": target_1,
+        "target_2": target_2,
+        "holding_period": _coerce_int(pick.get("holding_period"), default=3),
+        "reason_summary": pick.get("reason_summary"),
+        "components": json.dumps(pick.get("components", {}), ensure_ascii=False),
+        "source_schema": schema,
+        "source_file": str(source_path),
+    }
+
+
+def load_execution_watchlists_in_range(
+    outputs_root: str | Path = "outputs",
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> pd.DataFrame:
+    root = Path(outputs_root)
+    rows: list[dict[str, Any]] = []
+
+    for date_str in iter_output_dates(root):
+        if not _date_in_range(date_str, start_date, end_date):
+            continue
+
+        watchlist_path = root / date_str / f"execution_watchlist_{date_str}.json"
+        if not watchlist_path.exists():
+            continue
+
+        payload = _safe_read_json(watchlist_path)
+        picks = payload.get("picks") or []
+        if not isinstance(picks, list):
+            continue
+
+        regime = payload.get("regime")
+        for idx, pick in enumerate(picks, start=1):
+            if not isinstance(pick, dict):
+                continue
+            rows.append(
+                _normalize_watchlist_pick(
+                    date_str=date_str,
+                    regime=regime,
+                    pick_index=idx,
+                    pick=pick,
+                    source_path=watchlist_path,
+                )
+            )
+
+    return pd.DataFrame(rows)
+
+
+def load_execution_watchlist_tickers_in_range(
+    outputs_root: str | Path = "outputs",
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> list[str]:
+    """
+    Return unique tickers from execution watchlists in stable date/pick order.
+
+    This is used by lightweight validation runs that want to exercise current
+    live-equivalent logic over a recent window without rebuilding a much larger
+    historical universe.
+    """
+    picks_df = load_execution_watchlists_in_range(
+        outputs_root,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    if picks_df.empty or "ticker" not in picks_df.columns:
+        return []
+    return _dedup_keep_order(picks_df["ticker"].dropna().tolist())
+
+
+def _slice_next_session(price_df: pd.DataFrame, baseline_date: str) -> pd.DataFrame:
+    if price_df is None or price_df.empty:
+        return pd.DataFrame()
+    df = price_df.sort_index()
+    baseline_ts = pd.Timestamp(baseline_date)
+    return df[df.index > baseline_ts].copy()
+
+
+def _evaluate_watchlist_pick(
+    pick: dict[str, Any],
+    price_df: pd.DataFrame,
+) -> dict[str, Any]:
+    result = dict(pick)
+    result.update(
+        {
+            "status": None,
+            "matured": False,
+            "entry_date": None,
+            "actual_entry_price": None,
+            "entry_gap_pct": None,
+            "exit_date": None,
+            "exit_price": None,
+            "exit_day": None,
+            "exit_reason": None,
+            "hit_target": False,
+            "hit_stop": False,
+            "pnl_pct": None,
+            "positive_pnl": None,
+            "max_return_pct": None,
+            "min_return_pct": None,
+            "unrealized_pnl_pct": None,
+        }
+    )
+
+    ticker = str(pick.get("ticker") or "").strip().upper()
+    if not ticker:
+        result["status"] = "unsupported_schema"
+        result["exit_reason"] = "missing_ticker"
+        return result
+
+    planned_entry = _coerce_float(pick.get("planned_entry_price"))
+    max_entry = _coerce_float(pick.get("max_entry_price"))
+    stop_loss = _coerce_float(pick.get("stop_loss"))
+    target_1 = _coerce_float(pick.get("target_1"))
+    holding_period = _coerce_int(pick.get("holding_period"), default=3)
+
+    if stop_loss is None or target_1 is None:
+        result["status"] = "unsupported_schema"
+        result["exit_reason"] = "missing_stop_or_target"
+        return result
+
+    next_sessions = _slice_next_session(price_df, str(pick.get("baseline_date")))
+    if next_sessions.empty:
+        result["status"] = "open_or_partial"
+        result["exit_reason"] = "awaiting_next_session"
+        return result
+
+    first_bar = next_sessions.iloc[0]
+    entry_date = next_sessions.index[0]
+    entry_open = _coerce_float(first_bar.get("Open"))
+    if entry_open is None:
+        result["status"] = "no_data"
+        result["exit_reason"] = "missing_open"
+        return result
+
+    result["entry_date"] = entry_date.strftime("%Y-%m-%d")
+    result["actual_entry_price"] = round(entry_open, 4)
+
+    if planned_entry:
+        result["entry_gap_pct"] = round((entry_open / planned_entry - 1.0) * 100.0, 2)
+
+    if max_entry is not None and entry_open > max_entry:
+        result["status"] = "cancelled_gap_up"
+        result["exit_reason"] = "open_above_max_entry"
+        return result
+
+    if entry_open < stop_loss:
+        result["status"] = "cancelled_gap_down"
+        result["exit_reason"] = "open_below_stop_loss"
+        return result
+
+    bars = next_sessions.iloc[:holding_period].copy()
+    if bars.empty:
+        result["status"] = "open_or_partial"
+        result["exit_reason"] = "awaiting_entry_bars"
+        return result
+
+    max_high = pd.to_numeric(bars["High"], errors="coerce").dropna()
+    min_low = pd.to_numeric(bars["Low"], errors="coerce").dropna()
+    if not max_high.empty:
+        result["max_return_pct"] = round((float(max_high.max()) / entry_open - 1.0) * 100.0, 2)
+    if not min_low.empty:
+        result["min_return_pct"] = round((float(min_low.min()) / entry_open - 1.0) * 100.0, 2)
+
+    for day_idx, (dt, row) in enumerate(bars.iterrows(), start=1):
+        high = _coerce_float(row.get("High"))
+        low = _coerce_float(row.get("Low"))
+        close = _coerce_float(row.get("Close"))
+        if high is None or low is None or close is None:
+            continue
+
+        if high >= target_1:
+            result["exit_price"] = round(target_1, 4)
+            result["exit_date"] = dt.strftime("%Y-%m-%d")
+            result["exit_day"] = day_idx
+            result["exit_reason"] = "target_hit"
+            result["hit_target"] = True
+            result["status"] = "matured"
+            result["matured"] = True
+            break
+        if low <= stop_loss:
+            result["exit_price"] = round(stop_loss, 4)
+            result["exit_date"] = dt.strftime("%Y-%m-%d")
+            result["exit_day"] = day_idx
+            result["exit_reason"] = "stop_hit"
+            result["hit_stop"] = True
+            result["status"] = "matured"
+            result["matured"] = True
+            break
+    else:
+        if len(next_sessions) >= holding_period:
+            final_bar = bars.iloc[-1]
+            final_close = _coerce_float(final_bar.get("Close"))
+            if final_close is not None:
+                result["exit_price"] = round(final_close, 4)
+                result["exit_date"] = bars.index[-1].strftime("%Y-%m-%d")
+                result["exit_day"] = len(bars)
+                result["exit_reason"] = "hold_expired"
+                result["status"] = "matured"
+                result["matured"] = True
+        else:
+            latest_close = _coerce_float(bars.iloc[-1].get("Close"))
+            if latest_close is not None:
+                result["unrealized_pnl_pct"] = round((latest_close / entry_open - 1.0) * 100.0, 2)
+            result["status"] = "open_or_partial"
+            result["exit_reason"] = "holding_window_incomplete"
+
+    if result["matured"] and result["exit_price"] is not None:
+        pnl_pct = (float(result["exit_price"]) / entry_open - 1.0) * 100.0
+        result["pnl_pct"] = round(pnl_pct, 2)
+        result["positive_pnl"] = pnl_pct > 0
+
+    return result
+
+
+def compute_watchlist_backtest(
+    watchlist_picks: pd.DataFrame,
+    *,
+    outputs_root: str | Path = "outputs",
+    auto_adjust: bool = False,
+    threads: bool = True,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    if watchlist_picks is None or watchlist_picks.empty:
+        empty = pd.DataFrame()
+        return empty, empty, empty, {}
+
+    from src.core.cn_data import download_daily_range
+
+    tickers = _dedup_keep_order(watchlist_picks["ticker"].dropna().astype(str).tolist())
+    baseline_dates = sorted(watchlist_picks["baseline_date"].dropna().astype(str).tolist())
+    max_holding = int(watchlist_picks["holding_period"].fillna(3).max())
+    end_dt = (_to_dt(baseline_dates[-1]) + timedelta(days=max(15, max_holding * 5))).strftime(
+        "%Y-%m-%d"
+    )
+
+    data_map, data_report = download_daily_range(
+        tickers=tickers,
+        start=baseline_dates[0],
+        end=end_dt,
+        auto_adjust=auto_adjust,
+        threads=threads,
+    )
+
+    detail_rows: list[dict[str, Any]] = []
+    for pick in watchlist_picks.to_dict(orient="records"):
+        ticker = str(pick.get("ticker") or "").strip().upper()
+        price_df = data_map.get(ticker, pd.DataFrame())
+        if price_df.empty and ticker in (data_report.get("bad_tickers") or []):
+            row = dict(pick)
+            row.update(
+                {
+                    "status": "no_data",
+                    "matured": False,
+                    "entry_date": None,
+                    "actual_entry_price": None,
+                    "entry_gap_pct": None,
+                    "exit_date": None,
+                    "exit_price": None,
+                    "exit_day": None,
+                    "exit_reason": "download_failed",
+                    "hit_target": False,
+                    "hit_stop": False,
+                    "pnl_pct": None,
+                    "positive_pnl": None,
+                    "max_return_pct": None,
+                    "min_return_pct": None,
+                    "unrealized_pnl_pct": None,
+                }
+            )
+            detail_rows.append(row)
+            continue
+        detail_rows.append(_evaluate_watchlist_pick(pick, price_df))
+
+    perf_detail = pd.DataFrame(detail_rows)
+
+    def _pct_mean(series: pd.Series) -> float | None:
+        valid = series.dropna()
+        if valid.empty:
+            return None
+        return round(float(valid.mean()), 4)
+
+    def _pct_median(series: pd.Series) -> float | None:
+        valid = series.dropna()
+        if valid.empty:
+            return None
+        return round(float(valid.median()), 4)
+
+    by_date_rows: list[dict[str, Any]] = []
+    for date_str, group in perf_detail.groupby("baseline_date", sort=True):
+        matured = group[group["matured"] == True]
+        by_date_rows.append(
+            {
+                "baseline_date": date_str,
+                "regime": group["regime"].dropna().iloc[0] if not group["regime"].dropna().empty else None,
+                "n_picks": int(len(group)),
+                "n_matured": int(len(matured)),
+                "n_cancelled": int(group["status"].astype(str).str.startswith("cancelled").sum()),
+                "n_open_or_partial": int((group["status"] == "open_or_partial").sum()),
+                "n_no_data": int((group["status"] == "no_data").sum()),
+                "target_hit_rate": _pct_mean(matured["hit_target"].astype(float)) if not matured.empty else None,
+                "stop_hit_rate": _pct_mean(matured["hit_stop"].astype(float)) if not matured.empty else None,
+                "positive_pnl_rate": _pct_mean(matured["positive_pnl"].astype(float)) if not matured.empty else None,
+                "avg_pnl_pct": _pct_mean(matured["pnl_pct"]) if not matured.empty else None,
+                "median_pnl_pct": _pct_median(matured["pnl_pct"]) if not matured.empty else None,
+            }
+        )
+    perf_by_date = pd.DataFrame(by_date_rows)
+
+    grouped_detail = perf_detail.assign(
+        cancelled=lambda x: x["status"].astype(str).str.startswith("cancelled"),
+        open_partial=lambda x: x["status"] == "open_or_partial",
+        no_data=lambda x: x["status"] == "no_data",
+    )
+    group_rows: list[dict[str, Any]] = []
+    for (engine, regime), group in grouped_detail.groupby(["engine", "regime"], dropna=False):
+        matured_group = group[group["matured"] == True]
+        group_rows.append(
+            {
+                "engine": engine,
+                "regime": regime,
+                "n_picks": int(len(group)),
+                "n_matured": int(len(matured_group)),
+                "n_cancelled": int(group["cancelled"].sum()),
+                "n_open_or_partial": int(group["open_partial"].sum()),
+                "n_no_data": int(group["no_data"].sum()),
+                "avg_pnl_pct": _pct_mean(matured_group["pnl_pct"]) if not matured_group.empty else None,
+                "positive_pnl_rate": _pct_mean(matured_group["positive_pnl"].astype(float))
+                if not matured_group.empty
+                else None,
+                "target_hit_rate": _pct_mean(matured_group["hit_target"].astype(float))
+                if not matured_group.empty
+                else None,
+            }
+        )
+    by_group = pd.DataFrame(group_rows)
+
+    matured = perf_detail[perf_detail["matured"] == True].copy()
+    summary: dict[str, Any] = {
+        "source": "watchlist",
+        "outputs_root": str(outputs_root),
+        "total_picks": int(len(perf_detail)),
+        "matured_picks": int(len(matured)),
+        "cancelled_picks": int(perf_detail["status"].astype(str).str.startswith("cancelled").sum()),
+        "open_or_partial_picks": int((perf_detail["status"] == "open_or_partial").sum()),
+        "no_data_picks": int((perf_detail["status"] == "no_data").sum()),
+        "unsupported_schema_picks": int((perf_detail["status"] == "unsupported_schema").sum()),
+        "download_failures": int(len(data_report.get("bad_tickers", []))),
+        "download_failed_tickers": sorted(data_report.get("bad_tickers", [])),
+        "circuit_breaker": data_report.get("reasons", {}).get("__circuit_breaker__"),
+    }
+    if not matured.empty:
+        summary.update(
+            {
+                "target_hit_rate": _pct_mean(matured["hit_target"].astype(float)),
+                "stop_hit_rate": _pct_mean(matured["hit_stop"].astype(float)),
+                "positive_pnl_rate": _pct_mean(matured["positive_pnl"].astype(float)),
+                "avg_pnl_pct": _pct_mean(matured["pnl_pct"]),
+                "median_pnl_pct": _pct_median(matured["pnl_pct"]),
+                "avg_max_return_pct": _pct_mean(matured["max_return_pct"]),
+                "median_max_return_pct": _pct_median(matured["max_return_pct"]),
+            }
+        )
+
+    return perf_detail, perf_by_date, by_group, summary
+
+
 def compute_hit10_backtest(
     picks: list[DatePicks],
     *,
@@ -750,6 +1189,38 @@ def write_backtest_outputs(
     return paths
 
 
+def write_watchlist_backtest_outputs(
+    perf_detail: pd.DataFrame,
+    perf_by_date: pd.DataFrame,
+    perf_by_group: pd.DataFrame,
+    summary: dict[str, Any],
+    *,
+    output_dir: str | Path = "outputs/performance",
+) -> dict[str, str]:
+    out = Path(output_dir)
+    out.mkdir(parents=True, exist_ok=True)
+
+    paths: dict[str, str] = {}
+
+    p1 = out / "watchlist_perf_detail.csv"
+    perf_detail.to_csv(p1, index=False)
+    paths["watchlist_perf_detail_csv"] = str(p1)
+
+    p2 = out / "watchlist_perf_by_date.csv"
+    perf_by_date.to_csv(p2, index=False)
+    paths["watchlist_perf_by_date_csv"] = str(p2)
+
+    p3 = out / "watchlist_perf_by_group.csv"
+    perf_by_group.to_csv(p3, index=False)
+    paths["watchlist_perf_by_group_csv"] = str(p3)
+
+    p4 = out / "watchlist_perf_summary.json"
+    p4.write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
+    paths["watchlist_perf_summary_json"] = str(p4)
+
+    return paths
+
+
 def write_backtest_enhanced_outputs(
     trades_df: pd.DataFrame,
     summary: dict,
@@ -784,5 +1255,3 @@ def write_backtest_enhanced_outputs(
     paths["backtest_summary_json"] = str(p2)
     
     return paths
-
-

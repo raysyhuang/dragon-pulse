@@ -59,8 +59,19 @@ mean_reversion:
   stop_atr_mult: 0.95
   target_1_atr_mult: 1.5
   target_2_atr_mult: 2.0
-  max_entry_atr_mult: 0.2
+  max_entry_atr_mult: 0.1
   holding_period: 3
+  subtype_split:
+    enabled: true
+    rsi2_bounce_max: 3.0
+    streak_bounce_max: -3
+    dist_from_5d_low_bounce_max: 0.75
+    drift:
+      stop_atr_mult: 1.0
+      target_1_atr_mult: 1.25
+      target_2_atr_mult: 2.0
+      max_entry_atr_mult: 0.1
+      holding_period: 4
 
   # Regime
   regime:
@@ -114,8 +125,8 @@ book_size:
     max_picks: 2
     min_score: 75
   bear:
-    max_picks: 2
-    min_score: 70  # Tighter than bull/choppy but realistic for MR setups
+    max_picks: 1
+    min_score: 75  # Bear-regime MR has been weak recently, so size and quality are tighter
 
 # =============================================================================
 # ACCEPTANCE LAYER — app-level precision filter above engines

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-from scripts.backtest_1yr import resolve_mr_subtype_and_exit_params
+from src.pipelines.funnel import build_engine_candidates
 from src.signals.mean_reversion import (
     classify_mean_reversion_subtype,
+    resolve_mr_subtype_and_exit_params,
     score_mean_reversion,
 )
 
@@ -146,3 +147,55 @@ def test_subtype_split_disabled_keeps_default_exit_profile():
     assert params["target_1_atr_mult"] == 1.5
     assert params["target_2_atr_mult"] == 2.0
     assert params["holding_period"] == 3
+
+
+def test_build_engine_candidates_applies_subtype_split_to_live_mr_signals():
+    features = {
+        **_build_features(),
+        "rsi_2": 4.5,
+        "streak": -2,
+        "dist_from_5d_low": 1.2,
+    }
+    config = {
+        "mean_reversion": {
+            "rsi2_max": 10,
+            "adv_min_cny": 50_000_000,
+            "score_floor": 65,
+            "min_bars": 60,
+            "max_single_day_move": 0.11,
+            "stop_atr_mult": 0.95,
+            "target_1_atr_mult": 1.5,
+            "target_2_atr_mult": 2.0,
+            "max_entry_atr_mult": 0.2,
+            "holding_period": 3,
+            "subtype_split": {
+                "enabled": True,
+                "rsi2_bounce_max": 3.0,
+                "streak_bounce_max": -3,
+                "dist_from_5d_low_bounce_max": 0.75,
+                "drift": {
+                    "stop_atr_mult": 1.0,
+                    "target_1_atr_mult": 2.0,
+                    "target_2_atr_mult": 3.0,
+                    "max_entry_atr_mult": 0.1,
+                    "holding_period": 4,
+                },
+            },
+        },
+        "sniper": {"enabled": False},
+    }
+
+    candidates = build_engine_candidates(
+        feat_items=[("300001.SZ", _build_df(), features)],
+        regime="bear",
+        config=config,
+    )
+
+    assert len(candidates) == 1
+    engine, signal = candidates[0]
+    assert engine == "mean_reversion"
+    assert signal.subtype == "drift"
+    assert signal.stop_loss == 96.0
+    assert signal.target_1 == 108.0
+    assert signal.max_entry_price == 100.4
+    assert signal.holding_period == 4

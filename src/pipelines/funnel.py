@@ -14,7 +14,10 @@ import pandas as pd
 
 from src.core.acceptance import run_acceptance, AcceptanceResult
 from src.core.cn_limits import get_daily_limit
-from src.signals.mean_reversion import score_mean_reversion
+from src.signals.mean_reversion import (
+    resolve_mr_subtype_and_exit_params,
+    score_mean_reversion,
+)
 from src.signals.sniper import score_sniper
 
 logger = logging.getLogger(__name__)
@@ -131,6 +134,7 @@ def build_engine_candidates(
             is_st = info_map.get(ticker, {}).get("is_st", False)
 
             # Mean reversion
+            mr_subtype, mr_exit_params = resolve_mr_subtype_and_exit_params(mr_config, feats)
             mr_signal = score_mean_reversion(
                 ticker=ticker,
                 df=feat_df,
@@ -142,11 +146,12 @@ def build_engine_candidates(
                 score_floor=float(mr_config.get("score_floor", 65)),
                 min_bars=int(mr_config.get("min_bars", 60)),
                 max_single_day_move=float(mr_config.get("max_single_day_move", 0.11)),
-                stop_atr_mult=float(mr_config.get("stop_atr_mult", 0.95)),
-                target_1_atr_mult=float(mr_config.get("target_1_atr_mult", 1.5)),
-                target_2_atr_mult=float(mr_config.get("target_2_atr_mult", 2.0)),
-                max_entry_atr_mult=float(mr_config.get("max_entry_atr_mult", 0.2)),
-                holding_period=int(mr_config.get("holding_period", 3)),
+                stop_atr_mult=float(mr_exit_params["stop_atr_mult"]),
+                target_1_atr_mult=float(mr_exit_params["target_1_atr_mult"]),
+                target_2_atr_mult=float(mr_exit_params["target_2_atr_mult"]),
+                max_entry_atr_mult=float(mr_exit_params["max_entry_atr_mult"]),
+                holding_period=int(mr_exit_params["holding_period"]),
+                subtype=mr_subtype,
             )
             if mr_signal:
                 all_signals.append(("mean_reversion", mr_signal))

@@ -6,9 +6,13 @@ import logging
 from pathlib import Path
 
 from src.features.performance.backtest import (
+    compute_watchlist_backtest,
+    has_execution_watchlists_in_range,
     compute_hit10_backtest,
+    load_execution_watchlists_in_range,
     load_picks_in_range,
     write_backtest_outputs,
+    write_watchlist_backtest_outputs,
 )
 from src.features.performance.calibration import (
     build_calibration_suggestions,
@@ -33,6 +37,62 @@ def cmd_performance(args) -> int:
     outputs_root = getattr(args, "outputs_root", "outputs")
     start_date = getattr(args, "start", None)
     end_date = getattr(args, "end", None)
+    source = str(getattr(args, "source", "auto") or "auto").lower()
+    out_dir = getattr(args, "out_dir", "outputs/performance")
+
+    use_watchlist = source == "watchlist" or (
+        source == "auto"
+        and has_execution_watchlists_in_range(
+            outputs_root,
+            start_date=start_date,
+            end_date=end_date,
+        )
+    )
+
+    if use_watchlist:
+        watchlist_picks = load_execution_watchlists_in_range(
+            outputs_root,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if watchlist_picks.empty:
+            logger.warning("No execution watchlists found for the requested range.")
+            return 1
+
+        perf_detail, perf_by_date, perf_by_group, summary = compute_watchlist_backtest(
+            watchlist_picks,
+            outputs_root=outputs_root,
+            auto_adjust=bool(getattr(args, "auto_adjust", False)),
+            threads=not bool(getattr(args, "no_threads", False)),
+        )
+        paths = write_watchlist_backtest_outputs(
+            perf_detail,
+            perf_by_date,
+            perf_by_group,
+            summary,
+            output_dir=out_dir,
+        )
+
+        logger.info(
+            "Watchlist summary: total=%s matured=%s cancelled=%s open=%s avg_pnl=%s",
+            summary.get("total_picks"),
+            summary.get("matured_picks"),
+            summary.get("cancelled_picks"),
+            summary.get("open_or_partial_picks"),
+            summary.get("avg_pnl_pct"),
+        )
+        if summary.get("target_hit_rate") is not None:
+            logger.info(
+                "Matured picks: target_hit_rate=%.3f stop_hit_rate=%.3f positive_pnl_rate=%.3f",
+                float(summary.get("target_hit_rate")),
+                float(summary.get("stop_hit_rate")),
+                float(summary.get("positive_pnl_rate")),
+            )
+
+        logger.info("\nArtifacts written:")
+        for k, v in paths.items():
+            logger.info(f"  - {k}: {v}")
+        return 0
 
     picks = load_picks_in_range(outputs_root, start_date=start_date, end_date=end_date)
     if not picks:
@@ -50,7 +110,6 @@ def cmd_performance(args) -> int:
         threads=not bool(getattr(args, "no_threads", False)),
     )
 
-    out_dir = getattr(args, "out_dir", "outputs/performance")
     paths = write_backtest_outputs(
         perf_detail,
         perf_by_date,
@@ -99,4 +158,3 @@ def cmd_performance(args) -> int:
         logger.info(f"  - {k}: {v}")
 
     return 0
-

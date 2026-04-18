@@ -67,6 +67,40 @@ def classify_mean_reversion_subtype(
     return "drift"
 
 
+def resolve_mr_subtype_and_exit_params(mr_config: dict, features: dict) -> tuple[str, dict]:
+    """Resolve MR subtype and any subtype-specific exit overrides."""
+    params = {
+        "stop_atr_mult": float(mr_config.get("stop_atr_mult", 0.95)),
+        "target_1_atr_mult": float(mr_config.get("target_1_atr_mult", 1.5)),
+        "target_2_atr_mult": float(mr_config.get("target_2_atr_mult", 2.0)),
+        "max_entry_atr_mult": float(mr_config.get("max_entry_atr_mult", 0.2)),
+        "holding_period": int(mr_config.get("holding_period", 3)),
+    }
+
+    subtype_cfg = mr_config.get("subtype_split", {}) or {}
+    if not subtype_cfg.get("enabled", False):
+        return "default", params
+
+    subtype = classify_mean_reversion_subtype(
+        features,
+        rsi2_bounce_max=float(subtype_cfg.get("rsi2_bounce_max", 3.0)),
+        streak_bounce_max=int(subtype_cfg.get("streak_bounce_max", -3)),
+        dist_from_5d_low_bounce_max=float(subtype_cfg.get("dist_from_5d_low_bounce_max", 0.75)),
+    )
+    if subtype != "drift":
+        return subtype, params
+
+    drift_cfg = subtype_cfg.get("drift", {}) or {}
+    drift_params = {
+        "stop_atr_mult": float(drift_cfg.get("stop_atr_mult", params["stop_atr_mult"])),
+        "target_1_atr_mult": float(drift_cfg.get("target_1_atr_mult", params["target_1_atr_mult"])),
+        "target_2_atr_mult": float(drift_cfg.get("target_2_atr_mult", params["target_2_atr_mult"])),
+        "max_entry_atr_mult": float(drift_cfg.get("max_entry_atr_mult", params["max_entry_atr_mult"])),
+        "holding_period": int(drift_cfg.get("holding_period", params["holding_period"])),
+    }
+    return subtype, drift_params
+
+
 def score_mean_reversion(
     ticker: str,
     df: pd.DataFrame,

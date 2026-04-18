@@ -61,6 +61,12 @@ def main():
     p_perf.add_argument("--outputs-root", default="outputs", help="Root outputs directory")
     p_perf.add_argument("--start", help="Start date YYYY-MM-DD (inclusive)")
     p_perf.add_argument("--end", help="End date YYYY-MM-DD (inclusive)")
+    p_perf.add_argument(
+        "--source",
+        choices=["auto", "legacy", "watchlist"],
+        default="auto",
+        help="Evaluation source. 'auto' prefers execution_watchlist artifacts when present.",
+    )
     p_perf.add_argument("--out-dir", default="outputs/performance", help="Where to write performance artifacts")
     p_perf.add_argument("--forward-days", type=int, default=7, help="Forward trading days window")
     p_perf.add_argument("--threshold", type=float, default=10.0, help="Hit threshold percent")
