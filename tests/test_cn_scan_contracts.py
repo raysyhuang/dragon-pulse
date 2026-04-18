@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 from collections import Counter
+import time
 
 import pandas as pd
 import pytest
@@ -21,7 +22,9 @@ def test_market_cap_universe_requires_tushare_ranking(monkeypatch):
     )
 
     with pytest.raises(RuntimeError, match="TUSHARE_TOKEN"):
-        get_top_n_cn_by_market_cap()
+        get_top_n_cn_by_market_cap(
+            provider_config={"cache_file": "/tmp/does-not-exist-ranked-universe.csv"}
+        )
 
 
 def test_sort_signal_candidates_breaks_ties_by_adv_then_market_cap():
@@ -98,3 +101,42 @@ def test_download_daily_range_disables_tushare_backup_after_repeated_timeouts(
     assert calls["akshare"] == len(tickers)
     assert calls["tushare"] == 2
     assert "__disabled_backups__" in report["reasons"]
+
+
+def test_download_daily_range_times_out_stuck_primary_and_uses_backup(
+    monkeypatch,
+):
+    calls = Counter()
+
+    def fake_akshare_fetch(*args, **kwargs):
+        calls.update(["akshare"])
+        time.sleep(0.2)
+        return pd.DataFrame()
+
+    def fake_tushare_fetch(*args, **kwargs):
+        calls.update(["tushare"])
+        return pd.DataFrame(
+            {
+                "Open": [10.0],
+                "High": [10.5],
+                "Low": [9.8],
+                "Close": [10.2],
+                "Volume": [1000.0],
+            },
+            index=pd.to_datetime(["2025-01-02"]),
+        )
+
+    monkeypatch.setattr(cn_data, "_ak_fetch_daily", fake_akshare_fetch)
+    monkeypatch.setattr(cn_data, "_tushare_fetch_daily", fake_tushare_fetch)
+
+    data_map, report = cn_data.download_daily_range(
+        tickers=["000001.SZ"],
+        start="2025-01-01",
+        end="2025-01-31",
+        provider_config={"provider_timeout_seconds": 0.05},
+    )
+
+    assert calls["akshare"] == 1
+    assert calls["tushare"] == 1
+    assert "000001.SZ" in data_map
+    assert report["bad_tickers"] == []

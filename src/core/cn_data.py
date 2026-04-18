@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import logging
 import os
+import signal
+import threading
 import time
 from datetime import datetime, timedelta
 from typing import Optional, Iterable, Tuple
@@ -20,6 +22,33 @@ from typing import Optional, Iterable, Tuple
 logger = logging.getLogger(__name__)
 
 import pandas as pd
+
+
+class _ProviderTimeoutError(TimeoutError):
+    """Raised when a provider call exceeds the configured wall-clock timeout."""
+
+
+def _call_with_timeout(provider_name: str, timeout_seconds: float, func, *args, **kwargs):
+    """Run a provider fetch with a hard timeout on Unix main-thread code paths."""
+    if timeout_seconds <= 0:
+        return func(*args, **kwargs)
+
+    if threading.current_thread() is not threading.main_thread() or os.name == "nt":
+        return func(*args, **kwargs)
+
+    def _handle_timeout(signum, frame):
+        raise _ProviderTimeoutError(
+            f"{provider_name} fetch exceeded {timeout_seconds:.2f}s timeout"
+        )
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+    signal.signal(signal.SIGALRM, _handle_timeout)
+    signal.setitimer(signal.ITIMER_REAL, timeout_seconds)
+    try:
+        return func(*args, **kwargs)
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
 
 
 def _period_to_dates(period: str, end: Optional[datetime] = None) -> Tuple[datetime, datetime]:
@@ -596,6 +625,7 @@ def download_daily_range(
     tushare_token_env = (provider_config or {}).get("tushare_token_env", "TUSHARE_TOKEN")
     tushare_token = (provider_config or {}).get("tushare_token") or os.environ.get(tushare_token_env)
     backup_timeout_trip_count = int((provider_config or {}).get("backup_timeout_trip_count", 3))
+    provider_timeout_seconds = float((provider_config or {}).get("provider_timeout_seconds", 20.0))
 
     data_map: dict[str, pd.DataFrame] = {}
     bad_tickers: list[str] = []
@@ -630,9 +660,27 @@ def download_daily_range(
                 continue
             try:
                 if provider_name == "akshare":
-                    df_out = _ak_fetch_daily(code, exch, start_dt, end_dt, adjust)
+                    df_out = _call_with_timeout(
+                        provider_name,
+                        provider_timeout_seconds,
+                        _ak_fetch_daily,
+                        code,
+                        exch,
+                        start_dt,
+                        end_dt,
+                        adjust,
+                    )
                 elif provider_name == "tushare":
-                    df_out = _tushare_fetch_daily(f"{code}.{exch}", start_dt, end_dt, adjust, tushare_token)
+                    df_out = _call_with_timeout(
+                        provider_name,
+                        provider_timeout_seconds,
+                        _tushare_fetch_daily,
+                        f"{code}.{exch}",
+                        start_dt,
+                        end_dt,
+                        adjust,
+                        tushare_token,
+                    )
                 else:
                     continue
                 if _validate_df(df_out):
