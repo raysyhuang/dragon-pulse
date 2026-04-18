@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from collections import Counter
 
 import pandas as pd
 import pytest
 
+import src.core.cn_data as cn_data
 from src.core.universe import get_top_n_cn_by_market_cap
 from src.pipelines.scanner import _sort_signal_candidates
 
 
 def test_market_cap_universe_requires_tushare_ranking(monkeypatch):
     monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
-
-    import src.core.cn_data as cn_data
 
     monkeypatch.setattr(
         cn_data,
@@ -47,3 +47,54 @@ def test_sort_signal_candidates_breaks_ties_by_adv_then_market_cap():
     ranked = _sort_signal_candidates(candidates, data_map, info_map)
 
     assert [sig.ticker for _, sig in ranked] == ["CCC", "BBB", "AAA", "DDD"]
+
+
+def test_market_cap_universe_uses_ranked_cache_when_live_fetch_unavailable(
+    monkeypatch, tmp_path
+):
+    cache_file = tmp_path / "ranked_cache.csv"
+    pd.DataFrame(
+        {
+            "Ticker": ["000002.SZ", "600519.SH", "000001.SZ"],
+            "asof": ["2026-04-18"] * 3,
+        }
+    ).to_csv(cache_file, index=False)
+
+    monkeypatch.delenv("TUSHARE_TOKEN", raising=False)
+
+    ranked = get_top_n_cn_by_market_cap(
+        n=2,
+        provider_config={"cache_file": str(cache_file), "cache_max_age_days": 7},
+    )
+
+    assert ranked == ["000002.SZ", "600519.SH"]
+
+
+def test_download_daily_range_disables_tushare_backup_after_repeated_timeouts(
+    monkeypatch,
+):
+    calls = Counter()
+
+    monkeypatch.setattr(
+        cn_data,
+        "_ak_fetch_daily",
+        lambda *args, **kwargs: calls.update(["akshare"]) or pd.DataFrame(),
+    )
+
+    def fake_tushare_fetch(*args, **kwargs):
+        calls.update(["tushare"])
+        raise RuntimeError("HTTPConnectionPool(...): Read timed out. (read timeout=30)")
+
+    monkeypatch.setattr(cn_data, "_tushare_fetch_daily", fake_tushare_fetch)
+
+    tickers = [f"{i:06d}.SZ" for i in range(1, 7)]
+    _, report = cn_data.download_daily_range(
+        tickers=tickers,
+        start="2025-01-01",
+        end="2025-01-31",
+        provider_config={"backup_timeout_trip_count": 2},
+    )
+
+    assert calls["akshare"] == len(tickers)
+    assert calls["tushare"] == 2
+    assert "__disabled_backups__" in report["reasons"]

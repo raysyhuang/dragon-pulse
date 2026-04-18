@@ -523,6 +523,19 @@ def _provider_sequence(provider_config: Optional[dict]) -> Iterable[str]:
     return seq
 
 
+def _is_timeout_error(message: str) -> bool:
+    lowered = str(message).lower()
+    return any(
+        pattern in lowered
+        for pattern in (
+            "read timed out",
+            "connect timeout",
+            "timed out",
+            "timeout",
+        )
+    )
+
+
 def download_daily(
     tickers: list[str],
     period: str = "1y",
@@ -582,10 +595,13 @@ def download_daily_range(
     adjust = (provider_config or {}).get("adjust", "none")
     tushare_token_env = (provider_config or {}).get("tushare_token_env", "TUSHARE_TOKEN")
     tushare_token = (provider_config or {}).get("tushare_token") or os.environ.get(tushare_token_env)
+    backup_timeout_trip_count = int((provider_config or {}).get("backup_timeout_trip_count", 3))
 
     data_map: dict[str, pd.DataFrame] = {}
     bad_tickers: list[str] = []
     reasons: dict[str, str] = {}
+    disabled_backups: set[str] = set()
+    provider_timeout_failures: dict[str, int] = {}
 
     # Circuit breaker: abort early on systemic data failure.
     # Checks overall failure rate every CB_INTERVAL tickers after the
@@ -608,20 +624,34 @@ def download_daily_range(
         code, exch = _split_cn_symbol(ticker)
         df_out = pd.DataFrame()
         last_err = ""
-        for provider in providers:
+        for idx, provider in enumerate(providers):
+            provider_name = provider.lower()
+            if idx > 0 and provider_name in disabled_backups:
+                continue
             try:
-                if provider.lower() == "akshare":
+                if provider_name == "akshare":
                     df_out = _ak_fetch_daily(code, exch, start_dt, end_dt, adjust)
-                elif provider.lower() == "tushare":
+                elif provider_name == "tushare":
                     df_out = _tushare_fetch_daily(f"{code}.{exch}", start_dt, end_dt, adjust, tushare_token)
                 else:
                     continue
                 if _validate_df(df_out):
+                    provider_timeout_failures[provider_name] = 0
                     break
             except Exception as e:
                 last_err = str(e)
                 df_out = pd.DataFrame()
                 reasons[ticker] = f"{provider} error: {last_err}"
+                if idx > 0 and backup_timeout_trip_count > 0 and _is_timeout_error(last_err):
+                    provider_timeout_failures[provider_name] = (
+                        provider_timeout_failures.get(provider_name, 0) + 1
+                    )
+                    if provider_timeout_failures[provider_name] >= backup_timeout_trip_count:
+                        disabled_backups.add(provider_name)
+                        reasons["__disabled_backups__"] = (
+                            "Disabled backup providers after repeated timeout failures: "
+                            + ", ".join(sorted(disabled_backups))
+                        )
                 continue
 
         processed += 1

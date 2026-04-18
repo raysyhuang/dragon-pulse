@@ -271,7 +271,12 @@ def load_universe_from_cache(cache_file: str, max_age_days: Optional[int] = 7) -
         if pd.isna(asof):
             return []
         if max_age_days is not None:
-            age_days = (pd.Timestamp.utcnow().normalize() - asof.tz_localize(None).normalize()).days
+            now = pd.Timestamp.utcnow()
+            if getattr(now, "tzinfo", None) is not None:
+                now = now.tz_localize(None)
+            if getattr(asof, "tzinfo", None) is not None:
+                asof = asof.tz_localize(None)
+            age_days = (now.normalize() - asof.normalize()).days
             if age_days > max_age_days:
                 return []
         tickers = df["Ticker"].dropna().astype(str).tolist()
@@ -289,6 +294,58 @@ def save_universe_to_cache(tickers: list[str], cache_file: str) -> None:
         cache_file: Path to cache CSV file
     """
     df = pd.DataFrame({"Ticker": sorted(set(tickers))})
+    df["asof"] = pd.Timestamp.utcnow().strftime("%Y-%m-%d")
+    df.to_csv(cache_file, index=False)
+
+
+def _dedupe_preserve_order(tickers: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for ticker in tickers:
+        key = str(ticker)
+        if key and key not in seen:
+            seen.add(key)
+            ordered.append(key)
+    return ordered
+
+
+def load_ranked_universe_from_cache(
+    cache_file: str,
+    max_age_days: Optional[int] = 7,
+) -> list[str]:
+    """
+    Load an ordered ticker list from cache while preserving rank order.
+    """
+    if not os.path.exists(cache_file):
+        return []
+
+    try:
+        df = pd.read_csv(cache_file)
+        if "Ticker" not in df.columns or "asof" not in df.columns:
+            return []
+        asof = pd.to_datetime(df["asof"].iloc[0], errors="coerce")
+        if pd.isna(asof):
+            return []
+        if max_age_days is not None:
+            now = pd.Timestamp.utcnow()
+            if getattr(now, "tzinfo", None) is not None:
+                now = now.tz_localize(None)
+            if getattr(asof, "tzinfo", None) is not None:
+                asof = asof.tz_localize(None)
+            age_days = (now.normalize() - asof.normalize()).days
+            if age_days > max_age_days:
+                return []
+        tickers = df["Ticker"].dropna().astype(str).tolist()
+        return _dedupe_preserve_order(tickers)
+    except Exception:
+        return []
+
+
+def save_ranked_universe_to_cache(tickers: list[str], cache_file: str) -> None:
+    """
+    Save an ordered ticker list to cache without changing rank order.
+    """
+    df = pd.DataFrame({"Ticker": _dedupe_preserve_order(tickers)})
     df["asof"] = pd.Timestamp.utcnow().strftime("%Y-%m-%d")
     df.to_csv(cache_file, index=False)
 
@@ -423,11 +480,16 @@ def get_top_n_cn_by_market_cap(
     import os
 
     cfg = provider_config or {}
+    cache_file = cfg.get("cache_file", "universe_cache_CN_TOP_MCAP.csv")
+    cache_max_age_days = cfg.get("cache_max_age_days", 7)
     tushare_token = cfg.get("tushare_token") or os.environ.get(
         cfg.get("tushare_token_env", "TUSHARE_TOKEN"), ""
     )
+    cached = load_ranked_universe_from_cache(cache_file, cache_max_age_days)
 
     if not tushare_token:
+        if cached:
+            return cached[:n]
         raise RuntimeError(
             "Cannot build market-cap-ranked universe: TUSHARE_TOKEN is not set."
         )
@@ -457,12 +519,25 @@ def get_top_n_cn_by_market_cap(
             df = df.sort_values("total_mv", ascending=False)
             tickers = df["ts_code"].astype(str).str.upper().head(n).tolist()
             if tickers:
+                save_ranked_universe_to_cache(
+                    df["ts_code"].astype(str).str.upper().tolist(),
+                    cache_file,
+                )
                 return tickers
     except Exception as e:
+        stale = load_ranked_universe_from_cache(cache_file, max_age_days=None)
+        if stale:
+            print("[WARN] Market-cap universe fetch failed; using stale ranked cache.")
+            return stale[:n]
         raise RuntimeError(
             "Cannot build market-cap-ranked universe: "
             f"Tushare daily_basic failed: {e}"
         ) from e
+
+    stale = load_ranked_universe_from_cache(cache_file, max_age_days=None)
+    if stale:
+        print("[WARN] Market-cap universe fetch returned no data; using stale ranked cache.")
+        return stale[:n]
 
     raise RuntimeError(
         "Cannot build market-cap-ranked universe: "
