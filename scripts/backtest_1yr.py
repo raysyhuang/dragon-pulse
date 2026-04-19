@@ -299,6 +299,13 @@ def main():
     dl_time = time.time() - t0
     logger.info("Download complete: %d OK, %d failed (%.1f min)",
                 len(data_map), len(report.get("bad_tickers", [])), dl_time / 60)
+    if not data_map:
+        logger.error(
+            "Aborting backtest: no OHLCV data downloaded for %d universe tickers. "
+            "This usually indicates a market-data provider or network outage.",
+            len(universe),
+        )
+        return 1
 
     # Fetch basic info for live_equivalent mode (sector cap, limit-down ST detection)
     info_map: dict[str, dict] = {}
