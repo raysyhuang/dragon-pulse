@@ -141,6 +141,7 @@ def main():
     # --- Config ---
     mr_config = config.get("mean_reversion", {})
     sniper_config = config.get("sniper", {})
+    run_sniper = bool(sniper_config.get("enabled", False))
     sma_short = int(get_config_value(config, "mean_reversion", "regime", "sma_short", default=20))
     sma_long = int(get_config_value(config, "mean_reversion", "regime", "sma_long", default=50))
 
@@ -183,18 +184,19 @@ def main():
                 if mr_signal:
                     all_signals.append(("mean_reversion", mr_signal))
 
-                sniper_signal = score_sniper(
-                    ticker=ticker, df=feat_df, features=feats, regime=regime,
-                    csi300_df=csi_slice,
-                    atr_pct_floor=float(sniper_config.get("atr_pct_floor", 3.5)),
-                    min_avg_volume=int(sniper_config.get("min_avg_volume", 500_000)),
-                    stop_atr_mult=float(sniper_config.get("stop_atr_mult", 2.0)),
-                    target_atr_mult=float(sniper_config.get("target_atr_mult", 3.0)),
-                    target_2_atr_mult=float(sniper_config.get("target_2_atr_mult", 5.0)),
-                    holding_period=int(sniper_config.get("holding_period", 7)),
-                )
-                if sniper_signal:
-                    all_signals.append(("sniper", sniper_signal))
+                if run_sniper and csi_slice is not None:
+                    sniper_signal = score_sniper(
+                        ticker=ticker, df=feat_df, features=feats, regime=regime,
+                        csi300_df=csi_slice,
+                        atr_pct_floor=float(sniper_config.get("atr_pct_floor", 3.5)),
+                        min_avg_volume=int(sniper_config.get("min_avg_volume", 500_000)),
+                        stop_atr_mult=float(sniper_config.get("stop_atr_mult", 2.0)),
+                        target_atr_mult=float(sniper_config.get("target_atr_mult", 3.0)),
+                        target_2_atr_mult=float(sniper_config.get("target_2_atr_mult", 5.0)),
+                        holding_period=int(sniper_config.get("holding_period", 7)),
+                    )
+                    if sniper_signal:
+                        all_signals.append(("sniper", sniper_signal))
             except Exception as e:
                 logger.debug("Skipped %s: %s", ticker, e)
                 continue
