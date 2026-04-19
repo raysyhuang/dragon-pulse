@@ -626,6 +626,7 @@ def download_daily_range(
     tushare_token = (provider_config or {}).get("tushare_token") or os.environ.get(tushare_token_env)
     backup_timeout_trip_count = int((provider_config or {}).get("backup_timeout_trip_count", 3))
     provider_timeout_seconds = float((provider_config or {}).get("provider_timeout_seconds", 20.0))
+    progress_interval = int((provider_config or {}).get("progress_interval", 50))
 
     data_map: dict[str, pd.DataFrame] = {}
     bad_tickers: list[str] = []
@@ -646,6 +647,8 @@ def download_daily_range(
     # AkShare (Eastmoney) aggressively rate-limits rapid-fire requests;
     # without a delay, bulk downloads trigger IP bans after ~50 calls.
     _THROTTLE_SEC = 0.15
+    started_at = time.time()
+    total_tickers = len(tickers)
 
     for i, ticker in enumerate(tickers):
         if i > 0:
@@ -696,6 +699,11 @@ def download_daily_range(
                     )
                     if provider_timeout_failures[provider_name] >= backup_timeout_trip_count:
                         disabled_backups.add(provider_name)
+                        logger.warning(
+                            "Disabled %s backup after %d consecutive timeout failures",
+                            provider_name,
+                            provider_timeout_failures[provider_name],
+                        )
                         reasons["__disabled_backups__"] = (
                             "Disabled backup providers after repeated timeout failures: "
                             + ", ".join(sorted(disabled_backups))
@@ -709,6 +717,21 @@ def download_daily_range(
             reasons.setdefault(ticker, last_err or "No valid data returned")
         else:
             data_map[ticker] = df_out
+
+        if (
+            progress_interval > 0
+            and total_tickers >= progress_interval
+            and (processed % progress_interval == 0 or processed == total_tickers)
+        ):
+            elapsed_min = (time.time() - started_at) / 60
+            logger.info(
+                "Download progress: %d/%d processed, %d OK, %d failed (%.1f min)",
+                processed,
+                total_tickers,
+                len(data_map),
+                len(bad_tickers),
+                elapsed_min,
+            )
 
         # Circuit breaker: check overall failure rate periodically
         if (processed >= _CB_WINDOW

@@ -53,6 +53,36 @@ logger = logging.getLogger(__name__)
 LOOKBACK_DAYS = 400  # technical indicators need history
 
 
+def resolve_backtest_engines(engines_arg: str, config: dict) -> tuple[bool, bool, bool]:
+    """Return (run_mean_reversion, run_sniper, sniper_requested).
+
+    Backtests must mirror live scanner behavior: sniper can be requested by CLI,
+    but it remains quarantined unless config.sniper.enabled is true.
+    """
+    requested = {
+        part.strip()
+        for part in str(engines_arg or "all").split(",")
+        if part.strip()
+    }
+    if not requested:
+        requested = {"all"}
+
+    run_mr = bool(
+        "all" in requested
+        or "mr_only" in requested
+        or "mr" in requested
+        or "mean_reversion" in requested
+    )
+    sniper_requested = bool(
+        "all" in requested
+        or "sniper_only" in requested
+        or "sniper" in requested
+    )
+    sniper_enabled = bool((config.get("sniper") or {}).get("enabled", False))
+    run_sniper = sniper_requested and sniper_enabled
+    return run_mr, run_sniper, sniper_requested
+
+
 def get_cn_trading_days(start: date, end: date) -> list[date]:
     """Generate weekdays between start and end (approximate CN trading calendar)."""
     days = []
@@ -364,9 +394,10 @@ def main():
     day_summaries = []
     t_start = time.time()
 
-    # Engine filter (computed once)
-    run_mr = args.engines in ("all", "mr_only") or "mean_reversion" in args.engines
-    run_sniper = args.engines in ("all", "sniper_only") or "sniper" in args.engines
+    # Engine filter (computed once). Mirrors live scanner config gates.
+    run_mr, run_sniper, sniper_requested = resolve_backtest_engines(args.engines, config)
+    if sniper_requested and not run_sniper:
+        logger.warning("Sniper requested by --engines=%s but disabled by config; skipping sniper.", args.engines)
     logger.info("Engines: mr=%s sniper=%s", run_mr, run_sniper)
 
     min_bars = int(mr_config.get("min_bars", 60))
