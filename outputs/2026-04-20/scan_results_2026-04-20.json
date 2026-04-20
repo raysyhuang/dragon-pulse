@@ -1,0 +1,76 @@
+{
+  "date": "2026-04-20",
+  "generated_utc": "2026-04-20T09:46:55.062935",
+  "regime": "choppy",
+  "regime_detail": {
+    "csi300_last": 4728.67,
+    "csi300_sma_short": 4555.1,
+    "csi300_sma_long": 4629.13,
+    "market_breadth_pct_above_sma20": 0.7467,
+    "day_quality_score": 73.1,
+    "day_quality_components": {
+      "breadth": 25.0,
+      "regime": 10.0,
+      "signal_density": 8.1,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 11,
+    "acceptance_rejected_count": 9
+  },
+  "universe_size": 996,
+  "downloaded": 996,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 22,
+  "picks": [
+    {
+      "ticker": "600989.SH",
+      "name_cn": "宝丰能源",
+      "engine": "mean_reversion",
+      "score": 95.0,
+      "entry_price": 27.36,
+      "max_entry_price": 27.51,
+      "stop_loss": 25.97,
+      "target_1": 28.24,
+      "target_2": 30.1,
+      "holding_period": 3,
+      "adv_cny": 3514423878.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 70.0
+      }
+    },
+    {
+      "ticker": "600098.SH",
+      "name_cn": "广州发展",
+      "engine": "mean_reversion",
+      "score": 95.0,
+      "entry_price": 6.99,
+      "max_entry_price": 7.01,
+      "stop_loss": 6.79,
+      "target_1": 7.09,
+      "target_2": 7.42,
+      "holding_period": 3,
+      "adv_cny": 294318195.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 70.0
+      }
+    }
+  ],
+  "errors": []
+}
