@@ -1,14 +1,14 @@
 {
   "date": "2026-04-17",
-  "generated_utc": "2026-04-19T23:50:08.369198",
+  "generated_utc": "2026-04-20T02:27:14.978482",
   "results": [
     {
       "ticker": "601857.SH",
       "name": "中国石油",
       "action": "GO",
       "entry_price": 11.53,
-      "open_price": 11.66,
-      "gap_pct": 1.13,
+      "open_price": 11.48,
+      "gap_pct": -0.43,
       "reasons": []
     },
     {
@@ -16,8 +16,8 @@
       "name": "中国化学",
       "action": "GO",
       "entry_price": 8.57,
-      "open_price": 8.64,
-      "gap_pct": 0.82,
+      "open_price": 8.6,
+      "gap_pct": 0.35,
       "reasons": []
     }
   ]
