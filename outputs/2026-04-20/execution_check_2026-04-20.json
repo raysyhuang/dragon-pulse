@@ -1,0 +1,24 @@
+{
+  "date": "2026-04-20",
+  "generated_utc": "2026-04-20T23:50:33.414283",
+  "results": [
+    {
+      "ticker": "600989.SH",
+      "name": "宝丰能源",
+      "action": "GO",
+      "entry_price": 27.36,
+      "open_price": 27.6,
+      "gap_pct": 0.88,
+      "reasons": []
+    },
+    {
+      "ticker": "600098.SH",
+      "name": "广州发展",
+      "action": "GO",
+      "entry_price": 6.99,
+      "open_price": 6.98,
+      "gap_pct": -0.14,
+      "reasons": []
+    }
+  ]
+}
