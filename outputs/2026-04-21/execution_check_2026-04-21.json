@@ -1,0 +1,26 @@
+{
+  "date": "2026-04-21",
+  "generated_utc": "2026-04-21T23:49:49.539633",
+  "results": [
+    {
+      "ticker": "002821.SZ",
+      "name": "凯莱英",
+      "action": "WARN",
+      "entry_price": 111.33,
+      "open_price": 113.55,
+      "gap_pct": 1.99,
+      "reasons": [
+        "高开 +2.0% 偏高 — 建议减仓"
+      ]
+    },
+    {
+      "ticker": "601399.SH",
+      "name": "国机重装",
+      "action": "GO",
+      "entry_price": 4.2,
+      "open_price": 4.2,
+      "gap_pct": 0.0,
+      "reasons": []
+    }
+  ]
+}
