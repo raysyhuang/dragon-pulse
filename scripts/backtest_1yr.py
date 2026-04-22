@@ -83,6 +83,25 @@ def resolve_backtest_engines(engines_arg: str, config: dict) -> tuple[bool, bool
     return run_mr, run_sniper, sniper_requested
 
 
+def parse_regime_set(regimes_arg: str) -> set[str]:
+    """Parse a comma-separated regime filter into normalized regime names."""
+    return {
+        part.strip().lower()
+        for part in str(regimes_arg or "").split(",")
+        if part.strip()
+    }
+
+
+def apply_score_floor(
+    candidates: list[tuple[str, object]],
+    score_floor: float | None,
+) -> list[tuple[str, object]]:
+    """Filter scored signal candidates by a global score floor."""
+    if score_floor is None:
+        return candidates
+    return [candidate for candidate in candidates if candidate[1].score >= score_floor]
+
+
 def get_cn_trading_days(start: date, end: date) -> list[date]:
     """Generate weekdays between start and end (approximate CN trading calendar)."""
     days = []
@@ -240,7 +259,21 @@ def main():
                         help="Universe source: market_cap (default) or tickers seen in execution watchlists")
     parser.add_argument("--outputs-root", default="outputs",
                         help="Outputs root used when universe-source=watchlist")
+    parser.add_argument("--allowed-regimes", default="",
+                        help="Comma-separated regimes to scan: bull,choppy,bear. Empty means all.")
+    parser.add_argument("--excluded-regimes", default="",
+                        help="Comma-separated regimes to skip: bull,choppy,bear. Empty means none.")
+    parser.add_argument("--min-score-floor", type=float, default=None,
+                        help="Optional global score floor applied before pick allocation.")
     args = parser.parse_args()
+    allowed_regimes = parse_regime_set(args.allowed_regimes)
+    excluded_regimes = parse_regime_set(args.excluded_regimes)
+    valid_regimes = {"bull", "choppy", "bear"}
+    invalid_regimes = (allowed_regimes | excluded_regimes) - valid_regimes
+    if invalid_regimes:
+        parser.error(f"Unknown regime(s): {', '.join(sorted(invalid_regimes))}")
+    if args.min_score_floor is not None and not 0 <= args.min_score_floor <= 100:
+        parser.error("--min-score-floor must be between 0 and 100")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -262,6 +295,11 @@ def main():
                 "OFF" if args.disable_gap_filter else "ON",
                 "OFF" if args.no_sniper_trailing else "ON",
                 args.acceptance_mode)
+    logger.info("  allowed_regimes=%s  excluded_regimes=%s",
+                ",".join(sorted(allowed_regimes)) if allowed_regimes else "all",
+                ",".join(sorted(excluded_regimes)) if excluded_regimes else "none")
+    logger.info("  min_score_floor=%s",
+                args.min_score_floor if args.min_score_floor is not None else "disabled")
     logger.info("=" * 60)
 
     # --- One-time setup ---
@@ -401,6 +439,7 @@ def main():
     logger.info("Engines: mr=%s sniper=%s", run_mr, run_sniper)
 
     min_bars = int(mr_config.get("min_bars", 60))
+    regime_filtered_days = 0
 
     for i, scan_date in enumerate(trading_days):
         date_str = scan_date.strftime("%Y-%m-%d")
@@ -418,6 +457,22 @@ def main():
             else:
                 csi_slice = csi300_full.iloc[:0]
         regime = _classify_regime(csi_slice, sma_short, sma_long)
+
+        if (allowed_regimes and regime not in allowed_regimes) or regime in excluded_regimes:
+            regime_filtered_days += 1
+            day_summaries.append({
+                "date": date_str, "regime": regime, "picks": 0,
+                "wins": 0, "losses": 0, "holds": 0, "no_data": 0,
+                "acceptance_mode": "regime_filtered",
+                "eligible_count": 0,
+            })
+            if (i + 1) % 20 == 0:
+                elapsed = time.time() - t_start
+                rate = elapsed / (i + 1)
+                eta = rate * (len(trading_days) - i - 1)
+                logger.info("[%d/%d] %s: %s skipped by regime filter (%.1fs/day, ETA %.0fm)",
+                            i + 1, len(trading_days), date_str, regime, rate, eta / 60)
+            continue
 
         # Score all tickers using precomputed features up to scan_date
         all_signals = []
@@ -489,6 +544,7 @@ def main():
 
         # Sort by score desc
         sorted_picks = sorted(best.values(), key=lambda x: (-x[1].score,))
+        sorted_picks = apply_score_floor(sorted_picks, args.min_score_floor)
 
         # --- Pick selection: three modes ---
         # Defaults; overridden by acceptance paths below
@@ -821,7 +877,11 @@ def main():
         "acceptance_mode": args.acceptance_mode,
         "universe_source": args.universe_source,
         "outputs_root": args.outputs_root if args.universe_source == "watchlist" else None,
+        "allowed_regimes": sorted(allowed_regimes),
+        "excluded_regimes": sorted(excluded_regimes),
+        "min_score_floor": args.min_score_floor,
         "trading_days_scanned": len(trading_days),
+        "regime_filtered_days": regime_filtered_days,
         "days_with_picks": days_with_picks,
         "zero_pick_days": zero_pick_days,
         "zero_pick_days_pct": round(zero_pick_days_pct, 4),

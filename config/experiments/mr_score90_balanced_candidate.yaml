@@ -1,0 +1,9 @@
+# Balanced candidate from saved 1y/3y/5y MR-only score-floor comparison.
+# This keeps more opportunities than the 95 floor while improving long-window drawdown.
+book_size:
+  bull:
+    min_score: 90
+  choppy:
+    min_score: 90
+  bear:
+    min_score: 90
