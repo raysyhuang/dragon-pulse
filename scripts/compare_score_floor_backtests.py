@@ -95,7 +95,15 @@ def format_markdown(summary: pd.DataFrame) -> str:
     ]:
         display[col] = display[col].round(2)
 
-    return "# Score Floor Comparison\n\n" + display.to_markdown(index=False) + "\n"
+    warning = (
+        "> ⚠️ **Diagnostic only — not promotion-grade.** This filters saved trades "
+        "post-hoc, so it cannot model how a higher floor changes which picks the engine "
+        "selects on competitive days, acceptance-mode transitions, or capital allocation "
+        "across days. Empirically the filter overstated the score≥90 candidate's 3Y cum "
+        "return by ~4x vs a true paired rerun (see commit history 2026-04-23). Use a "
+        "full backtest with the candidate config before promoting any floor.\n\n"
+    )
+    return "# Score Floor Comparison\n\n" + warning + display.to_markdown(index=False) + "\n"
 
 
 def main() -> int:

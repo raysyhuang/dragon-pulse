@@ -1,9 +1,0 @@
-# Win-rate focused candidate from saved 1y/3y/5y MR-only score-floor comparison.
-# This requires every live MR pick to carry a composite score of at least 95.
-book_size:
-  bull:
-    min_score: 95
-  choppy:
-    min_score: 95
-  bear:
-    min_score: 95
