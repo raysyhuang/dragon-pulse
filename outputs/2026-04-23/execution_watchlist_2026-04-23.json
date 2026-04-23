@@ -1,0 +1,51 @@
+{
+  "date": "2026-04-23",
+  "regime": "choppy",
+  "universe_size": 996,
+  "picks": [
+    {
+      "ticker": "000423.SZ",
+      "name_cn": "东阿阿胶",
+      "engine": "mean_reversion",
+      "score": 96.0,
+      "entry_price": 52.21,
+      "max_entry_price": 52.33,
+      "stop_loss": 51.06,
+      "target_1": 53.17,
+      "target_2": 54.64,
+      "holding_period": 3,
+      "adv_cny": 399512932.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 80.0
+      }
+    },
+    {
+      "ticker": "603799.SH",
+      "name_cn": "华友钴业",
+      "engine": "mean_reversion",
+      "score": 95.0,
+      "entry_price": 62.22,
+      "max_entry_price": 62.47,
+      "stop_loss": 59.84,
+      "target_1": 64.89,
+      "target_2": 67.23,
+      "holding_period": 3,
+      "adv_cny": 4435794351.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 70.0
+      }
+    }
+  ]
+}
