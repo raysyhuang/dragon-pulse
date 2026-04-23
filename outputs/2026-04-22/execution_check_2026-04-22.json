@@ -1,26 +1,24 @@
 {
   "date": "2026-04-22",
-  "generated_utc": "2026-04-22T23:51:16.285939",
+  "generated_utc": "2026-04-23T02:27:19.294418",
   "results": [
     {
       "ticker": "000423.SZ",
       "name": "东阿阿胶",
       "action": "GO",
       "entry_price": 52.42,
-      "open_price": 53.05,
-      "gap_pct": 1.2,
+      "open_price": 52.35,
+      "gap_pct": -0.13,
       "reasons": []
     },
     {
       "ticker": "600970.SH",
       "name": "中材国际",
-      "action": "WARN",
+      "action": "GO",
       "entry_price": 10.22,
-      "open_price": 10.43,
-      "gap_pct": 2.05,
-      "reasons": [
-        "高开 +2.1% 偏高 — 建议减仓"
-      ]
+      "open_price": 10.18,
+      "gap_pct": -0.39,
+      "reasons": []
     }
   ]
 }
