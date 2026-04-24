@@ -1,26 +1,24 @@
 {
   "date": "2026-04-23",
-  "generated_utc": "2026-04-23T23:51:06.013827",
+  "generated_utc": "2026-04-24T02:27:09.745888",
   "results": [
     {
       "ticker": "000423.SZ",
       "name": "东阿阿胶",
       "action": "GO",
       "entry_price": 52.21,
-      "open_price": 52.35,
-      "gap_pct": 0.27,
+      "open_price": 52.21,
+      "gap_pct": 0.0,
       "reasons": []
     },
     {
       "ticker": "603799.SH",
       "name": "华友钴业",
-      "action": "CANCEL",
+      "action": "GO",
       "entry_price": 62.22,
-      "open_price": 64.83,
-      "gap_pct": 4.19,
-      "reasons": [
-        "高开 +4.2% 超过3.0%上限 — 追高风险，取消入场"
-      ]
+      "open_price": 62.21,
+      "gap_pct": -0.02,
+      "reasons": []
     }
   ]
 }
