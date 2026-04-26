@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from collections import Counter
 import time
@@ -56,10 +57,11 @@ def test_market_cap_universe_uses_ranked_cache_when_live_fetch_unavailable(
     monkeypatch, tmp_path
 ):
     cache_file = tmp_path / "ranked_cache.csv"
+    fresh_asof = (datetime.utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
     pd.DataFrame(
         {
             "Ticker": ["000002.SZ", "600519.SH", "000001.SZ"],
-            "asof": ["2026-04-18"] * 3,
+            "asof": [fresh_asof] * 3,
         }
     ).to_csv(cache_file, index=False)
 
