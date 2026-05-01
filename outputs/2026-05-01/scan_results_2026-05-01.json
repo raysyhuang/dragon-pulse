@@ -1,0 +1,76 @@
+{
+  "date": "2026-05-01",
+  "generated_utc": "2026-05-01T09:40:47.486212",
+  "regime": "bull",
+  "regime_detail": {
+    "csi300_last": 4807.31,
+    "csi300_sma_short": 4684.21,
+    "csi300_sma_long": 4646.03,
+    "market_breadth_pct_above_sma20": 0.6242,
+    "day_quality_score": 89.8,
+    "day_quality_components": {
+      "breadth": 25.0,
+      "regime": 20.0,
+      "signal_density": 14.8,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 16,
+    "acceptance_rejected_count": 14
+  },
+  "universe_size": 996,
+  "downloaded": 996,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 24,
+  "picks": [
+    {
+      "ticker": "002195.SZ",
+      "name_cn": "岩山科技",
+      "engine": "mean_reversion",
+      "score": 96.0,
+      "entry_price": 8.61,
+      "max_entry_price": 8.64,
+      "stop_loss": 8.32,
+      "target_1": 8.81,
+      "target_2": 9.21,
+      "holding_period": 3,
+      "adv_cny": 1667965866.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 80.0
+      }
+    },
+    {
+      "ticker": "601020.SH",
+      "name_cn": "华钰矿业",
+      "engine": "mean_reversion",
+      "score": 96.0,
+      "entry_price": 28.66,
+      "max_entry_price": 28.82,
+      "stop_loss": 27.16,
+      "target_1": 30.59,
+      "target_2": 31.53,
+      "holding_period": 3,
+      "adv_cny": 1106821765.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 80.0
+      }
+    }
+  ],
+  "errors": []
+}
