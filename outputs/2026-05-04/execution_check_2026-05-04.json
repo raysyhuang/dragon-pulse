@@ -1,0 +1,17 @@
+{
+  "date": "2026-05-04",
+  "generated_utc": "2026-05-04T23:52:13.753510",
+  "results": [
+    {
+      "ticker": "600498.SH",
+      "name": "烽火通信",
+      "action": "CANCEL",
+      "entry_price": 46.68,
+      "open_price": 49.2,
+      "gap_pct": 5.4,
+      "reasons": [
+        "高开 +5.4% 超过3.0%上限 — 追高风险，取消入场"
+      ]
+    }
+  ]
+}
