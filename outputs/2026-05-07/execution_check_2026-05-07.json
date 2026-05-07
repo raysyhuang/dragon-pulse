@@ -1,0 +1,28 @@
+{
+  "date": "2026-05-07",
+  "generated_utc": "2026-05-07T23:52:14.024655",
+  "results": [
+    {
+      "ticker": "601857.SH",
+      "name": "中国石油",
+      "action": "CANCEL",
+      "entry_price": 11.27,
+      "open_price": 11.65,
+      "gap_pct": 3.37,
+      "reasons": [
+        "高开 +3.4% 超过3.0%上限 — 追高风险，取消入场"
+      ]
+    },
+    {
+      "ticker": "600989.SH",
+      "name": "宝丰能源",
+      "action": "CANCEL",
+      "entry_price": 28.1,
+      "open_price": 29.0,
+      "gap_pct": 3.2,
+      "reasons": [
+        "高开 +3.2% 超过3.0%上限 — 追高风险，取消入场"
+      ]
+    }
+  ]
+}
