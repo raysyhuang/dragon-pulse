@@ -1,0 +1,20 @@
+{
+  "date": "2026-05-08",
+  "regime": "bull",
+  "csi300_last": 4900.51,
+  "csi300_sma_short": 4727.11,
+  "csi300_sma_long": 4652.92,
+  "market_breadth_pct_above_sma20": 0.7232,
+  "day_quality_score": 55.0,
+  "day_quality_components": {
+    "breadth": 25.0,
+    "regime": 20.0,
+    "signal_density": 0.0,
+    "top_score": 0.0,
+    "diversity": 10.0
+  },
+  "acceptance_mode": "full",
+  "acceptance_abstained": true,
+  "acceptance_eligible_count": 0,
+  "acceptance_rejected_count": 0
+}
