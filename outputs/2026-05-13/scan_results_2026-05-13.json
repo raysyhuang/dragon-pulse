@@ -1,0 +1,76 @@
+{
+  "date": "2026-05-13",
+  "generated_utc": "2026-05-13T10:15:42.678029",
+  "regime": "bull",
+  "regime_detail": {
+    "csi300_last": 4948.05,
+    "csi300_sma_short": 4785.58,
+    "csi300_sma_long": 4666.28,
+    "market_breadth_pct_above_sma20": 0.7034,
+    "day_quality_score": 87.1,
+    "day_quality_components": {
+      "breadth": 25.0,
+      "regime": 20.0,
+      "signal_density": 12.1,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 14,
+    "acceptance_rejected_count": 12
+  },
+  "universe_size": 995,
+  "downloaded": 995,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 28,
+  "picks": [
+    {
+      "ticker": "600188.SH",
+      "name_cn": "兖矿能源",
+      "engine": "mean_reversion",
+      "score": 96.0,
+      "entry_price": 20.77,
+      "max_entry_price": 20.87,
+      "stop_loss": 19.8,
+      "target_1": 21.22,
+      "target_2": 22.8,
+      "holding_period": 3,
+      "adv_cny": 1259562991.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 80.0
+      }
+    },
+    {
+      "ticker": "000729.SZ",
+      "name_cn": "燕京啤酒",
+      "engine": "mean_reversion",
+      "score": 95.0,
+      "entry_price": 12.61,
+      "max_entry_price": 12.65,
+      "stop_loss": 12.23,
+      "target_1": 12.86,
+      "target_2": 13.42,
+      "holding_period": 3,
+      "adv_cny": 562802436.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 70.0
+      }
+    }
+  ],
+  "errors": []
+}
