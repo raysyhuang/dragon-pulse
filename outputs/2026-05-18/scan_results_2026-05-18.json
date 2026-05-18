@@ -1,0 +1,76 @@
+{
+  "date": "2026-05-18",
+  "generated_utc": "2026-05-18T10:23:24.103187",
+  "regime": "bull",
+  "regime_detail": {
+    "csi300_last": 4833.52,
+    "csi300_sma_short": 4832.42,
+    "csi300_sma_long": 4681.96,
+    "market_breadth_pct_above_sma20": 0.4595,
+    "day_quality_score": 83.3,
+    "day_quality_components": {
+      "breadth": 13.3,
+      "regime": 20.0,
+      "signal_density": 20.0,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 42,
+    "acceptance_rejected_count": 40
+  },
+  "universe_size": 996,
+  "downloaded": 996,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 87,
+  "picks": [
+    {
+      "ticker": "000792.SZ",
+      "name_cn": "盐湖股份",
+      "engine": "mean_reversion",
+      "score": 96.0,
+      "entry_price": 33.35,
+      "max_entry_price": 33.52,
+      "stop_loss": 31.78,
+      "target_1": 35.16,
+      "target_2": 36.69,
+      "holding_period": 3,
+      "adv_cny": 4398119920.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 80.0
+      }
+    },
+    {
+      "ticker": "002176.SZ",
+      "name_cn": "江特电机",
+      "engine": "mean_reversion",
+      "score": 96.0,
+      "entry_price": 13.26,
+      "max_entry_price": 13.34,
+      "stop_loss": 12.48,
+      "target_1": 13.94,
+      "target_2": 14.59,
+      "holding_period": 3,
+      "adv_cny": 2933045255.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 80.0
+      }
+    }
+  ],
+  "errors": []
+}
