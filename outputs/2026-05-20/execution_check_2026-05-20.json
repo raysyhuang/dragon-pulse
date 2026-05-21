@@ -1,0 +1,24 @@
+{
+  "date": "2026-05-20",
+  "generated_utc": "2026-05-21T02:29:57.366644",
+  "results": [
+    {
+      "ticker": "605090.SH",
+      "name": "九丰能源",
+      "action": "GO",
+      "entry_price": 41.77,
+      "open_price": 41.77,
+      "gap_pct": 0.0,
+      "reasons": []
+    },
+    {
+      "ticker": "002001.SZ",
+      "name": "新和成",
+      "action": "GO",
+      "entry_price": 31.21,
+      "open_price": 31.3,
+      "gap_pct": 0.29,
+      "reasons": []
+    }
+  ]
+}
