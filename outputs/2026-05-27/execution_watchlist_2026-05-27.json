@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-27",
+  "regime": "bull",
+  "universe_size": 997,
+  "picks": [
+    {
+      "ticker": "300199.SZ",
+      "name_cn": "翰宇药业",
+      "engine": "alpha_rs_pullback",
+      "score": 98.75,
+      "entry_price": 25.34,
+      "max_entry_price": 25.85,
+      "stop_loss": 23.91,
+      "target_1": 28.07,
+      "target_2": 30.02,
+      "holding_period": 5,
+      "adv_cny": 1290134573.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=99",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.15963855421695,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "300661.SZ",
+      "name_cn": "圣邦股份",
+      "engine": "alpha_rs_pullback",
+      "score": 98.03,
+      "entry_price": 116.66,
+      "max_entry_price": 118.99,
+      "stop_loss": 108.72,
+      "target_1": 131.82,
+      "target_2": 142.65,
+      "holding_period": 5,
+      "adv_cny": 3464084323.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=97",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 96.75509704778989,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "date": "2026-05-27",
+  "generated_utc": "2026-05-26T23:58:25.138170",
+  "regime": "bull",
+  "regime_detail": {
+    "csi300_last": 4947.85,
+    "csi300_sma_short": 4863.64,
+    "csi300_sma_long": 4707.87,
+    "market_breadth_pct_above_sma20": 0.422,
+    "day_quality_score": 80.2,
+    "day_quality_components": {
+      "breadth": 10.2,
+      "regime": 20.0,
+      "signal_density": 20.0,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 20,
+    "acceptance_rejected_count": 18
+  },
+  "universe_size": 997,
+  "downloaded": 997,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 77,
+  "picks": [
+    {
+      "ticker": "300199.SZ",
+      "name_cn": "翰宇药业",
+      "engine": "alpha_rs_pullback",
+      "score": 98.75,
+      "entry_price": 25.34,
+      "max_entry_price": 25.85,
+      "stop_loss": 23.91,
+      "target_1": 28.07,
+      "target_2": 30.02,
+      "holding_period": 5,
+      "adv_cny": 1290134573.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=99",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.15963855421695,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "300661.SZ",
+      "name_cn": "圣邦股份",
+      "engine": "alpha_rs_pullback",
+      "score": 98.03,
+      "entry_price": 116.66,
+      "max_entry_price": 118.99,
+      "stop_loss": 108.72,
+      "target_1": 131.82,
+      "target_2": 142.65,
+      "holding_period": 5,
+      "adv_cny": 3464084323.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=97",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 96.75509704778989,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ],
+  "errors": []
+}
