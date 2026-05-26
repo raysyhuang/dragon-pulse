@@ -41,6 +41,7 @@ technicals:
 # =============================================================================
 # Active in ALL regimes (bull, choppy, bear)
 mean_reversion:
+  enabled: false  # replaced by bull-gated RS Pullback alpha core; keep code for research/fallback
   # Weights (must sum to 1.0)
   w_rsi2: 0.40
   w_trend: 0.25
@@ -112,14 +113,14 @@ sniper:
     csi300_symbol: "000300.SH"
 
 # =============================================================================
-# RESEARCH ALPHA CANDIDATES — validated in spike, disabled until integrated backtest
+# RS PULLBACK ALPHA CORE — bull-gated paper/daily core; Sniper remains quarantined
 # =============================================================================
 alpha_candidates:
-  enabled: false  # research/dry-run only; do not enable live without full integrated validation
-  engines: []     # options: ["rs_pullback", "sniper_breakout"]
+  enabled: true
+  engines: ["rs_pullback"]
   rs_pullback:
-    regimes: ["bull", "bear"]
-    score_floor: 80
+    regimes: ["bull"]
+    score_floor: 90
     max_entry_pct: 0.02
     min_adv_cny: 80000000
     stop_atr_mult: 1.1
@@ -127,6 +128,7 @@ alpha_candidates:
     target_2_atr_mult: 3.6
     holding_period: 5
   sniper_breakout:
+    enabled: false
     regimes: ["bull", "bear", "choppy"]
     score_floor: 74
     max_entry_pct: 0.03
@@ -146,20 +148,20 @@ book_size:
   # Regime-specific constraints
   bull:
     max_picks: 2
-    min_score: 65
+    min_score: 90
   choppy:
-    max_picks: 2
-    min_score: 75
+    max_picks: 0
+    min_score: 999
   bear:
-    max_picks: 1
-    min_score: 75  # Bear-regime MR has been weak recently, so size and quality are tighter
+    max_picks: 0
+    min_score: 999
 
 # =============================================================================
 # ACCEPTANCE LAYER — app-level precision filter above engines
 # =============================================================================
 acceptance:
   enabled: true
-  excluded_regimes: ["choppy"]  # MAS-style regime veto: choppy has been DP's weakest bucket
+  excluded_regimes: ["bear", "choppy"]  # bull-gated RS Pullback: no bear/choppy exposure
   dq_full_threshold: 55       # day quality ≥ this → full mode (A+B tiers)
   dq_selective_threshold: 20  # day quality ≥ this → selective (A-tier only)
   max_full: 2                 # max picks in full mode
@@ -180,7 +182,7 @@ outputs:
 runtime:
   threads: true
   yf_auto_adjust: false
-  method_version: "v4.0-scan"
+  method_version: "v4.1-rs-pullback-bull-gated-paper"
   china_trading_days: true
   exclude_suspended: true
 

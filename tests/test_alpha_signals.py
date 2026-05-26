@@ -1,4 +1,5 @@
 import pandas as pd
+from unittest.mock import patch
 
 from src.pipelines.funnel import build_engine_candidates
 from src.signals.alpha_candidates import score_rs_pullback_alpha, score_sniper_breakout_alpha
@@ -79,6 +80,21 @@ def test_build_engine_candidates_keeps_alpha_disabled_by_default():
     )
 
     assert [engine for engine, _ in candidates] == []
+
+
+def test_build_engine_candidates_can_disable_mean_reversion_for_alpha_core():
+    feat_items = [("600118.SH", _trend_df(), {"rsi_2": 1})]
+
+    with patch("src.pipelines.funnel.score_mean_reversion") as mock_mr:
+        candidates = build_engine_candidates(
+            feat_items=feat_items,
+            regime="bull",
+            config={"mean_reversion": {"enabled": False, "rsi2_max": 5, "score_floor": 65}},
+            csi300_df=_flat_csi(),
+        )
+
+    assert candidates == []
+    assert not mock_mr.called
 
 
 def test_build_engine_candidates_adds_alpha_when_research_flag_enabled():

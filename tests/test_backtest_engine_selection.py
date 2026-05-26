@@ -53,6 +53,19 @@ def test_backtest_can_run_enabled_alpha_when_explicitly_requested():
     assert run_alpha is True
 
 
+def test_backtest_respects_mean_reversion_disable_flag_when_all_requested():
+    run_mr, run_sniper, sniper_requested, run_alpha, alpha_requested = resolve_backtest_engines(
+        "all",
+        {"mean_reversion": {"enabled": False}, "sniper": {"enabled": False}},
+    )
+
+    assert run_mr is False
+    assert sniper_requested is True
+    assert run_sniper is False
+    assert alpha_requested is False
+    assert run_alpha is False
+
+
 def test_backtest_limit_touch_fills_at_max_entry_when_intraday_low_touches_limit():
     forward_df = pd.DataFrame(
         [

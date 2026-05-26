@@ -87,8 +87,10 @@ def resolve_backtest_engines(engines_arg: str, config: dict) -> tuple[bool, bool
         or "alpha" in requested
         or "alpha_candidates" in requested
     )
+    mr_enabled = bool((config.get("mean_reversion") or {}).get("enabled", True))
     sniper_enabled = bool((config.get("sniper") or {}).get("enabled", False))
     alpha_enabled = bool((config.get("alpha_candidates") or {}).get("enabled", False))
+    run_mr = run_mr and mr_enabled
     run_sniper = sniper_requested and sniper_enabled
     run_alpha = alpha_requested and alpha_enabled
     return run_mr, run_sniper, sniper_requested, run_alpha, alpha_requested

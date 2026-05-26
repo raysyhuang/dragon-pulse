@@ -129,6 +129,7 @@ def build_engine_candidates(
     sniper_config = config.get("sniper", {})
     alpha_config = config.get("alpha_candidates", {}) or {}
     run_sniper = sniper_config.get("enabled", False)
+    run_mr = mr_config.get("enabled", True)
     run_alpha = alpha_config.get("enabled", False)
     alpha_engines = set(alpha_config.get("engines", []))
 
@@ -141,27 +142,28 @@ def build_engine_candidates(
             is_st = info_map.get(ticker, {}).get("is_st", False)
 
             # Mean reversion
-            mr_subtype, mr_exit_params = resolve_mr_subtype_and_exit_params(mr_config, feats)
-            mr_signal = score_mean_reversion(
-                ticker=ticker,
-                df=feat_df,
-                features=feats,
-                regime=regime,
-                is_st=is_st,
-                rsi2_max=float(mr_config.get("rsi2_max", 5)),
-                adv_min_cny=float(mr_config.get("adv_min_cny", 100_000_000)),
-                score_floor=float(mr_config.get("score_floor", 65)),
-                min_bars=int(mr_config.get("min_bars", 60)),
-                max_single_day_move=float(mr_config.get("max_single_day_move", 0.11)),
-                stop_atr_mult=float(mr_exit_params["stop_atr_mult"]),
-                target_1_atr_mult=float(mr_exit_params["target_1_atr_mult"]),
-                target_2_atr_mult=float(mr_exit_params["target_2_atr_mult"]),
-                max_entry_atr_mult=float(mr_exit_params["max_entry_atr_mult"]),
-                holding_period=int(mr_exit_params["holding_period"]),
-                subtype=mr_subtype,
-            )
-            if mr_signal:
-                all_signals.append(("mean_reversion", mr_signal))
+            if run_mr:
+                mr_subtype, mr_exit_params = resolve_mr_subtype_and_exit_params(mr_config, feats)
+                mr_signal = score_mean_reversion(
+                    ticker=ticker,
+                    df=feat_df,
+                    features=feats,
+                    regime=regime,
+                    is_st=is_st,
+                    rsi2_max=float(mr_config.get("rsi2_max", 5)),
+                    adv_min_cny=float(mr_config.get("adv_min_cny", 100_000_000)),
+                    score_floor=float(mr_config.get("score_floor", 65)),
+                    min_bars=int(mr_config.get("min_bars", 60)),
+                    max_single_day_move=float(mr_config.get("max_single_day_move", 0.11)),
+                    stop_atr_mult=float(mr_exit_params["stop_atr_mult"]),
+                    target_1_atr_mult=float(mr_exit_params["target_1_atr_mult"]),
+                    target_2_atr_mult=float(mr_exit_params["target_2_atr_mult"]),
+                    max_entry_atr_mult=float(mr_exit_params["max_entry_atr_mult"]),
+                    holding_period=int(mr_exit_params["holding_period"]),
+                    subtype=mr_subtype,
+                )
+                if mr_signal:
+                    all_signals.append(("mean_reversion", mr_signal))
 
             # Sniper (quarantined by default)
             if run_sniper and csi300_df is not None:
