@@ -47,17 +47,21 @@ from src.signals.mean_reversion import (
     score_mean_reversion,
 )
 from src.signals.sniper import score_sniper
+from src.signals.alpha_candidates import (
+    score_rs_pullback_alpha,
+    score_sniper_breakout_alpha,
+)
 
 logger = logging.getLogger(__name__)
 
 LOOKBACK_DAYS = 400  # technical indicators need history
 
 
-def resolve_backtest_engines(engines_arg: str, config: dict) -> tuple[bool, bool, bool]:
-    """Return (run_mean_reversion, run_sniper, sniper_requested).
+def resolve_backtest_engines(engines_arg: str, config: dict) -> tuple[bool, bool, bool, bool, bool]:
+    """Return (run_mean_reversion, run_sniper, sniper_requested, run_alpha, alpha_requested).
 
-    Backtests must mirror live scanner behavior: sniper can be requested by CLI,
-    but it remains quarantined unless config.sniper.enabled is true.
+    Backtests must mirror live scanner behavior: quarantined/research engines can
+    be requested by CLI, but they only run when their config block is enabled.
     """
     requested = {
         part.strip()
@@ -78,9 +82,16 @@ def resolve_backtest_engines(engines_arg: str, config: dict) -> tuple[bool, bool
         or "sniper_only" in requested
         or "sniper" in requested
     )
+    alpha_requested = bool(
+        "alpha_only" in requested
+        or "alpha" in requested
+        or "alpha_candidates" in requested
+    )
     sniper_enabled = bool((config.get("sniper") or {}).get("enabled", False))
+    alpha_enabled = bool((config.get("alpha_candidates") or {}).get("enabled", False))
     run_sniper = sniper_requested and sniper_enabled
-    return run_mr, run_sniper, sniper_requested
+    run_alpha = alpha_requested and alpha_enabled
+    return run_mr, run_sniper, sniper_requested, run_alpha, alpha_requested
 
 
 def parse_regime_set(regimes_arg: str | list[str] | tuple[str, ...] | set[str]) -> set[str]:
@@ -132,8 +143,11 @@ def evaluate_pick(
 
     Entry modes:
         signal              — legacy: assume fill at signal entry_price
-        no_chase_next_open  — MAS-style replay: use next open as fill if it is
-                              <= max_entry_price, otherwise skip/cancel trade
+        no_chase_next_open  — use next open as fill if it is <= max_entry_price;
+                              otherwise skip/cancel trade
+        limit_touch         — MAS-like DAY limit replay: fill at next open if it
+                              is <= max_entry_price; otherwise fill at max_entry
+                              if T+1 intraday low touches it; otherwise skip
 
     Exit modes:
         target_stop     — original: exit on target or stop hit, hold_expired at end
@@ -185,6 +199,18 @@ def evaluate_pick(
             result["exit_reason"] = "entry_skipped_no_chase"
             return result
         entry_price = next_open
+    elif entry_mode == "limit_touch":
+        first_bar = bars.iloc[0]
+        next_open = float(first_bar[open_col]) if open_col in bars.columns else float(first_bar[close_col])
+        next_low = float(first_bar[low_col]) if low_col in bars.columns else next_open
+        if max_entry_price is None or next_open <= float(max_entry_price):
+            entry_price = next_open
+        elif next_low <= float(max_entry_price):
+            entry_price = float(max_entry_price)
+        else:
+            result["entry_status"] = "skipped"
+            result["exit_reason"] = "entry_skipped_no_chase"
+            return result
     elif entry_mode != "signal":
         raise ValueError(f"Unknown entry_mode: {entry_mode}")
 
@@ -275,8 +301,8 @@ def main():
                         choices=["target_stop", "profitable_close", "trailing"],
                         help="Exit strategy: target_stop (default), profitable_close, trailing")
     parser.add_argument("--entry-mode", default="no_chase_next_open",
-                        choices=["signal", "no_chase_next_open"],
-                        help="Entry replay: signal=legacy signal-price fill; no_chase_next_open=fill next open only if <= max_entry_price")
+                        choices=["signal", "no_chase_next_open", "limit_touch"],
+                        help="Entry replay: signal=legacy signal-price fill; no_chase_next_open=next-open no-chase; limit_touch=MAS-like DAY limit touch")
     parser.add_argument("--disable-gap-filter", action="store_true",
                         help="Disable MR gap-risk rejection (for baseline comparison)")
     parser.add_argument("--mr-target", default="sma5", choices=["sma5", "atr"],
@@ -422,6 +448,7 @@ def main():
     # --- Config ---
     mr_config = config.get("mean_reversion", {})
     sniper_config = config.get("sniper", {})
+    alpha_config = config.get("alpha_candidates", {}) or {}
     sma_short = int(get_config_value(config, "mean_reversion", "regime", "sma_short", default=20))
     sma_long = int(get_config_value(config, "mean_reversion", "regime", "sma_long", default=50))
 
@@ -469,10 +496,12 @@ def main():
     t_start = time.time()
 
     # Engine filter (computed once). Mirrors live scanner config gates.
-    run_mr, run_sniper, sniper_requested = resolve_backtest_engines(args.engines, config)
+    run_mr, run_sniper, sniper_requested, run_alpha, alpha_requested = resolve_backtest_engines(args.engines, config)
     if sniper_requested and not run_sniper:
         logger.warning("Sniper requested by --engines=%s but disabled by config; skipping sniper.", args.engines)
-    logger.info("Engines: mr=%s sniper=%s", run_mr, run_sniper)
+    if alpha_requested and not run_alpha:
+        logger.warning("Alpha requested by --engines=%s but disabled by config; skipping alpha.", args.engines)
+    logger.info("Engines: mr=%s sniper=%s alpha=%s", run_mr, run_sniper, run_alpha)
 
     min_bars = int(mr_config.get("min_bars", 60))
     regime_filtered_days = 0
@@ -568,6 +597,50 @@ def main():
                     )
                 if sniper_signal:
                     all_signals.append(("sniper", sniper_signal))
+
+                # Research alpha candidates (disabled by default; must be explicitly enabled and requested).
+                if run_alpha:
+                    alpha_engines = set(alpha_config.get("engines", []))
+                    is_st = info_map.get(ticker, {}).get("is_st", False)
+                    if "rs_pullback" in alpha_engines:
+                        rs_cfg = alpha_config.get("rs_pullback", {}) or {}
+                        rs_signal = score_rs_pullback_alpha(
+                            ticker=ticker,
+                            df=hist_df,
+                            regime=regime,
+                            csi300_df=csi_slice,
+                            is_st=is_st,
+                            regimes=tuple(rs_cfg.get("regimes", ["bull", "bear"])),
+                            score_floor=float(rs_cfg.get("score_floor", 80.0)),
+                            max_entry_pct=float(rs_cfg.get("max_entry_pct", 0.02)),
+                            min_adv_cny=float(rs_cfg.get("min_adv_cny", 80_000_000)),
+                            stop_atr_mult=float(rs_cfg.get("stop_atr_mult", 1.1)),
+                            target_atr_mult=float(rs_cfg.get("target_atr_mult", 2.1)),
+                            target_2_atr_mult=float(rs_cfg.get("target_2_atr_mult", 3.6)),
+                            holding_period=int(rs_cfg.get("holding_period", 5)),
+                        )
+                        if rs_signal:
+                            all_signals.append(("alpha_rs_pullback", rs_signal))
+
+                    if "sniper_breakout" in alpha_engines:
+                        bo_cfg = alpha_config.get("sniper_breakout", {}) or {}
+                        bo_signal = score_sniper_breakout_alpha(
+                            ticker=ticker,
+                            df=hist_df,
+                            regime=regime,
+                            csi300_df=csi_slice,
+                            is_st=is_st,
+                            regimes=tuple(bo_cfg.get("regimes", ["bull", "bear", "choppy"])),
+                            score_floor=float(bo_cfg.get("score_floor", 74.0)),
+                            max_entry_pct=float(bo_cfg.get("max_entry_pct", 0.03)),
+                            min_adv_cny=float(bo_cfg.get("min_adv_cny", 80_000_000)),
+                            stop_atr_mult=float(bo_cfg.get("stop_atr_mult", 1.6)),
+                            target_atr_mult=float(bo_cfg.get("target_atr_mult", 3.2)),
+                            target_2_atr_mult=float(bo_cfg.get("target_2_atr_mult", 4.7)),
+                            holding_period=int(bo_cfg.get("holding_period", 5)),
+                        )
+                        if bo_signal:
+                            all_signals.append(("alpha_sniper_breakout", bo_signal))
 
             except Exception:
                 continue
@@ -732,7 +805,7 @@ def main():
             eval_result["engine"] = engine
             eval_result["score"] = sig.score
             eval_result["regime"] = regime
-            eval_result["subtype"] = getattr(sig, "subtype", None) if engine == "mean_reversion" else None
+            eval_result["subtype"] = getattr(sig, "subtype", None)
             all_results.append(eval_result)
 
             if eval_result["exit_reason"] == "target_hit":

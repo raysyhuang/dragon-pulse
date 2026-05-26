@@ -15,7 +15,7 @@ from scripts.backtest_1yr import (
 
 
 def test_backtest_respects_sniper_quarantine_when_all_requested():
-    run_mr, run_sniper, sniper_requested = resolve_backtest_engines(
+    run_mr, run_sniper, sniper_requested, run_alpha, alpha_requested = resolve_backtest_engines(
         "all",
         {"sniper": {"enabled": False}},
     )
@@ -23,10 +23,12 @@ def test_backtest_respects_sniper_quarantine_when_all_requested():
     assert run_mr is True
     assert sniper_requested is True
     assert run_sniper is False
+    assert alpha_requested is False
+    assert run_alpha is False
 
 
 def test_backtest_can_run_enabled_sniper_when_explicitly_requested():
-    run_mr, run_sniper, sniper_requested = resolve_backtest_engines(
+    run_mr, run_sniper, sniper_requested, run_alpha, alpha_requested = resolve_backtest_engines(
         "sniper_only",
         {"sniper": {"enabled": True}},
     )
@@ -34,6 +36,46 @@ def test_backtest_can_run_enabled_sniper_when_explicitly_requested():
     assert run_mr is False
     assert sniper_requested is True
     assert run_sniper is True
+    assert alpha_requested is False
+    assert run_alpha is False
+
+
+def test_backtest_can_run_enabled_alpha_when_explicitly_requested():
+    run_mr, run_sniper, sniper_requested, run_alpha, alpha_requested = resolve_backtest_engines(
+        "alpha_only",
+        {"alpha_candidates": {"enabled": True}},
+    )
+
+    assert run_mr is False
+    assert sniper_requested is False
+    assert run_sniper is False
+    assert alpha_requested is True
+    assert run_alpha is True
+
+
+def test_backtest_limit_touch_fills_at_max_entry_when_intraday_low_touches_limit():
+    forward_df = pd.DataFrame(
+        [
+            {"open": 10.00, "high": 10.10, "low": 9.90, "close": 10.00},
+            {"open": 10.31, "high": 10.80, "low": 10.18, "close": 10.40},
+        ],
+        index=pd.to_datetime(["2026-05-25", "2026-05-26"]),
+    )
+
+    result = evaluate_pick(
+        ticker="600118.SH",
+        entry_price=10.00,
+        stop_loss=9.50,
+        target_1=11.00,
+        holding_period=3,
+        forward_df=forward_df,
+        max_entry_price=10.20,
+        entry_mode="limit_touch",
+    )
+
+    assert result["entry_status"] == "filled"
+    assert result["actual_entry_price"] == 10.20
+    assert result["entry_price"] == 10.20
 
 
 def test_backtest_regime_filter_parser_normalizes_comma_separated_values():

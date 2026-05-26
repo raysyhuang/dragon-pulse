@@ -19,6 +19,10 @@ from src.signals.mean_reversion import (
     score_mean_reversion,
 )
 from src.signals.sniper import score_sniper
+from src.signals.alpha_candidates import (
+    score_rs_pullback_alpha,
+    score_sniper_breakout_alpha,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +127,10 @@ def build_engine_candidates(
     info_map = info_map or {}
     mr_config = config.get("mean_reversion", {})
     sniper_config = config.get("sniper", {})
+    alpha_config = config.get("alpha_candidates", {}) or {}
     run_sniper = sniper_config.get("enabled", False)
+    run_alpha = alpha_config.get("enabled", False)
+    alpha_engines = set(alpha_config.get("engines", []))
 
     all_signals: list[tuple[str, object]] = []
 
@@ -175,6 +182,48 @@ def build_engine_candidates(
                 )
                 if sniper_signal:
                     all_signals.append(("sniper", sniper_signal))
+
+            # Research alpha candidates (disabled by default; not legacy Sniper/MR).
+            if run_alpha and csi300_df is not None:
+                if "rs_pullback" in alpha_engines:
+                    rs_cfg = alpha_config.get("rs_pullback", {}) or {}
+                    rs_signal = score_rs_pullback_alpha(
+                        ticker=ticker,
+                        df=feat_df,
+                        regime=regime,
+                        csi300_df=csi300_df,
+                        is_st=is_st,
+                        regimes=tuple(rs_cfg.get("regimes", ["bull", "bear"])),
+                        score_floor=float(rs_cfg.get("score_floor", 80.0)),
+                        max_entry_pct=float(rs_cfg.get("max_entry_pct", 0.02)),
+                        min_adv_cny=float(rs_cfg.get("min_adv_cny", 80_000_000)),
+                        stop_atr_mult=float(rs_cfg.get("stop_atr_mult", 1.1)),
+                        target_atr_mult=float(rs_cfg.get("target_atr_mult", 2.1)),
+                        target_2_atr_mult=float(rs_cfg.get("target_2_atr_mult", 3.6)),
+                        holding_period=int(rs_cfg.get("holding_period", 5)),
+                    )
+                    if rs_signal:
+                        all_signals.append(("alpha_rs_pullback", rs_signal))
+
+                if "sniper_breakout" in alpha_engines:
+                    bo_cfg = alpha_config.get("sniper_breakout", {}) or {}
+                    bo_signal = score_sniper_breakout_alpha(
+                        ticker=ticker,
+                        df=feat_df,
+                        regime=regime,
+                        csi300_df=csi300_df,
+                        is_st=is_st,
+                        regimes=tuple(bo_cfg.get("regimes", ["bull", "bear", "choppy"])),
+                        score_floor=float(bo_cfg.get("score_floor", 74.0)),
+                        max_entry_pct=float(bo_cfg.get("max_entry_pct", 0.03)),
+                        min_adv_cny=float(bo_cfg.get("min_adv_cny", 80_000_000)),
+                        stop_atr_mult=float(bo_cfg.get("stop_atr_mult", 1.6)),
+                        target_atr_mult=float(bo_cfg.get("target_atr_mult", 3.2)),
+                        target_2_atr_mult=float(bo_cfg.get("target_2_atr_mult", 4.7)),
+                        holding_period=int(bo_cfg.get("holding_period", 5)),
+                    )
+                    if bo_signal:
+                        all_signals.append(("alpha_sniper_breakout", bo_signal))
 
         except Exception:
             continue

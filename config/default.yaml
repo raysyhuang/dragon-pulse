@@ -112,6 +112,31 @@ sniper:
     csi300_symbol: "000300.SH"
 
 # =============================================================================
+# RESEARCH ALPHA CANDIDATES — validated in spike, disabled until integrated backtest
+# =============================================================================
+alpha_candidates:
+  enabled: false  # research/dry-run only; do not enable live without full integrated validation
+  engines: []     # options: ["rs_pullback", "sniper_breakout"]
+  rs_pullback:
+    regimes: ["bull", "bear"]
+    score_floor: 80
+    max_entry_pct: 0.02
+    min_adv_cny: 80000000
+    stop_atr_mult: 1.1
+    target_atr_mult: 2.1
+    target_2_atr_mult: 3.6
+    holding_period: 5
+  sniper_breakout:
+    regimes: ["bull", "bear", "choppy"]
+    score_floor: 74
+    max_entry_pct: 0.03
+    min_adv_cny: 80000000
+    stop_atr_mult: 1.6
+    target_atr_mult: 3.2
+    target_2_atr_mult: 4.7
+    holding_period: 5
+
+# =============================================================================
 # PORTFOLIO & RISK SETTINGS — Variable Book Size
 # =============================================================================
 book_size:
