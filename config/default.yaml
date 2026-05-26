@@ -105,6 +105,7 @@ sniper:
   stop_atr_mult: 2.0
   target_atr_mult: 3.0
   target_2_atr_mult: 5.0
+  max_entry_pct: 0.02          # A-share MAS-style no-chase ceiling (entry × 1.02)
   holding_period: 7
 
   regime:
@@ -133,6 +134,7 @@ book_size:
 # =============================================================================
 acceptance:
   enabled: true
+  excluded_regimes: ["choppy"]  # MAS-style regime veto: choppy has been DP's weakest bucket
   dq_full_threshold: 55       # day quality ≥ this → full mode (A+B tiers)
   dq_selective_threshold: 20  # day quality ≥ this → selective (A-tier only)
   max_full: 2                 # max picks in full mode

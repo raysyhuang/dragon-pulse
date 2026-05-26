@@ -115,6 +115,27 @@ def test_translate_reason_summary_no_equals():
     assert result == "just a plain reason"
 
 
+def test_run_preflight_cancels_when_open_exceeds_pick_max_entry():
+    module = load_morning_check_module()
+
+    results = module.run_preflight(
+        picks=[{
+            "ticker": "600118.SH",
+            "name_cn": "中国卫星",
+            "entry_price": 83.0,
+            "max_entry_price": 84.0,
+            "stop_loss": 80.0,
+        }],
+        open_prices={"600118.SH": 84.5},
+        prev_volumes={"600118.SH": 10_000_000},
+        first_15m_volumes={"600118.SH": 2_000_000},
+        config={"max_gap_up_pct": 3.0, "max_gap_down_pct": 5.0, "min_volume_ratio": 0.10},
+    )
+
+    assert results[0].action == "CANCEL"
+    assert any("最高可买价" in reason for reason in results[0].reasons)
+
+
 def test_main_returns_zero_when_open_prices_are_missing(tmp_path, monkeypatch):
     module = load_morning_check_module()
 

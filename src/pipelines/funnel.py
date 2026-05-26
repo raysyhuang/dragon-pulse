@@ -170,6 +170,7 @@ def build_engine_candidates(
                     target_atr_mult=float(sniper_config.get("target_atr_mult", 3.0)),
                     target_2_atr_mult=float(sniper_config.get("target_2_atr_mult", 5.0)),
                     holding_period=int(sniper_config.get("holding_period", 7)),
+                    max_entry_pct=float(sniper_config.get("max_entry_pct", 0.02)),
                     is_st=is_st,
                 )
                 if sniper_signal:
@@ -290,6 +291,14 @@ def run_selection_funnel(
         result.acceptance_mode = "off"
         return result
 
+    # MAS-style hard regime veto: lets DP stay candidate-only/no-trade in
+    # historically weak market states (for example choppy A-share tape).
+    excluded_regimes = _get_excluded_regimes(config)
+    if regime in excluded_regimes:
+        result.acceptance_mode = "regime_filtered"
+        result.acceptance_eligible_count = len(sorted_candidates)
+        return result
+
     # --- Stage 1: Breadth suppression ---
     breadth_floor = float(config.get("book_size", {}).get("breadth_floor", 0.30))
     if breadth_pct < breadth_floor:
@@ -370,6 +379,16 @@ def run_selection_funnel(
 def _get_max_picks(config: dict, regime: str) -> int:
     book_cfg = config.get("book_size", {}).get(regime, {})
     return int(book_cfg.get("max_picks", 5)) if isinstance(book_cfg, dict) else 5
+
+
+def _get_excluded_regimes(config: dict) -> set[str]:
+    acceptance_cfg = config.get("acceptance", {}) or {}
+    raw = acceptance_cfg.get("excluded_regimes", [])
+    if isinstance(raw, str):
+        parts = raw.split(",")
+    else:
+        parts = raw
+    return {str(part).strip().lower() for part in parts if str(part).strip()}
 
 
 def _limit_down_veto(

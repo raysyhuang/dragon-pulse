@@ -83,13 +83,13 @@ def resolve_backtest_engines(engines_arg: str, config: dict) -> tuple[bool, bool
     return run_mr, run_sniper, sniper_requested
 
 
-def parse_regime_set(regimes_arg: str) -> set[str]:
-    """Parse a comma-separated regime filter into normalized regime names."""
-    return {
-        part.strip().lower()
-        for part in str(regimes_arg or "").split(",")
-        if part.strip()
-    }
+def parse_regime_set(regimes_arg: str | list[str] | tuple[str, ...] | set[str]) -> set[str]:
+    """Parse a comma-separated or config-list regime filter into normalized names."""
+    if isinstance(regimes_arg, (list, tuple, set)):
+        parts = regimes_arg
+    else:
+        parts = str(regimes_arg or "").split(",")
+    return {str(part).strip().lower() for part in parts if str(part).strip()}
 
 
 def apply_score_floor(
@@ -123,19 +123,31 @@ def evaluate_pick(
     exit_mode: str = "target_stop",
     engine: str = "",
     atr: float = 0.0,
+    max_entry_price: float | None = None,
+    entry_mode: str = "signal",
 ) -> dict:
     """Evaluate a single pick against forward price data.
 
     T+1 rule: no same-day exits. Evaluation starts from day 1.
+
+    Entry modes:
+        signal              — legacy: assume fill at signal entry_price
+        no_chase_next_open  — MAS-style replay: use next open as fill if it is
+                              <= max_entry_price, otherwise skip/cancel trade
 
     Exit modes:
         target_stop     — original: exit on target or stop hit, hold_expired at end
         profitable_close — exit on close > entry after day 2+ (captures MR drift)
         trailing         — once P&L > 1×ATR intraday, move stop to breakeven
     """
+    requested_entry_price = float(entry_price)
     result = {
         "ticker": ticker,
-        "entry_price": entry_price,
+        "entry_price": requested_entry_price,
+        "requested_entry_price": requested_entry_price,
+        "actual_entry_price": None,
+        "max_entry_price": max_entry_price,
+        "entry_status": "pending",
         "stop_loss": stop_loss,
         "target_1": target_1,
         "holding_period": holding_period,
@@ -148,19 +160,38 @@ def evaluate_pick(
     }
 
     if forward_df.empty:
+        result["entry_status"] = "no_data"
         result["exit_reason"] = "no_data"
         return result
 
     close_col = "Close" if "Close" in forward_df.columns else "close"
     high_col = "High" if "High" in forward_df.columns else "high"
     low_col = "Low" if "Low" in forward_df.columns else "low"
+    open_col = "Open" if "Open" in forward_df.columns else "open"
 
-    # T+1: skip day 0 (entry day), evaluate from day 1
+    # T+1: skip day 0 (signal day), enter/evaluate from day 1.
     bars = forward_df.iloc[1:holding_period + 1] if len(forward_df) > 1 else pd.DataFrame()
 
     if bars.empty:
+        result["entry_status"] = "no_data"
         result["exit_reason"] = "insufficient_forward_data"
         return result
+
+    if entry_mode == "no_chase_next_open":
+        first_bar = bars.iloc[0]
+        next_open = float(first_bar[open_col]) if open_col in bars.columns else float(first_bar[close_col])
+        if max_entry_price is not None and next_open > float(max_entry_price):
+            result["entry_status"] = "skipped"
+            result["exit_reason"] = "entry_skipped_no_chase"
+            return result
+        entry_price = next_open
+    elif entry_mode != "signal":
+        raise ValueError(f"Unknown entry_mode: {entry_mode}")
+
+    entry_price = float(entry_price)
+    result["entry_price"] = entry_price
+    result["actual_entry_price"] = entry_price
+    result["entry_status"] = "filled"
 
     # Trailing stop state: once high exceeds entry + 1×ATR, stop moves to breakeven
     effective_stop = stop_loss
@@ -243,6 +274,9 @@ def main():
     parser.add_argument("--exit-mode", default="target_stop",
                         choices=["target_stop", "profitable_close", "trailing"],
                         help="Exit strategy: target_stop (default), profitable_close, trailing")
+    parser.add_argument("--entry-mode", default="no_chase_next_open",
+                        choices=["signal", "no_chase_next_open"],
+                        help="Entry replay: signal=legacy signal-price fill; no_chase_next_open=fill next open only if <= max_entry_price")
     parser.add_argument("--disable-gap-filter", action="store_true",
                         help="Disable MR gap-risk rejection (for baseline comparison)")
     parser.add_argument("--mr-target", default="sma5", choices=["sma5", "atr"],
@@ -283,6 +317,8 @@ def main():
     start_date = datetime.strptime(args.start, "%Y-%m-%d").date()
     end_date = datetime.strptime(args.end, "%Y-%m-%d").date()
     config = load_config(args.config)
+    config_excluded_regimes = parse_regime_set((config.get("acceptance") or {}).get("excluded_regimes", []))
+    excluded_regimes |= config_excluded_regimes
 
     trading_days = get_cn_trading_days(start_date, end_date)
     if args.max_days > 0:
@@ -290,8 +326,8 @@ def main():
 
     logger.info("=" * 60)
     logger.info("BACKTEST: %s to %s (%d trading days)", args.start, args.end, len(trading_days))
-    logger.info("  exit_mode=%s  mr_target=%s  gap_filter=%s  sniper_trailing=%s  acceptance=%s",
-                args.exit_mode, args.mr_target,
+    logger.info("  exit_mode=%s  entry_mode=%s  mr_target=%s  gap_filter=%s  sniper_trailing=%s  acceptance=%s",
+                args.exit_mode, args.entry_mode, args.mr_target,
                 "OFF" if args.disable_gap_filter else "ON",
                 "OFF" if args.no_sniper_trailing else "ON",
                 args.acceptance_mode)
@@ -528,6 +564,7 @@ def main():
                         target_atr_mult=float(sniper_config.get("target_atr_mult", 3.0)),
                         target_2_atr_mult=float(sniper_config.get("target_2_atr_mult", 5.0)),
                         holding_period=int(sniper_config.get("holding_period", 7)),
+                        max_entry_pct=float(sniper_config.get("max_entry_pct", 0.02)),
                     )
                 if sniper_signal:
                     all_signals.append(("sniper", sniper_signal))
@@ -688,6 +725,8 @@ def main():
                 exit_mode=pick_exit_mode,
                 engine=engine,
                 atr=pick_atr,
+                max_entry_price=getattr(sig, "max_entry_price", None),
+                entry_mode=args.entry_mode,
             )
             eval_result["date"] = date_str
             eval_result["engine"] = engine
@@ -736,6 +775,7 @@ def main():
     df_valid = df[df["pnl_pct"].notna()].copy()
 
     total = len(df_valid)
+    entry_skipped_no_chase = int((df["exit_reason"] == "entry_skipped_no_chase").sum())
     target_hits = int(df_valid["hit_target"].sum())
     stop_hits = int(df_valid["hit_stop"].sum())
     hold_expired = int((df_valid["exit_reason"] == "hold_expired").sum())
@@ -870,6 +910,7 @@ def main():
         "end": args.end,
         "period": f"{args.start} to {args.end}",
         "exit_mode": args.exit_mode,
+        "entry_mode": args.entry_mode,
         "mr_target_mode": args.mr_target,
         "engines": args.engines,
         "gap_filter_disabled": args.disable_gap_filter,
@@ -887,6 +928,7 @@ def main():
         "zero_pick_days_pct": round(zero_pick_days_pct, 4),
         "avg_picks_per_active_day": round(avg_picks_per_active_day, 2),
         "total_picks": total,
+        "entry_skipped_no_chase": entry_skipped_no_chase,
         "target_hits": target_hits,
         "stop_hits": stop_hits,
         "hold_expired": hold_expired,
@@ -913,9 +955,10 @@ def main():
 
     # Print summary
     logger.info("=" * 60)
-    logger.info("BACKTEST SUMMARY: %s to %s (exit_mode=%s)", args.start, args.end, args.exit_mode)
+    logger.info("BACKTEST SUMMARY: %s to %s (exit_mode=%s, entry_mode=%s)",
+                args.start, args.end, args.exit_mode, args.entry_mode)
     logger.info("=" * 60)
-    logger.info("Total picks evaluated: %d", total)
+    logger.info("Total picks evaluated: %d | No-chase skipped: %d", total, entry_skipped_no_chase)
     logger.info("PnL win rate: %.1f%% | Target hit rate: %.1f%%", pnl_win_rate * 100, target_hit_rate * 100)
     logger.info("Avg win: +%.2f%% | Avg loss: %.2f%%", avg_win, avg_loss)
     logger.info("True expectancy: %.2f%% | Weighted: %.2f%%", true_expectancy, weighted_expectancy)

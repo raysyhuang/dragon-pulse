@@ -213,6 +213,22 @@ class TestRunSelectionFunnel:
         assert result.day_quality_score >= 0
 
 
+    def test_choppy_regime_can_be_hard_blocked(self):
+        """MAS-style regime veto: config can turn choppy into a no-trade day."""
+        config = self._default_config()
+        config["acceptance"]["excluded_regimes"] = ["choppy"]
+        candidates = _make_candidates(("A", 95), ("B", 90), ("C", 85))
+
+        result = run_selection_funnel(
+            candidates, "choppy", 0.60, config,
+            universe_size=100, acceptance_mode="live_equivalent",
+        )
+
+        assert result.final_picks == []
+        assert result.acceptance_mode == "regime_filtered"
+        assert result.acceptance_eligible_count == 3
+
+
 class TestLiveConfigBehavior:
     """Validate that the live config (default.yaml) produces picks in realistic conditions."""
 

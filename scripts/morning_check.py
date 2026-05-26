@@ -174,14 +174,23 @@ def run_preflight(
 
         gap_pct = (open_price / entry_price - 1) * 100
 
-        # Check gap (with per-pick stop_loss if available)
+        # Check gap (with per-pick stop_loss and max_entry_price if available)
         pick_stop_loss = pick.get("stop_loss")
         if pick_stop_loss is not None:
             pick_stop_loss = float(pick_stop_loss)
-        gap_action, gap_reasons = check_gap(
-            entry_price, open_price, max_gap_up, max_gap_down,
-            stop_loss=pick_stop_loss,
-        )
+        pick_max_entry = pick.get("max_entry_price")
+        if pick_max_entry is not None:
+            pick_max_entry = float(pick_max_entry)
+
+        if pick_max_entry is not None and pick_max_entry > 0 and open_price > pick_max_entry:
+            gap_action, gap_reasons = "CANCEL", [
+                f"开盘 ¥{open_price:.2f} > 最高可买价 ¥{pick_max_entry:.2f} — no-chase取消入场"
+            ]
+        else:
+            gap_action, gap_reasons = check_gap(
+                entry_price, open_price, max_gap_up, max_gap_down,
+                stop_loss=pick_stop_loss,
+            )
 
         # Check volume
         vol_action, vol_reasons = check_volume_confirmation(

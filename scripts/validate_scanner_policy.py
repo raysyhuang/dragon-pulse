@@ -194,6 +194,7 @@ def main():
                         target_atr_mult=float(sniper_config.get("target_atr_mult", 3.0)),
                         target_2_atr_mult=float(sniper_config.get("target_2_atr_mult", 5.0)),
                         holding_period=int(sniper_config.get("holding_period", 7)),
+                        max_entry_pct=float(sniper_config.get("max_entry_pct", 0.02)),
                     )
                     if sniper_signal:
                         all_signals.append(("sniper", sniper_signal))

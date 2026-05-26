@@ -52,6 +52,7 @@ def score_sniper(
     target_atr_mult: float = 3.0,
     target_2_atr_mult: float = 5.0,
     holding_period: int = 7,
+    max_entry_pct: float = 0.02,
     is_st: bool = False,
 ) -> SniperSignal | None:
     """Score a ticker for sniper (BB squeeze + vol compression) potential.
@@ -215,6 +216,11 @@ def score_sniper(
     target_1 = min(target_1, cap)
     target_2 = min(target_2, cap)
 
+    # MAS-style no-chase ceiling for T+1 / 09:35 execution checks.
+    # Keep this explicit on the signal so morning_check can CANCEL rather
+    # than falling back to a broad global gap threshold.
+    max_entry = min(close_price * (1 + max_entry_pct), cap)
+
     return SniperSignal(
         ticker=ticker,
         score=round(composite, 2),
@@ -225,4 +231,5 @@ def score_sniper(
         target_2=round(target_2, 2),
         holding_period=holding_period,
         components=scores,
+        max_entry_price=round(max_entry, 2),
     )
