@@ -1,0 +1,51 @@
+{
+  "date": "2026-05-26",
+  "regime": "bull",
+  "universe_size": 997,
+  "picks": [
+    {
+      "ticker": "000333.SZ",
+      "name_cn": "美的集团",
+      "engine": "mean_reversion",
+      "score": 95.14,
+      "entry_price": 79.55,
+      "max_entry_price": 79.71,
+      "stop_loss": 77.99,
+      "target_1": 80.53,
+      "target_2": 82.84,
+      "holding_period": 3,
+      "adv_cny": 2640488891.0,
+      "market_cap_cny": null,
+      "reason_summary": "trend_intact=100, down_streak=100, rsi2_oversold=98",
+      "components": {
+        "rsi2_oversold": 97.8617758385034,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 80.0
+      }
+    },
+    {
+      "ticker": "300750.SZ",
+      "name_cn": "宁德时代",
+      "engine": "mean_reversion",
+      "score": 95.0,
+      "entry_price": 402.5,
+      "max_entry_price": 403.93,
+      "stop_loss": 388.91,
+      "target_1": 408.58,
+      "target_2": 431.1,
+      "holding_period": 3,
+      "adv_cny": 14618913934.0,
+      "market_cap_cny": null,
+      "reason_summary": "rsi2_oversold=100, trend_intact=100, down_streak=100",
+      "components": {
+        "rsi2_oversold": 100.0,
+        "trend_intact": 100.0,
+        "down_streak": 100.0,
+        "proximity_to_low": 80.0,
+        "volume": 70.0
+      }
+    }
+  ]
+}
