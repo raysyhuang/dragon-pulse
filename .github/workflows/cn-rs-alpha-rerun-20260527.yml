@@ -1,0 +1,101 @@
+name: CN RS Alpha Fresh Rerun 2026-05-27
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cn-rs-alpha-rerun-20260527.yml"
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  PYTHONUNBUFFERED: "1"
+  TZ: "Asia/Shanghai"
+
+concurrency:
+  group: cn-rs-alpha-rerun-20260527
+  cancel-in-progress: true
+
+jobs:
+  fresh-rerun:
+    name: Fresh RS Alpha Scan + Telegram Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CN provider smoke test
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python scripts/smoke_cn_provider.py --config config/default.yaml
+
+      - name: Run fresh RS Alpha scan for 2026-05-27
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MAS_TELEGRAM_LOG_URL: ${{ secrets.MAS_TELEGRAM_LOG_URL }}
+          MAS_API_SECRET_KEY: ${{ secrets.MAS_API_SECRET_KEY }}
+          DRAGON_PULSE_SKIP_TELEGRAM: "1"
+        run: |
+          python main.py scan --config config/default.yaml --date 2026-05-27
+
+      - name: Verify fresh watchlist artifact
+        run: |
+          WL_FILE="outputs/2026-05-27/execution_watchlist_2026-05-27.json"
+          if [ ! -f "${WL_FILE}" ]; then
+            echo "Fresh watchlist not generated: ${WL_FILE}"
+            exit 1
+          fi
+          echo "Fresh watchlist artifact verified: ${WL_FILE}"
+          python -m json.tool "${WL_FILE}" | head -80
+
+      - name: Send Telegram morning check from fresh RS Alpha watchlist
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MAS_TELEGRAM_LOG_URL: ${{ secrets.MAS_TELEGRAM_LOG_URL }}
+          MAS_API_SECRET_KEY: ${{ secrets.MAS_API_SECRET_KEY }}
+        run: |
+          rm -f outputs/2026-05-27/.morning_open_pending_sent outputs/2026-05-27/.morning_alert_sent
+          python scripts/morning_check.py --date 2026-05-27
+
+      - name: Commit fresh rerun outputs
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add outputs/2026-05-27 data/bad_tickers.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No fresh outputs to commit"
+          else
+            git commit -m "auto: fresh RS alpha rerun for 2026-05-27"
+            git push origin HEAD:main || {
+              git fetch origin main
+              git rebase origin/main
+              git push origin HEAD:main
+            }
+          fi
