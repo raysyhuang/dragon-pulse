@@ -1,0 +1,74 @@
+{
+  "date": "2026-05-28",
+  "generated_utc": "2026-05-28T10:21:10.833726",
+  "regime": "bull",
+  "regime_detail": {
+    "csi300_last": 4914.21,
+    "csi300_sma_short": 4877.75,
+    "csi300_sma_long": 4717.18,
+    "market_breadth_pct_above_sma20": 0.3747,
+    "day_quality_score": 61.6,
+    "day_quality_components": {
+      "breadth": 6.2,
+      "regime": 20.0,
+      "signal_density": 5.4,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 9,
+    "acceptance_rejected_count": 7
+  },
+  "universe_size": 996,
+  "downloaded": 996,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 33,
+  "picks": [
+    {
+      "ticker": "300661.SZ",
+      "name_cn": "圣邦股份",
+      "engine": "alpha_rs_pullback",
+      "score": 97.9,
+      "entry_price": 121.5,
+      "max_entry_price": 123.93,
+      "stop_loss": 112.46,
+      "target_1": 138.76,
+      "target_2": 151.08,
+      "holding_period": 5,
+      "adv_cny": 3319209023.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=96",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 96.3347029819207,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "301200.SZ",
+      "name_cn": "大族数控",
+      "engine": "alpha_rs_pullback",
+      "score": 97.0,
+      "entry_price": 294.99,
+      "max_entry_price": 300.89,
+      "stop_loss": 269.55,
+      "target_1": 343.56,
+      "target_2": 378.25,
+      "holding_period": 5,
+      "adv_cny": 1613684771.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=98",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.33385569808392,
+        "trend": 100.0,
+        "volume": 75.0
+      }
+    }
+  ],
+  "errors": []
+}
