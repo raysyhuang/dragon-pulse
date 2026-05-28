@@ -275,6 +275,14 @@ def send_open_pending_alert(
     pending_marker: Path,
 ) -> bool:
     """Send a watchlist-only alert when opening prices are not live yet."""
+    if date_str != today_str:
+        logger.info(
+            "Latest watchlist is from %s, not %s. Skipping stale waiting-for-open alert.",
+            date_str,
+            today_str,
+        )
+        return False
+
     if _marker_is_for_today(pending_marker, today_str):
         logger.info(f"Waiting-for-open alert already sent for {today_str} (marker: {pending_marker}). Skipping.")
         return True

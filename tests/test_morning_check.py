@@ -85,6 +85,43 @@ def test_send_open_pending_alert_writes_marker_and_sends_message(tmp_path, monke
     assert "开盘价尚未公布" in msg
 
 
+def test_send_open_pending_alert_skips_stale_prior_day_watchlist(tmp_path, monkeypatch):
+    module = load_morning_check_module()
+
+    date_str = "2026-05-27"
+    today_str = "2026-05-28"
+    out_dir = tmp_path / "outputs" / date_str
+    out_dir.mkdir(parents=True)
+    watchlist_path = out_dir / f"execution_watchlist_{date_str}.json"
+    watchlist_path.write_text(json.dumps({
+        "date": date_str,
+        "regime": "bull",
+        "universe_size": 997,
+        "picks": [
+            {"ticker": "300199.SZ", "name_cn": "翰宇药业", "entry_price": 25.34,
+             "max_entry_price": 25.85, "stop_loss": 23.91, "target_1": 28.07,
+             "holding_period": 5, "score": 99, "reason_summary": "rs=100"},
+        ],
+    }), encoding="utf-8")
+    pending_marker = out_dir / ".morning_open_pending_sent"
+
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+
+    with patch("src.core.alerts.AlertManager.send_alert", return_value={"telegram": True}) as send_alert:
+        sent = module.send_open_pending_alert(
+            today_str=today_str,
+            date_str=date_str,
+            watchlist_path=watchlist_path,
+            picks=[],
+            pending_marker=pending_marker,
+        )
+
+    assert sent is False
+    assert not pending_marker.exists()
+    send_alert.assert_not_called()
+
+
 def test_translate_reason_summary_mean_reversion_keys():
     from src.core.alerts import _translate_reason_summary
     result = _translate_reason_summary("rsi2_oversold=100, trend_intact=80, down_streak=60")
