@@ -1,0 +1,49 @@
+{
+  "date": "2026-05-29",
+  "regime": "bull",
+  "universe_size": 996,
+  "picks": [
+    {
+      "ticker": "300661.SZ",
+      "name_cn": "圣邦股份",
+      "engine": "alpha_rs_pullback",
+      "score": 97.9,
+      "entry_price": 121.5,
+      "max_entry_price": 123.93,
+      "stop_loss": 112.46,
+      "target_1": 138.76,
+      "target_2": 151.08,
+      "holding_period": 5,
+      "adv_cny": 3319209023.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=96",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 96.3347029819207,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "301200.SZ",
+      "name_cn": "大族数控",
+      "engine": "alpha_rs_pullback",
+      "score": 97.0,
+      "entry_price": 294.99,
+      "max_entry_price": 300.89,
+      "stop_loss": 269.55,
+      "target_1": 343.56,
+      "target_2": 378.25,
+      "holding_period": 5,
+      "adv_cny": 1613684771.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=98",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.33385569808392,
+        "trend": 100.0,
+        "volume": 75.0
+      }
+    }
+  ]
+}
