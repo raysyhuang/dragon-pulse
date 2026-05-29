@@ -21,7 +21,12 @@ def test_telegram_suppression():
 
     os.environ["GITHUB_RUN_ATTEMPT"] = "1"
 
-    config = AlertConfig(enabled=True, channels=["telegram"])
+    config = AlertConfig(
+        enabled=True,
+        channels=["telegram"],
+        telegram_bot_token="test-token",
+        telegram_chat_id="test-chat",
+    )
     manager = AlertManager(config)
 
     with patch('requests.post') as mock_post:
