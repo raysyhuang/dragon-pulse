@@ -2,11 +2,22 @@ name: CN Morning Check
 
 on:
   schedule:
-    # 07:30 Shanghai = 23:30 UTC-1day (weekdays: Sun-Thu for Mon-Fri mornings)
-    - cron: "30 23 * * 0-4"
-    # 09:35 Shanghai = 01:35 UTC (weekdays) — retry with real open prices
+    # 07:15 Shanghai = 23:15 UTC-1day (Sun-Thu for Mon-Fri mornings).
+    # Runs the same-day scan and sends the pre-open Telegram watchlist.
+    - cron: "15 23 * * 0-4"
+    # 09:35 Shanghai = 01:35 UTC (weekdays).
+    # Reuses the same-day watchlist and sends GO/CANCEL using live open prices.
     - cron: "35 1 * * 1-5"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "preopen_scan sends fresh watchlist; open_check validates same-day watchlist"
+        required: true
+        default: "preopen_scan"
+        type: choice
+        options:
+          - preopen_scan
+          - open_check
 
 env:
   PYTHON_VERSION: "3.11"
@@ -14,12 +25,114 @@ env:
   TZ: "Asia/Shanghai"
 
 concurrency:
-  group: cn-morning
-  cancel-in-progress: true
+  group: cn-morning-${{ github.event.schedule || inputs.mode || 'manual' }}
+  cancel-in-progress: false
 
 jobs:
+  preopen-scan:
+    name: 07:15 Same-Day Pre-Open Scan
+    if: github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'preopen_scan'
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Compute trading date
+        id: date
+        run: |
+          TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+          echo "trade_date=${TRADE_DATE}" >> "$GITHUB_OUTPUT"
+          echo "Trading date: ${TRADE_DATE}"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CN provider smoke test
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python scripts/smoke_cn_provider.py --config config/default.yaml
+
+      - name: Run same-day scan and send Telegram
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MAS_TELEGRAM_LOG_URL: ${{ secrets.MAS_TELEGRAM_LOG_URL }}
+          MAS_API_SECRET_KEY: ${{ secrets.MAS_API_SECRET_KEY }}
+        run: |
+          python main.py scan --config config/default.yaml --date "${{ steps.date.outputs.trade_date }}"
+
+      - name: Verify same-day watchlist artifact
+        run: |
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          WL_FILE="outputs/${TRADE_DATE}/execution_watchlist_${TRADE_DATE}.json"
+          if [ ! -f "${WL_FILE}" ]; then
+            echo "ERROR: execution_watchlist not generated for ${TRADE_DATE}"
+            exit 1
+          fi
+          echo "Watchlist artifact verified: ${WL_FILE}"
+          python -m json.tool "${WL_FILE}" | head -30
+
+      - name: Commit same-day pre-open outputs
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          git add "outputs/${TRADE_DATE}" data/bad_tickers.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No same-day pre-open outputs to commit"
+          else
+            git commit -m "auto: CN pre-open outputs for ${TRADE_DATE}"
+            pushed=false
+            for i in 1 2 3; do
+              if git push origin HEAD:main; then
+                pushed=true
+                break
+              fi
+              echo "Push failed (attempt $i/3), rebasing..."
+              git stash push --include-untracked --message "cn-preopen-rebase-${i}" || true
+              git fetch origin main
+              git rebase origin/main
+              git stash pop || true
+            done
+            if [ "${pushed}" != "true" ]; then
+              echo "Failed to push CN pre-open outputs after 3 attempts"
+              exit 1
+            fi
+          fi
+
+      - name: Upload same-day pre-open outputs artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cn-preopen-outputs
+          path: outputs/**
+          retention-days: 7
+
   preflight:
-    name: Pre-Flight Gap Check
+    name: 09:35 Open GO/CANCEL Check
+    if: github.event.schedule == '35 1 * * 1-5' || inputs.mode == 'open_check'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -33,22 +146,17 @@ jobs:
       - name: Find latest watchlist
         id: check
         run: |
-          # The morning check runs BEFORE today's nightly scan, so we need
-          # the most recent watchlist (typically yesterday's trading date).
-          # Sort by date embedded in filename (not mtime, which is unreliable
-          # after a fresh git checkout).
-          LATEST_WL=$(ls outputs/*/execution_watchlist_*.json 2>/dev/null | sort -t_ -k3 -r | head -1)
-          if [ -n "${LATEST_WL}" ]; then
+          TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+          WL_FILE="outputs/${TRADE_DATE}/execution_watchlist_${TRADE_DATE}.json"
+          if [ -f "${WL_FILE}" ]; then
             echo "found=true" >> "$GITHUB_OUTPUT"
-            # Extract date from filename: execution_watchlist_YYYY-MM-DD.json
-            TRADE_DATE=$(basename "${LATEST_WL}" | sed 's/execution_watchlist_//;s/\.json//')
             echo "trade_date=${TRADE_DATE}" >> "$GITHUB_OUTPUT"
-            echo "Watchlist found: ${LATEST_WL} (trade date: ${TRADE_DATE})"
+            echo "Same-day watchlist found: ${WL_FILE}"
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
-            TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
             echo "trade_date=${TRADE_DATE}" >> "$GITHUB_OUTPUT"
-            echo "No watchlist found. Nightly run may have failed or produced no picks."
+            echo "ERROR: Missing same-day watchlist ${WL_FILE}. The 07:15 pre-open scan must finish and commit before the 09:35 open check."
+            exit 1
           fi
 
       - name: Set up Python
