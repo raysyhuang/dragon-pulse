@@ -1,6 +1,11 @@
 name: CN Morning Check
 
 on:
+  # Temporary/manual rerun path: pushing this workflow file runs the same 07:15 pre-open job once.
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cn-morning.yml"
   schedule:
     # 07:15 Shanghai = 23:15 UTC-1day (Sun-Thu for Mon-Fri mornings).
     # Runs the same-day scan and sends the pre-open Telegram watchlist.
@@ -31,7 +36,7 @@ concurrency:
 jobs:
   preopen-scan:
     name: 07:15 Same-Day Pre-Open Scan
-    if: github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'preopen_scan'
+    if: github.event_name == 'push' || github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'preopen_scan'
     runs-on: ubuntu-latest
     timeout-minutes: 240
     permissions:
