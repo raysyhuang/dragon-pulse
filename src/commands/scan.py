@@ -107,7 +107,7 @@ def _send_scan_alert(result: dict) -> None:
         lines = [
             f"<b>\U0001f409 龙脉扫描 — {scan_date}</b>",
             f"市场状态: {emoji} <b>{regime_label}</b> | 宽度: {breadth:.0%}",
-            f"信号: {result.get('signals_total', 0)} MR | 入选: {eligible} | 日质量: {dq_score:.0f}/100 → <b>{acc_label}</b>",
+            f"信号: {result.get('signals_total', 0)} | 入选: {eligible} | 日质量: {dq_score:.0f}/100 → <b>{acc_label}</b>",
             "",
         ]
 
