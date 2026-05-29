@@ -3,10 +3,18 @@ import importlib.util
 import json
 import sys
 import types
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
+from zoneinfo import ZoneInfo
 
 import pandas as pd
+
+
+def _sh(hour: int, minute: int = 30) -> datetime:
+    """Helper: Asia/Shanghai timestamp on a fixed weekday."""
+    return datetime(2026, 5, 11, hour, minute, tzinfo=ZoneInfo("Asia/Shanghai"))
 
 
 def load_morning_check_module():
@@ -21,6 +29,8 @@ def load_morning_check_module():
 
 def test_fetch_open_prices_reads_snapshot_once_and_filters_zero_opens(monkeypatch):
     module = load_morning_check_module()
+
+    monkeypatch.setattr(module, "_shanghai_now", lambda: _sh(9, 35))
 
     fake_ak = types.SimpleNamespace()
     fake_ak.stock_zh_a_spot_em = MagicMock(return_value=pd.DataFrame([
@@ -37,6 +47,136 @@ def test_fetch_open_prices_reads_snapshot_once_and_filters_zero_opens(monkeypatc
         "300001.SZ": 18.88,
     }
     fake_ak.stock_zh_a_spot_em.assert_called_once()
+
+
+def test_fetch_open_prices_returns_empty_before_0925_shanghai(monkeypatch):
+    """Before 09:25 Shanghai, AkShare is not called — its 今开 field can hold
+    the prior session's open pre-market and would produce false gap signals.
+    """
+    module = load_morning_check_module()
+
+    monkeypatch.setattr(module, "_shanghai_now", lambda: _sh(7, 52))
+
+    fake_ak = types.SimpleNamespace()
+    fake_ak.stock_zh_a_spot_em = MagicMock(return_value=pd.DataFrame([
+        {"代码": "600000", "今开": 10.25},
+    ]))
+    monkeypatch.setitem(sys.modules, "akshare", fake_ak)
+
+    prices = module.fetch_open_prices(["600000.SH"])
+
+    assert prices == {}
+    fake_ak.stock_zh_a_spot_em.assert_not_called()
+
+
+def test_fetch_open_prices_runs_after_gate_at_exactly_0925(monkeypatch):
+    module = load_morning_check_module()
+
+    monkeypatch.setattr(module, "_shanghai_now", lambda: _sh(9, 25))
+
+    fake_ak = types.SimpleNamespace()
+    fake_ak.stock_zh_a_spot_em = MagicMock(return_value=pd.DataFrame([
+        {"代码": "600000", "今开": 10.25},
+    ]))
+    monkeypatch.setitem(sys.modules, "akshare", fake_ak)
+
+    prices = module.fetch_open_prices(["600000.SH"])
+
+    assert prices == {"600000.SH": 10.25}
+    fake_ak.stock_zh_a_spot_em.assert_called_once()
+
+
+def _make_result(module, ticker, action, open_price, gap_pct):
+    return module.PreFlightResult(
+        ticker=ticker,
+        name_cn=ticker,
+        entry_price=0.0,
+        open_price=open_price,
+        gap_pct=gap_pct,
+        prev_volume=0,
+        open_volume_15m=0,
+        volume_ratio=0.0,
+        action=action,
+        reasons=[],
+    )
+
+
+def test_verdict_signature_stable_and_changes_with_action(tmp_path):
+    module = load_morning_check_module()
+
+    r_go_a = _make_result(module, "600000.SH", "GO", 10.10, 0.50)
+    r_go_b = _make_result(module, "601020.SH", "GO", 28.30, 0.71)
+    r_cancel_a = _make_result(module, "600000.SH", "CANCEL", 11.65, 3.40)
+
+    sig_go = module._compute_verdict_signature([r_go_a, r_go_b])
+    sig_go_reordered = module._compute_verdict_signature([r_go_b, r_go_a])
+    sig_cancel = module._compute_verdict_signature([r_cancel_a, r_go_b])
+
+    assert sig_go == sig_go_reordered
+    assert sig_go != sig_cancel
+
+
+def test_should_send_final_no_marker_sends(tmp_path):
+    module = load_morning_check_module()
+    marker = tmp_path / ".morning_alert_sent"
+
+    should_send, reason = module._should_send_final(marker, "2026-05-11", "abc")
+
+    assert should_send is True
+    assert "no prior marker" in reason
+
+
+def test_should_send_final_same_signature_skips(tmp_path):
+    module = load_morning_check_module()
+    marker = tmp_path / ".morning_alert_sent"
+    module._write_final_marker(
+        marker, today_str="2026-05-11", date_str="2026-05-08",
+        kind="final", signature="abc",
+    )
+
+    should_send, reason = module._should_send_final(marker, "2026-05-11", "abc")
+
+    assert should_send is False
+    assert "verdict unchanged" in reason
+
+
+def test_should_send_final_different_signature_resends(tmp_path):
+    module = load_morning_check_module()
+    marker = tmp_path / ".morning_alert_sent"
+    module._write_final_marker(
+        marker, today_str="2026-05-11", date_str="2026-05-08",
+        kind="final", signature="oldsig",
+    )
+
+    should_send, reason = module._should_send_final(marker, "2026-05-11", "newsig")
+
+    assert should_send is True
+    assert "verdict changed" in reason
+
+
+def test_should_send_final_legacy_marker_treated_as_sent(tmp_path):
+    """Legacy `sent=YYYY-MM-DD` markers carry no signature, so we cannot detect
+    a change. Treat them as already-sent for the recorded day."""
+    module = load_morning_check_module()
+    marker = tmp_path / ".morning_alert_sent"
+    marker.write_text("sent=2026-05-11\n", encoding="utf-8")
+
+    should_send, reason = module._should_send_final(marker, "2026-05-11", "anysig")
+
+    assert should_send is False
+    assert "legacy marker" in reason
+
+
+def test_should_send_final_legacy_marker_stale_day_sends(tmp_path):
+    """A legacy marker from a different calendar day should not block a send."""
+    module = load_morning_check_module()
+    marker = tmp_path / ".morning_alert_sent"
+    marker.write_text("sent=2026-05-10\n", encoding="utf-8")
+
+    should_send, reason = module._should_send_final(marker, "2026-05-11", "anysig")
+
+    assert should_send is True
+    assert "stale" in reason
 
 
 def test_send_open_pending_alert_writes_marker_and_sends_message(tmp_path, monkeypatch):

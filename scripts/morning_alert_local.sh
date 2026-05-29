@@ -50,14 +50,11 @@ fi
 TRADE_DATE=$(basename "${LATEST_WL}" | sed 's/execution_watchlist_//;s/\.json//')
 echo "Latest watchlist: ${LATEST_WL} (trade date: ${TRADE_DATE})"
 
-# Check shared dedup marker (written by morning_check.py from any runner)
+# The shared dedup marker is now verdict-aware. morning_check.py decides
+# whether to skip (same verdict) or re-send a corrected alert. Always run it
+# and let the script handle dedup; the marker file is still pushed below.
 MORNING_MARKER="outputs/${TRADE_DATE}/.morning_alert_sent"
-if [ -f "${MORNING_MARKER}" ]; then
-    echo "Morning alert already sent for ${TRADE_DATE} (marker exists). Skipping."
-    exit 0
-fi
-
-echo "No marker found — running morning check locally."
+echo "Running morning check locally (marker dedup handled inside script)."
 ${PYTHON} scripts/morning_check.py --date "${TRADE_DATE}"
 
 # Push the marker so a late CI run sees it and skips

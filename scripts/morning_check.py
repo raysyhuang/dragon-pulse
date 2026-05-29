@@ -219,15 +219,35 @@ def run_preflight(
     return results
 
 
+def _shanghai_now() -> datetime:
+    """Current time in Asia/Shanghai. Module-level so tests can monkeypatch."""
+    from zoneinfo import ZoneInfo
+    return datetime.now(tz=ZoneInfo("Asia/Shanghai"))
+
+
 def fetch_open_prices(tickers: list[str]) -> dict[str, float]:
-    """Fetch real-time opening prices from AkShare (best effort)."""
-    prices = {}
+    """Fetch real-time opening prices from AkShare (best effort).
+
+    Before 09:25 Asia/Shanghai (auction close), return {} without calling
+    AkShare. The `今开` field can still hold the prior session's open
+    pre-market, which would produce false gap signals.
+    """
+    prices: dict[str, float] = {}
     code_map = {
         ticker.split(".")[0]: ticker
         for ticker in tickers
         if ticker and "." in ticker
     }
     if not code_map:
+        return prices
+
+    now_sh = _shanghai_now()
+    gate = now_sh.replace(hour=9, minute=25, second=0, microsecond=0)
+    if now_sh < gate:
+        logger.info(
+            "Skipping live open fetch: %s Shanghai is before 09:25 auction close.",
+            now_sh.strftime("%H:%M:%S"),
+        )
         return prices
 
     try:
@@ -254,16 +274,107 @@ def fetch_open_prices(tickers: list[str]) -> dict[str, float]:
     return prices
 
 
-def _marker_is_for_today(marker: Path, today_str: str) -> bool:
-    """Check if a dedup marker was written for today's session."""
+def _read_marker(marker: Path) -> dict | None:
+    """Parse a dedup marker into a dict, or None if missing/unreadable.
+
+    Returns a dict like ``{"sent": ..., "signature": ..., "kind": ...,
+    "date": ..., "legacy": bool}``. Legacy text markers (`sent=YYYY-MM-DD`)
+    parse to ``{"sent": "<date>", "legacy": True}``.
+    """
     if not marker.exists():
-        return False
+        return None
     try:
         content = marker.read_text(encoding="utf-8").strip()
-        # Marker format: "sent=YYYY-MM-DD"
-        return content == f"sent={today_str}"
     except Exception:
+        return None
+    if not content:
+        return None
+    try:
+        data = json.loads(content)
+        if isinstance(data, dict) and "sent" in data:
+            return data
+    except json.JSONDecodeError:
+        pass
+    if content.startswith("sent="):
+        return {"sent": content.split("=", 1)[1].strip(), "legacy": True}
+    return None
+
+
+def _marker_is_for_today(marker: Path, today_str: str) -> bool:
+    """Check if a (pending) dedup marker was written for today's session.
+
+    Supports both the legacy `sent=YYYY-MM-DD` text and the new JSON form.
+    """
+    data = _read_marker(marker)
+    if data is None:
         return False
+    return data.get("sent") == today_str
+
+
+def _compute_verdict_signature(results: list[PreFlightResult]) -> str:
+    """Stable hash over (ticker, action, open_price, gap_pct) for each pick.
+
+    Used to detect when a later morning-check run produces a different
+    execution verdict (e.g., real opens replacing stale pre-market values).
+    """
+    import hashlib
+
+    items = sorted(
+        [
+            r.ticker,
+            r.action,
+            round(float(r.open_price or 0), 4),
+            round(float(r.gap_pct or 0), 2),
+        ]
+        for r in results
+    )
+    payload = json.dumps(items, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _should_send_final(
+    marker: Path,
+    today_str: str,
+    signature: str,
+) -> tuple[bool, str]:
+    """Decide whether to (re)send the final morning alert.
+
+    Returns (should_send, reason). The marker is verdict-aware: same signature
+    on the same calendar day → skip; different signature → send a corrected
+    alert. Legacy text markers cannot be compared and are treated as already
+    sent for today.
+    """
+    data = _read_marker(marker)
+    if data is None:
+        return True, "no prior marker"
+    if data.get("sent") != today_str:
+        return True, f"marker from {data.get('sent')!r} is stale"
+    if data.get("legacy"):
+        return False, "legacy marker present (no signature to compare)"
+    prior = data.get("signature")
+    if prior == signature:
+        return False, "verdict unchanged"
+    return True, f"verdict changed (prior {prior!r})"
+
+
+def _write_final_marker(
+    marker: Path,
+    *,
+    today_str: str,
+    date_str: str,
+    kind: str,
+    signature: str,
+) -> None:
+    payload = {
+        "sent": today_str,
+        "date": date_str,
+        "kind": kind,
+        "signature": signature,
+    }
+    marker.write_text(
+        json.dumps(payload, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
 
 
 def send_open_pending_alert(
@@ -445,8 +556,10 @@ def main():
     if not picks:
         logger.info("No picks to validate.")
         # Still send a compact Telegram message for zero-picks days
-        if _marker_is_for_today(morning_marker, today_str):
-            logger.info(f"Morning alert already sent for {today_str} (marker: {morning_marker}). Skipping.")
+        no_picks_signature = "no_picks"
+        should_send, reason = _should_send_final(morning_marker, today_str, no_picks_signature)
+        if not should_send:
+            logger.info(f"Morning alert already sent for {today_str} ({reason}). Skipping.")
             return 0
 
         # Check scan health to distinguish "quiet market" from "broken scan"
@@ -517,7 +630,13 @@ def main():
                     data={"asof": date_str},
                     priority=priority,
                 )
-                morning_marker.write_text(f"sent={today_str}\n", encoding="utf-8")
+                _write_final_marker(
+                    morning_marker,
+                    today_str=today_str,
+                    date_str=date_str,
+                    kind="no_picks",
+                    signature=no_picks_signature,
+                )
                 logger.info("No-picks morning alert sent to Telegram (health=%s)", scan_health)
         except Exception as e:
             logger.warning(f"Failed to send no-picks alert: {e}")
@@ -599,9 +718,13 @@ def main():
     check_file.write_text(json.dumps(check_output, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info(f"Saved execution check to {check_file}")
 
-    # Send combined Telegram alert (watchlist details + execution verdicts)
-    if _marker_is_for_today(morning_marker, today_str):
-        logger.info(f"Morning alert already sent for {today_str} (marker: {morning_marker}). Skipping Telegram.")
+    # Send combined Telegram alert (watchlist details + execution verdicts).
+    # Verdict-aware dedup: if a later run produces a different (ticker, action,
+    # open, gap) signature than the marker, re-send a corrected alert.
+    verdict_signature = _compute_verdict_signature(results)
+    should_send, reason = _should_send_final(morning_marker, today_str, verdict_signature)
+    if not should_send:
+        logger.info(f"Morning alert already sent for {today_str} ({reason}). Skipping Telegram.")
         return 0
     try:
         from src.core.alerts import AlertConfig, AlertManager, _ticker_display, _regime_emoji, _regime_cn, _translate_reason_summary
@@ -683,9 +806,15 @@ def main():
                 data={"asof": date_str},
                 priority="high" if go_picks else "low",
             )
-            morning_marker.write_text(f"sent={today_str}\n", encoding="utf-8")
+            _write_final_marker(
+                morning_marker,
+                today_str=today_str,
+                date_str=date_str,
+                kind="final",
+                signature=verdict_signature,
+            )
             pending_marker.unlink(missing_ok=True)
-            logger.info("Combined morning alert sent to Telegram")
+            logger.info("Combined morning alert sent to Telegram (sig=%s)", verdict_signature[:8])
     except Exception as e:
         logger.warning(f"Failed to send morning alert: {e}")
 
