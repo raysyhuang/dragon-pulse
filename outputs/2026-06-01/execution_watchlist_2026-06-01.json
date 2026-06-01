@@ -1,0 +1,49 @@
+{
+  "date": "2026-06-01",
+  "regime": "bull",
+  "universe_size": 996,
+  "picks": [
+    {
+      "ticker": "688146.SH",
+      "name_cn": "中船特气",
+      "engine": "alpha_rs_pullback",
+      "score": 98.45,
+      "entry_price": 174.66,
+      "max_entry_price": 178.15,
+      "stop_loss": 156.79,
+      "target_1": 208.77,
+      "target_2": 233.14,
+      "holding_period": 5,
+      "adv_cny": 2641789651.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=98",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.16301369863012,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "300502.SZ",
+      "name_cn": "新易盛",
+      "engine": "alpha_rs_pullback",
+      "score": 96.98,
+      "entry_price": 706.45,
+      "max_entry_price": 720.58,
+      "stop_loss": 661.19,
+      "target_1": 792.86,
+      "target_2": 854.57,
+      "holding_period": 5,
+      "adv_cny": 23525507578.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=93",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 93.26885243668164,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ]
+}
