@@ -1,0 +1,74 @@
+{
+  "date": "2026-06-04",
+  "generated_utc": "2026-06-04T00:24:37.096764",
+  "regime": "bull",
+  "regime_detail": {
+    "csi300_last": 4938.81,
+    "csi300_sma_short": 4894.59,
+    "csi300_sma_long": 4737.97,
+    "market_breadth_pct_above_sma20": 0.3246,
+    "day_quality_score": 58.8,
+    "day_quality_components": {
+      "breadth": 2.0,
+      "regime": 20.0,
+      "signal_density": 6.7,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 10,
+    "acceptance_rejected_count": 8
+  },
+  "universe_size": 996,
+  "downloaded": 996,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 26,
+  "picks": [
+    {
+      "ticker": "688700.SH",
+      "name_cn": "东威科技",
+      "engine": "alpha_rs_pullback",
+      "score": 98.43,
+      "entry_price": 87.0,
+      "max_entry_price": 88.74,
+      "stop_loss": 79.21,
+      "target_1": 101.88,
+      "target_2": 112.5,
+      "holding_period": 5,
+      "adv_cny": 1333398956.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=98",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.11226725082146,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "600667.SH",
+      "name_cn": "太极实业",
+      "engine": "alpha_rs_pullback",
+      "score": 97.02,
+      "entry_price": 14.87,
+      "max_entry_price": 15.17,
+      "stop_loss": 13.71,
+      "target_1": 17.09,
+      "target_2": 18.67,
+      "holding_period": 5,
+      "adv_cny": 3865063934.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=98",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.38461538461533,
+        "trend": 100.0,
+        "volume": 75.0
+      }
+    }
+  ],
+  "errors": []
+}

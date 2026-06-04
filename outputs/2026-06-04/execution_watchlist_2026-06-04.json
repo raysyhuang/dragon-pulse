@@ -1,0 +1,49 @@
+{
+  "date": "2026-06-04",
+  "regime": "bull",
+  "universe_size": 996,
+  "picks": [
+    {
+      "ticker": "688700.SH",
+      "name_cn": "东威科技",
+      "engine": "alpha_rs_pullback",
+      "score": 98.43,
+      "entry_price": 87.0,
+      "max_entry_price": 88.74,
+      "stop_loss": 79.21,
+      "target_1": 101.88,
+      "target_2": 112.5,
+      "holding_period": 5,
+      "adv_cny": 1333398956.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=98",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.11226725082146,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "600667.SH",
+      "name_cn": "太极实业",
+      "engine": "alpha_rs_pullback",
+      "score": 97.02,
+      "entry_price": 14.87,
+      "max_entry_price": 15.17,
+      "stop_loss": 13.71,
+      "target_1": 17.09,
+      "target_2": 18.67,
+      "holding_period": 5,
+      "adv_cny": 3865063934.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=98",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.38461538461533,
+        "trend": 100.0,
+        "volume": 75.0
+      }
+    }
+  ]
+}
