@@ -1,0 +1,49 @@
+{
+  "date": "2026-06-05",
+  "regime": "bull",
+  "universe_size": 996,
+  "picks": [
+    {
+      "ticker": "300835.SZ",
+      "name_cn": "龙磁科技",
+      "engine": "alpha_rs_pullback",
+      "score": 98.12,
+      "entry_price": 187.49,
+      "max_entry_price": 191.24,
+      "stop_loss": 170.41,
+      "target_1": 220.1,
+      "target_2": 243.39,
+      "holding_period": 5,
+      "adv_cny": 1000857166.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=97",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 97.05329949238583,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "300502.SZ",
+      "name_cn": "新易盛",
+      "engine": "alpha_rs_pullback",
+      "score": 97.9,
+      "entry_price": 775.94,
+      "max_entry_price": 791.46,
+      "stop_loss": 729.76,
+      "target_1": 864.11,
+      "target_2": 927.09,
+      "holding_period": 5,
+      "adv_cny": 24494510406.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=96",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 96.337152871394,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ]
+}
