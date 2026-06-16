@@ -1,0 +1,49 @@
+{
+  "date": "2026-06-16",
+  "regime": "bull",
+  "universe_size": 996,
+  "picks": [
+    {
+      "ticker": "002371.SZ",
+      "name_cn": "北方华创",
+      "engine": "alpha_rs_pullback",
+      "score": 96.42,
+      "entry_price": 682.22,
+      "max_entry_price": 695.86,
+      "stop_loss": 646.84,
+      "target_1": 749.76,
+      "target_2": 798.0,
+      "holding_period": 5,
+      "adv_cny": 9044438735.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=91",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 91.38414634146342,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "002422.SZ",
+      "name_cn": "科伦药业",
+      "engine": "alpha_rs_pullback",
+      "score": 96.28,
+      "entry_price": 36.49,
+      "max_entry_price": 37.22,
+      "stop_loss": 34.67,
+      "target_1": 39.96,
+      "target_2": 42.44,
+      "holding_period": 5,
+      "adv_cny": 729028639.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, pull_quality=99, trend=91",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.63953488372096,
+        "trend": 90.7437835783537,
+        "volume": 90.0
+      }
+    }
+  ]
+}
