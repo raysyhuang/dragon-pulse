@@ -138,6 +138,11 @@ def evaluate_pick(
     atr: float = 0.0,
     max_entry_price: float | None = None,
     entry_mode: str = "signal",
+    runner_max_hold: int = 10,
+    trail_atr: float = 1.5,
+    breakeven_at: float = 3.0,
+    laggard_day: int = 2,
+    laggard_thresh: float = 0.0,
 ) -> dict:
     """Evaluate a single pick against forward price data.
 
@@ -155,7 +160,12 @@ def evaluate_pick(
         target_stop     — original: exit on target or stop hit, hold_expired at end
         profitable_close — exit on close > entry after day 2+ (captures MR drift)
         trailing         — once P&L > 1×ATR intraday, move stop to breakeven
+        runner          — full position; ignore fixed target; once close >= entry*(1+breakeven_at%)
+                          engage breakeven + trail at trail_atr×ATR; time-exit at runner_max_hold.
+                          Captures trend the fixed 3-day/target exit leaves on the table.
+        runner_laggard  — runner + cut early if flat/red at the laggard_day close.
     """
+    runner_modes = {"runner", "runner_laggard"}
     requested_entry_price = float(entry_price)
     result = {
         "ticker": ticker,
@@ -186,7 +196,8 @@ def evaluate_pick(
     open_col = "Open" if "Open" in forward_df.columns else "open"
 
     # T+1: skip day 0 (signal day), enter/evaluate from day 1.
-    bars = forward_df.iloc[1:holding_period + 1] if len(forward_df) > 1 else pd.DataFrame()
+    eff_hold = runner_max_hold if exit_mode in runner_modes else holding_period
+    bars = forward_df.iloc[1:eff_hold + 1] if len(forward_df) > 1 else pd.DataFrame()
 
     if bars.empty:
         result["entry_status"] = "no_data"
@@ -220,6 +231,49 @@ def evaluate_pick(
     result["entry_price"] = entry_price
     result["actual_entry_price"] = entry_price
     result["entry_status"] = "filled"
+
+    # ---- Runner / runner_laggard: let winners run on an ATR trailing stop. ----
+    if exit_mode in runner_modes:
+        eff_atr = atr if atr and atr > 0 else abs(entry_price - stop_loss)
+        effective_stop = stop_loss
+        engaged = False
+        highest_close = entry_price
+        for day_idx, (dt, row) in enumerate(bars.iterrows(), start=1):
+            high = float(row[high_col])
+            low = float(row[low_col])
+            close = float(row[close_col])
+
+            # Conservative intrabar order: stop (Low) before any upside.
+            if low <= effective_stop:
+                result["exit_price"] = effective_stop
+                result["exit_day"] = day_idx
+                result["exit_reason"] = "trail_stop" if engaged else "stop_hit"
+                result["hit_stop"] = True
+                break
+
+            # Laggard cut: flat/red at the cut bar's close -> abandon early.
+            if (exit_mode == "runner_laggard" and day_idx == laggard_day
+                    and close <= entry_price * (1 + laggard_thresh / 100.0)):
+                result["exit_price"] = close
+                result["exit_day"] = day_idx
+                result["exit_reason"] = "laggard_cut"
+                break
+
+            highest_close = max(highest_close, close)
+            if not engaged and close >= entry_price * (1 + breakeven_at / 100.0):
+                engaged = True
+            if engaged and eff_atr > 0:
+                effective_stop = max(effective_stop, entry_price,
+                                     highest_close - trail_atr * eff_atr)
+        else:
+            last_close = float(bars.iloc[-1][close_col])
+            result["exit_price"] = last_close
+            result["exit_day"] = len(bars)
+            result["exit_reason"] = "hold_expired_runner" if engaged else "hold_expired"
+
+        if result["exit_price"] is not None and entry_price > 0:
+            result["pnl_pct"] = round((result["exit_price"] / entry_price - 1) * 100, 2)
+        return result
 
     # Trailing stop state: once high exceeds entry + 1×ATR, stop moves to breakeven
     effective_stop = stop_loss
@@ -290,6 +344,25 @@ def _slice_from(df: pd.DataFrame, scan_date: date) -> pd.DataFrame:
         mask = pd.to_datetime(idx).date >= scan_date
     return df.loc[mask]
 
+def _atr14_up_to(df: pd.DataFrame, scan_date: date, period: int = 14) -> float:
+    """ATR(period) using bars up to and including scan_date. 0.0 if insufficient."""
+    if df is None or df.empty:
+        return 0.0
+    hist = _slice_up_to(df, scan_date)
+    if len(hist) < period + 1:
+        return 0.0
+    h = "High" if "High" in hist.columns else "high"
+    l = "Low" if "Low" in hist.columns else "low"
+    c = "Close" if "Close" in hist.columns else "close"
+    high = pd.to_numeric(hist[h], errors="coerce")
+    low = pd.to_numeric(hist[l], errors="coerce")
+    close = pd.to_numeric(hist[c], errors="coerce")
+    prev = close.shift(1)
+    tr = pd.concat([(high - low), (high - prev).abs(), (low - prev).abs()], axis=1).max(axis=1)
+    atr = tr.rolling(period).mean().iloc[-1]
+    return float(atr) if pd.notna(atr) else 0.0
+
+
 def main():
     parser = argparse.ArgumentParser(description="Dragon Pulse Backtest (bulk download)")
     parser.add_argument("--start", default="2025-03-14", help="Start date YYYY-MM-DD")
@@ -300,8 +373,23 @@ def main():
     parser.add_argument("--label", default="", help="Label suffix for output files")
     parser.add_argument("--top-n", type=int, default=5, help="Top N picks per day")
     parser.add_argument("--exit-mode", default="target_stop",
-                        choices=["target_stop", "profitable_close", "trailing"],
-                        help="Exit strategy: target_stop (default), profitable_close, trailing")
+                        choices=["target_stop", "profitable_close", "trailing",
+                                 "runner", "runner_laggard"],
+                        help="Exit strategy: target_stop (default), profitable_close, "
+                             "trailing, runner, runner_laggard")
+    parser.add_argument("--runner-max-hold", type=int, default=10,
+                        help="Max hold (trading days) for runner exit modes")
+    parser.add_argument("--trail-atr", type=float, default=1.5,
+                        help="Trailing-stop distance in ATR for runner modes")
+    parser.add_argument("--breakeven-at", type=float, default=3.0,
+                        help="Close pct gain that engages breakeven+trail (runner modes)")
+    parser.add_argument("--laggard-day", type=int, default=2,
+                        help="Bar index whose close decides the laggard cut (runner_laggard)")
+    parser.add_argument("--laggard-thresh", type=float, default=0.0,
+                        help="Cut if return-to-close <= this pct at laggard-day")
+    parser.add_argument("--dump-picks", default="",
+                        help="If set, write the pinned pick set (pre-exit) to this CSV "
+                             "for reproducible exit-logic replay.")
     parser.add_argument("--entry-mode", default="no_chase_next_open",
                         choices=["signal", "no_chase_next_open", "limit_touch"],
                         help="Entry replay: signal=legacy signal-price fill; no_chase_next_open=next-open no-chase; limit_touch=MAS-like DAY limit touch")
@@ -495,6 +583,7 @@ def main():
     # --- Iterate trading days ---
     all_results = []
     day_summaries = []
+    dumped_picks = []  # pinned pick set for reproducible exit-logic replay
     t_start = time.time()
 
     # Engine filter (computed once). Mirrors live scanner config gates.
@@ -778,6 +867,20 @@ def main():
         # Evaluate picks using forward data from the cached bulk download
         wins = losses = holds = no_data = 0
         for engine, sig in final_picks:
+            if args.dump_picks:
+                dumped_picks.append({
+                    "baseline_date": date_str,
+                    "regime": regime,
+                    "engine": engine,
+                    "ticker": sig.ticker,
+                    "name_cn": getattr(sig, "name_cn", None) or getattr(sig, "name", None),
+                    "score": getattr(sig, "score", None),
+                    "planned_entry_price": getattr(sig, "entry_price", None),
+                    "max_entry_price": getattr(sig, "max_entry_price", None),
+                    "stop_loss": getattr(sig, "stop_loss", None),
+                    "target_1": getattr(sig, "target_1", None),
+                    "holding_period": getattr(sig, "holding_period", None),
+                })
             fwd_df = _slice_from(data_map.get(sig.ticker, pd.DataFrame()), scan_date)
 
             # Determine exit mode: trailing for sniper unless disabled
@@ -789,6 +892,11 @@ def main():
                 # Estimate ATR from stop distance / multiplier
                 pick_atr = abs(sig.entry_price - sig.stop_loss) / float(
                     sniper_config.get("stop_atr_mult", 2.0))
+            elif args.exit_mode in ("runner", "runner_laggard"):
+                # True ATR(14) from history up to scan_date; fall back to stop distance.
+                pick_atr = _atr14_up_to(data_map.get(sig.ticker, pd.DataFrame()), scan_date)
+                if pick_atr <= 0:
+                    pick_atr = abs(sig.entry_price - sig.stop_loss)
 
             eval_result = evaluate_pick(
                 ticker=sig.ticker,
@@ -802,6 +910,11 @@ def main():
                 atr=pick_atr,
                 max_entry_price=getattr(sig, "max_entry_price", None),
                 entry_mode=args.entry_mode,
+                runner_max_hold=args.runner_max_hold,
+                trail_atr=args.trail_atr,
+                breakeven_at=args.breakeven_at,
+                laggard_day=args.laggard_day,
+                laggard_thresh=args.laggard_thresh,
             )
             eval_result["date"] = date_str
             eval_result["engine"] = engine
@@ -1076,6 +1189,10 @@ def main():
     daily_path = out_dir / f"backtest_daily{suffix}.csv"
     pd.DataFrame(day_summaries).to_csv(daily_path, index=False)
     logger.info("Daily: %s", daily_path)
+
+    if args.dump_picks:
+        pd.DataFrame(dumped_picks).to_csv(args.dump_picks, index=False)
+        logger.info("Pinned picks (%d): %s", len(dumped_picks), args.dump_picks)
 
     return 0
 

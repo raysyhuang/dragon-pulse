@@ -1,0 +1,121 @@
+name: Exit Logic Validation
+
+# Validates alternative exit logic (runner / runner_laggard / scaleout) against the
+# production fixed target/stop exit, over multi-year history, on a PINNED pick set
+# (scanned once -> reproducible; differences are attributable to the exit logic alone).
+
+on:
+  workflow_dispatch:
+    inputs:
+      engines:
+        description: "Engine to validate (live model = alpha)"
+        required: false
+        default: "alpha"
+      dump_start:
+        description: "Pinned-pick scan start (YYYY-MM-DD)"
+        required: false
+        default: "2021-03-14"
+      dump_end:
+        description: "Pinned-pick scan end (YYYY-MM-DD)"
+        required: false
+        default: "2026-03-13"
+      windows:
+        description: "Replay windows: name:start:end (space-separated)"
+        required: false
+        default: "5y:2021-03-14:2026-03-13 3y:2023-03-14:2026-03-13 1y:2025-03-14:2026-03-13"
+      position_pct:
+        description: "Per-position allocation %"
+        required: false
+        default: "20"
+
+env:
+  PYTHON_VERSION: "3.11"
+  PYTHONUNBUFFERED: "1"
+  PYTHONPATH: "."
+
+concurrency:
+  group: exit-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Exit Logic Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Dump pinned pick set (scan once)
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          mkdir -p outputs/backtest
+          python scripts/backtest_1yr.py \
+            --start "${{ inputs.dump_start }}" --end "${{ inputs.dump_end }}" \
+            --config config/default.yaml \
+            --acceptance-mode live_equivalent \
+            --engines "${{ inputs.engines }}" \
+            --exit-mode target_stop \
+            --dump-picks outputs/backtest/pinned.csv \
+            --label exitval_pin \
+            2>&1 | tee outputs/backtest/exitval_dump.log
+
+      - name: Validate exits (fixed vs runner vs runner_laggard vs scaleout)
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python scripts/exit_validation.py \
+            --picks-csv outputs/backtest/pinned.csv \
+            --windows ${{ inputs.windows }} \
+            --modes fixed runner runner_laggard scaleout \
+            --position-pct ${{ inputs.position_pct }} --max-concurrent 5 \
+            --out-dir outputs/backtest/exit_validation_main \
+            2>&1 | tee outputs/backtest/exitval_main.log
+
+      - name: Runner parameter sweep (wider trail / later breakeven)
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          set -e
+          sweep() {
+            local tag=$1 trail=$2 be=$3 hold=$4
+            echo "=== runner sweep ${tag}: trail=${trail} breakeven=${be} hold=${hold} ==="
+            python scripts/exit_validation.py \
+              --picks-csv outputs/backtest/pinned.csv \
+              --windows ${{ inputs.windows }} \
+              --modes runner runner_laggard \
+              --trail-atr "$trail" --breakeven-at "$be" --runner-max-hold "$hold" \
+              --position-pct ${{ inputs.position_pct }} --max-concurrent 5 \
+              --out-dir "outputs/backtest/exit_validation_${tag}"
+          }
+          sweep wide   2.5 5  15 2>&1 | tee outputs/backtest/exitval_sweep_wide.log
+          sweep wider  3.0 8  20 2>&1 | tee outputs/backtest/exitval_sweep_wider.log
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: exit-validation-${{ github.run_number }}
+          path: |
+            outputs/backtest/pinned.csv
+            outputs/backtest/exit_validation_*/exit_validation_summary.csv
+            outputs/backtest/exitval_*.log
+          retention-days: 14
