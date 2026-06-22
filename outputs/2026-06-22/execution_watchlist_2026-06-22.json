@@ -1,0 +1,49 @@
+{
+  "date": "2026-06-22",
+  "regime": "bull",
+  "universe_size": 997,
+  "picks": [
+    {
+      "ticker": "301377.SZ",
+      "name_cn": "鼎泰高科",
+      "engine": "alpha_rs_pullback",
+      "score": 98.96,
+      "entry_price": 600.0,
+      "max_entry_price": 612.0,
+      "stop_loss": 549.73,
+      "target_1": 695.97,
+      "target_2": 764.51,
+      "holding_period": 5,
+      "adv_cny": 2637088785.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=100",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.8737782164347,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "600601.SH",
+      "name_cn": "方正科技",
+      "engine": "alpha_rs_pullback",
+      "score": 98.85,
+      "entry_price": 14.4,
+      "max_entry_price": 14.69,
+      "stop_loss": 13.48,
+      "target_1": 16.16,
+      "target_2": 17.41,
+      "holding_period": 5,
+      "adv_cny": 3686987526.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=100",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.51327140013271,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ]
+}
