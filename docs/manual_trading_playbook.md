@@ -6,9 +6,20 @@ both alternative exits (ATR runner) and relaxed entries (chase band) were tested
 5 years and **rejected**; they only beat this config in the recent bull and lost over
 the full cycle including the 2021–22 bear.
 
-> ⚠️ **Backtest caveat:** the validation universe uses *current* top-1000 market cap
-> applied to history (survivorship/look-ahead bias). Real-world returns and drawdowns
-> will be **worse** than the backtest figures below. Size conservatively at first.
+> ⚠️ **Survivorship bias is large — measured 2026-06-23.** The validation universe uses
+> *current* top-1000 market cap applied to history. 19% of backtest picks were not in the
+> top-1000 as of their own date. Removing them cuts 5Y return **+65% → +24%** (Sharpe
+> 0.82 → 0.42, DD 19% → 25%). **Use the survivorship-clean numbers as the realistic
+> expectation, and treat even those as an optimistic upper bound:**
+>
+> | Window | Clean return | Clean ann. | Sharpe | Max DD |
+> |--------|-------------|-----------|--------|--------|
+> | 5Y (incl. bear) | +24% | ~4.7%/yr | 0.42 | 25% |
+> | 3Y | +26% | ~8.6%/yr | 0.65 | 24% |
+> | 1Y (recent bull) | +54% | ~59%/yr | 2.13 | 13% |
+>
+> The edge is real but **thin outside bull markets** and the recent strong 1Y flatters it.
+> This is consistent with the soft live Apr–Jun 2026 result. Size conservatively.
 
 ---
 
