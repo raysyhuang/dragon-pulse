@@ -32,7 +32,11 @@ load_dotenv(project_root / ".env")
 
 from src.core.config import load_config, get_config_value
 from src.core.data import get_data_functions
-from src.core.universe import get_top_n_cn_by_market_cap
+from src.core.universe import (
+    get_top_n_cn_by_market_cap,
+    build_pit_universe_schedule,
+    active_pit_universe,
+)
 from src.features.technical import (
     compute_all_technical_features,
     compute_rsi2_features,
@@ -407,6 +411,14 @@ def main():
     parser.add_argument("--universe-source", default="market_cap",
                         choices=["market_cap", "watchlist"],
                         help="Universe source: market_cap (default) or tickers seen in execution watchlists")
+    parser.add_argument("--universe-mode", default="static",
+                        choices=["static", "point_in_time"],
+                        help="static = current top-N over all history (survivorship-biased); "
+                             "point_in_time = top-N by market cap as of each rebalance (unbiased)")
+    parser.add_argument("--universe-n", type=int, default=1000,
+                        help="Universe size (top-N by market cap)")
+    parser.add_argument("--universe-rebalance-months", type=int, default=1,
+                        help="Point-in-time universe rebalance cadence in months")
     parser.add_argument("--outputs-root", default="outputs",
                         help="Outputs root used when universe-source=watchlist")
     parser.add_argument("--allowed-regimes", default="",
@@ -458,6 +470,7 @@ def main():
     _, download_daily_range_fn, provider_config, _ = get_data_functions(config)
 
     # Build universe once
+    pit_schedule = None  # set when universe_mode == point_in_time
     if args.universe_source == "watchlist":
         logger.info(
             "Building universe from execution watchlists in %s for %s to %s...",
@@ -479,9 +492,28 @@ def main():
             )
             return 1
         logger.info("Universe: %d tickers from execution watchlists", len(universe))
+    elif args.universe_mode == "point_in_time":
+        logger.info(
+            "Building POINT-IN-TIME universe: top %d by market cap, rebalanced every %d month(s)...",
+            args.universe_n, args.universe_rebalance_months,
+        )
+        pit_schedule = build_pit_universe_schedule(
+            start_date, end_date, n=args.universe_n,
+            rebalance_months=args.universe_rebalance_months,
+            provider_config=provider_config,
+        )
+        if not pit_schedule:
+            logger.error("Point-in-time universe build returned no members.")
+            return 1
+        union = sorted({t for _, members in pit_schedule for t in members})
+        universe = union
+        logger.info(
+            "Point-in-time universe: %d rebalances, %d unique tickers (union)",
+            len(pit_schedule), len(universe),
+        )
     else:
-        logger.info("Building universe: top 1000 A-shares by market cap...")
-        universe = get_top_n_cn_by_market_cap(n=1000, provider_config=provider_config)
+        logger.info("Building universe: top %d A-shares by market cap (static/current)...", args.universe_n)
+        universe = get_top_n_cn_by_market_cap(n=args.universe_n, provider_config=provider_config)
         logger.info("Universe: %d tickers", len(universe))
 
     # Download date range: lookback before start through end + max holding buffer
@@ -630,10 +662,15 @@ def main():
                             i + 1, len(trading_days), date_str, regime, rate, eta / 60)
             continue
 
+        # Point-in-time universe gate: restrict to members as of this scan day.
+        pit_members = active_pit_universe(pit_schedule, scan_date) if pit_schedule else None
+
         # Score all tickers using precomputed features up to scan_date
         all_signals = []
         for ticker, feat_df in feat_map.items():
             try:
+                if pit_members is not None and ticker not in pit_members:
+                    continue
                 pos = date_pos_map[ticker].get(scan_date)
                 if pos is None:
                     # Find nearest date <= scan_date

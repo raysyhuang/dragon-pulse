@@ -543,3 +543,108 @@ def get_top_n_cn_by_market_cap(
         "Cannot build market-cap-ranked universe: "
         "Tushare daily_basic returned no market-cap data."
     )
+
+
+def _tushare_pro(provider_config: dict | None = None):
+    cfg = provider_config or {}
+    token = cfg.get("tushare_token") or os.environ.get(
+        cfg.get("tushare_token_env", "TUSHARE_TOKEN"), ""
+    )
+    if not token:
+        raise RuntimeError("TUSHARE_TOKEN not set; required for point-in-time universe.")
+    import tushare as ts  # pyright: ignore[reportMissingModuleSource]
+    return ts.pro_api(token=token)
+
+
+def get_top_n_cn_by_market_cap_asof(
+    trade_date,
+    n: int = 1000,
+    provider_config: dict | None = None,
+    _pro=None,
+) -> list[str]:
+    """Top-*n* A-share tickers by total market cap AS OF ``trade_date``.
+
+    Uses Tushare ``daily_basic`` for the given (or nearest prior) trading day, so the
+    ranking reflects what was actually large-cap then — eliminating survivorship/
+    look-ahead bias from using today's universe over historical windows.
+
+    ``trade_date`` accepts ``YYYYMMDD``/``YYYY-MM-DD`` strings or a date/datetime.
+    """
+    from datetime import datetime, date as _date, timedelta
+
+    if isinstance(trade_date, (_date, datetime)):
+        base = datetime(trade_date.year, trade_date.month, trade_date.day)
+    else:
+        s = str(trade_date).replace("-", "")
+        base = datetime.strptime(s, "%Y%m%d")
+
+    pro = _pro or _tushare_pro(provider_config)
+    for off in range(8):  # step back to the nearest trading day with data
+        d = (base - timedelta(days=off)).strftime("%Y%m%d")
+        df = pro.daily_basic(trade_date=d, fields="ts_code,total_mv")
+        if df is not None and not df.empty:
+            df = df.dropna(subset=["total_mv"]).sort_values("total_mv", ascending=False)
+            return df["ts_code"].astype(str).str.upper().head(n).tolist()
+    return []
+
+
+def build_pit_universe_schedule(
+    start_date,
+    end_date,
+    n: int = 1000,
+    rebalance_months: int = 1,
+    provider_config: dict | None = None,
+) -> list[tuple]:
+    """Build a point-in-time universe rebalanced every ``rebalance_months``.
+
+    Returns a list of ``(rebalance_date: date, members: set[str])`` sorted ascending.
+    The union of all members is the set of tickers that were ever in the top-*n* over
+    the window — use it for the bulk download; gate each scan day by the most recent
+    rebalance <= that day.
+    """
+    from datetime import datetime, date as _date, timedelta
+
+    def _to_d(x):
+        if isinstance(x, _date) and not isinstance(x, datetime):
+            return x
+        return datetime.strptime(str(x).replace("-", "")[:8], "%Y%m%d").date()
+
+    start, end = _to_d(start_date), _to_d(end_date)
+    pro = _tushare_pro(provider_config)
+
+    # Rebalance anchors: month-by-month (15th, a reliable trading window) from start.
+    anchors: list[_date] = []
+    y, m = start.year, start.month
+    while _date(y, m, 15) <= end + timedelta(days=31):
+        anchors.append(_date(y, m, 15))
+        m += rebalance_months
+        while m > 12:
+            m -= 12
+            y += 1
+
+    schedule: list[tuple] = []
+    for anchor in anchors:
+        members = set(get_top_n_cn_by_market_cap_asof(anchor, n=n, _pro=pro))
+        if members:
+            schedule.append((anchor, members))
+        time.sleep(0.25)  # be gentle on Tushare rate limits
+    return schedule
+
+
+def active_pit_universe(schedule: list[tuple], scan_date) -> set:
+    """Members of the most recent rebalance <= scan_date (set; empty if none)."""
+    from datetime import datetime, date as _date
+
+    def _to_d(x):
+        if isinstance(x, _date) and not isinstance(x, datetime):
+            return x
+        return datetime.strptime(str(x).replace("-", "")[:8], "%Y%m%d").date()
+
+    sd = _to_d(scan_date)
+    active: set = set()
+    for rb_date, members in schedule:  # schedule is ascending
+        if rb_date <= sd:
+            active = members
+        else:
+            break
+    return active

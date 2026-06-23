@@ -1,0 +1,114 @@
+name: Point-in-Time Validation
+
+# Survivorship-bias-FREE validation: scans the alpha engine over history using a
+# point-in-time top-N universe (ranked by market cap as of each monthly rebalance),
+# dumps the pinned picks, then runs the fixed-exit portfolio sim across windows.
+# Compare against the static-universe (biased) numbers to see the true edge.
+
+on:
+  workflow_dispatch:
+    inputs:
+      engines:
+        description: "Engine (live model = alpha)"
+        required: false
+        default: "alpha"
+      dump_start:
+        description: "Scan start (YYYY-MM-DD)"
+        required: false
+        default: "2021-03-14"
+      dump_end:
+        description: "Scan end (YYYY-MM-DD)"
+        required: false
+        default: "2026-03-13"
+      universe_n:
+        description: "Universe size (top-N by market cap)"
+        required: false
+        default: "1000"
+      rebalance_months:
+        description: "Point-in-time rebalance cadence (months)"
+        required: false
+        default: "1"
+      windows:
+        description: "Replay windows name:start:end (space-separated)"
+        required: false
+        default: "5y:2021-03-14:2026-03-13 3y:2023-03-14:2026-03-13 1y:2025-03-14:2026-03-13"
+      position_pct:
+        description: "Per-position allocation %"
+        required: false
+        default: "20"
+
+env:
+  PYTHON_VERSION: "3.11"
+  PYTHONUNBUFFERED: "1"
+  PYTHONPATH: "."
+
+concurrency:
+  group: pit-validation-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Point-in-Time Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Dump pinned picks — POINT-IN-TIME universe
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          mkdir -p outputs/backtest
+          python scripts/backtest_1yr.py \
+            --start "${{ inputs.dump_start }}" --end "${{ inputs.dump_end }}" \
+            --config config/default.yaml \
+            --acceptance-mode live_equivalent \
+            --engines "${{ inputs.engines }}" \
+            --exit-mode target_stop \
+            --universe-mode point_in_time \
+            --universe-n "${{ inputs.universe_n }}" \
+            --universe-rebalance-months "${{ inputs.rebalance_months }}" \
+            --dump-picks outputs/backtest/pinned_pit.csv \
+            --label pit_dump \
+            2>&1 | tee outputs/backtest/pit_dump.log
+
+      - name: Fixed-exit performance on point-in-time picks
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python scripts/exit_validation.py \
+            --picks-csv outputs/backtest/pinned_pit.csv \
+            --windows ${{ inputs.windows }} \
+            --modes fixed \
+            --position-pct ${{ inputs.position_pct }} --max-concurrent 5 \
+            --out-dir outputs/backtest/pit_perf \
+            2>&1 | tee outputs/backtest/pit_perf.log
+
+      - name: Upload PIT validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pit-validation-${{ github.run_number }}
+          path: |
+            outputs/backtest/pinned_pit.csv
+            outputs/backtest/pit_perf/exit_validation_summary.csv
+            outputs/backtest/pit_*.log
+          retention-days: 14
