@@ -1,0 +1,49 @@
+{
+  "date": "2026-06-23",
+  "regime": "bull",
+  "universe_size": 998,
+  "picks": [
+    {
+      "ticker": "301200.SZ",
+      "name_cn": "大族数控",
+      "engine": "alpha_rs_pullback",
+      "score": 98.96,
+      "entry_price": 338.96,
+      "max_entry_price": 345.74,
+      "stop_loss": 315.46,
+      "target_1": 383.83,
+      "target_2": 415.88,
+      "holding_period": 5,
+      "adv_cny": 1709887313.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=100",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.85941857517106,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "688347.SH",
+      "name_cn": "华虹宏力",
+      "engine": "alpha_rs_pullback",
+      "score": 98.92,
+      "entry_price": 280.0,
+      "max_entry_price": 285.6,
+      "stop_loss": 255.53,
+      "target_1": 326.72,
+      "target_2": 360.09,
+      "holding_period": 5,
+      "adv_cny": 7560108328.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=100",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.72517911975446,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ]
+}

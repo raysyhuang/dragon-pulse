@@ -1,0 +1,74 @@
+{
+  "date": "2026-06-23",
+  "generated_utc": "2026-06-23T00:19:50.676125",
+  "regime": "bull",
+  "regime_detail": {
+    "csi300_last": 5059.66,
+    "csi300_sma_short": 4873.78,
+    "csi300_sma_long": 4825.73,
+    "market_breadth_pct_above_sma20": 0.5607,
+    "day_quality_score": 78.4,
+    "day_quality_components": {
+      "breadth": 21.7,
+      "regime": 20.0,
+      "signal_density": 6.7,
+      "top_score": 25.0,
+      "diversity": 5.0
+    },
+    "acceptance_mode": "full",
+    "acceptance_abstained": false,
+    "acceptance_eligible_count": 10,
+    "acceptance_rejected_count": 8
+  },
+  "universe_size": 998,
+  "downloaded": 998,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 57,
+  "picks": [
+    {
+      "ticker": "301200.SZ",
+      "name_cn": "大族数控",
+      "engine": "alpha_rs_pullback",
+      "score": 98.96,
+      "entry_price": 338.96,
+      "max_entry_price": 345.74,
+      "stop_loss": 315.46,
+      "target_1": 383.83,
+      "target_2": 415.88,
+      "holding_period": 5,
+      "adv_cny": 1709887313.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=100",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.85941857517106,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "688347.SH",
+      "name_cn": "华虹宏力",
+      "engine": "alpha_rs_pullback",
+      "score": 98.92,
+      "entry_price": 280.0,
+      "max_entry_price": 285.6,
+      "stop_loss": 255.53,
+      "target_1": 326.72,
+      "target_2": 360.09,
+      "holding_period": 5,
+      "adv_cny": 7560108328.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=100",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 99.72517911975446,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ],
+  "errors": []
+}
