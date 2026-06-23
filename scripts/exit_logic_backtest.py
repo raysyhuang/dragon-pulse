@@ -110,13 +110,32 @@ def simulate_pick(pick: dict, price_df: pd.DataFrame, p: argparse.Namespace) -> 
         out["status"] = "unsupported_schema"
         return out
 
-    # Same cancellation rules as the live engine.
-    if max_entry is not None and entry > max_entry:
-        out.update(status="cancelled", exit_reason="open_above_max_entry")
-        return out
+    # Gap below stop -> skip in every entry policy.
     if entry < stop0:
         out.update(status="cancelled", exit_reason="open_below_stop_loss")
         return out
+
+    # Entry policy (default 'nochase' preserves live behavior):
+    #   nochase     fill at T+1 open iff open <= max_entry, else skip
+    #   chase_band  fill at T+1 open iff open <= max_entry*(1+band%), else skip
+    #   limit_touch fill at open if <= max_entry; else fill at max_entry if T+1
+    #               low touches it (intraday pullback); else skip
+    entry_mode = getattr(p, "entry_mode", "nochase")
+    band = getattr(p, "chase_band", 0.0) / 100.0
+    if max_entry is not None:
+        if entry_mode == "limit_touch":
+            first_low = _f(fwd.iloc[0].get("Low"))
+            if entry <= max_entry:
+                pass
+            elif first_low is not None and first_low <= max_entry:
+                entry = max_entry
+            else:
+                out.update(status="cancelled", exit_reason="no_touch")
+                return out
+        else:  # nochase (band=0) or chase_band
+            if entry > max_entry * (1.0 + band):
+                out.update(status="cancelled", exit_reason="open_above_max_entry")
+                return out
 
     atr = _atr_at_entry(df, entry_ts, period=14)
     if atr is None:
