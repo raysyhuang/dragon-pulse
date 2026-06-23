@@ -32,9 +32,16 @@ ranked, deduped, sector-capped).
 - Trade **only in bull regime.** Zero new entries in choppy or bear. If the watchlist
   is empty, that's the system working — do nothing.
 
-**Selection:**
-- Take at most **2 picks per day** (engine cap), **max 1 per sector**.
-- Picks already require **score ≥ 90** and **ADV ≥ ¥80M**.
+**Selection (validated improvement — take ONE/day):**
+- Take the **single top-scored pick per day**, **max 1 per sector**. Picks already
+  require **score ≥ 90** and **ADV ≥ ¥80M**.
+- Selection sweep (2026-06-23, pinned 5Y): top-1/day by score beats top-2 on Sharpe in
+  every window (5Y 0.82→0.88, 3Y 1.16→1.22, 1Y 2.58→2.87) and cuts max drawdown ~20–55%
+  (1Y 16%→7%). The top pick is genuinely better than the 2nd. Mirrors MAS's "one-pick/day."
+- Rank by **score**, not by risk. A stop-risk filter (drop wide-stop names) was tested and
+  *hurt* (removes winners) — do not use it.
+- Trade-off: fewer trades → less total compounding, but the book is under-utilized at
+  top-1/day, so size up per position (below) to recover return at the better risk profile.
 
 **Entry — strict no-chase (validated as correct):**
 - Place a **buy limit at `max_entry_price`** (= signal entry × 1.02) for the T+1 session.
