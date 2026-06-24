@@ -12,14 +12,19 @@ the full cycle including the 2021–22 bear.
 > 0.82 → 0.42, DD 19% → 25%). **Use the survivorship-clean numbers as the realistic
 > expectation, and treat even those as an optimistic upper bound:**
 >
-> | Window | Clean return | Clean ann. | Sharpe | Max DD |
-> |--------|-------------|-----------|--------|--------|
-> | 5Y (incl. bear) | +24% | ~4.7%/yr | 0.42 | 25% |
-> | 3Y | +26% | ~8.6%/yr | 0.65 | 24% |
-> | 1Y (recent bull) | +54% | ~59%/yr | 2.13 | 13% |
+> **DEFINITIVE point-in-time numbers** (2026-06-23, scanner re-run on as-of-date top-1000
+> universe — the true unbiased edge; two methods agree). Use these as expectations:
 >
-> The edge is real but **thin outside bull markets** and the recent strong 1Y flatters it.
-> This is consistent with the soft live Apr–Jun 2026 result. Size conservatively.
+> | Window | PIT return | PIT ann. | Sharpe | **Max DD** |
+> |--------|-----------|----------|--------|-----------|
+> | 5Y (incl. bear) | +29% | ~5.7%/yr | 0.46 | **30%** |
+> | 3Y | +35% | ~11.4%/yr | 0.72 | 25% |
+> | 1Y (recent bull) | +64% | ~70%/yr | 2.34 | 10% |
+>
+> For reference: static-biased 5Y was +65%/0.82/19%DD; survivorship-clean audit +24%/0.42/25%.
+> The true edge is ~¼–⅓ of the headline, per-trade P&L ~0.36% (vs biased 1.05%), and the
+> honest full-cycle **drawdown is ~30%**. Edge is real but thin and recent-bull-flattered —
+> consistent with the soft live Apr–Jun 2026 result. **Size for a thin edge with deep DD.**
 
 ---
 
@@ -32,16 +37,17 @@ ranked, deduped, sector-capped).
 - Trade **only in bull regime.** Zero new entries in choppy or bear. If the watchlist
   is empty, that's the system working — do nothing.
 
-**Selection (validated improvement — take ONE/day):**
-- Take the **single top-scored pick per day**, **max 1 per sector**. Picks already
-  require **score ≥ 90** and **ADV ≥ ¥80M**.
-- Selection sweep (2026-06-23, pinned 5Y): top-1/day by score beats top-2 on Sharpe in
-  every window (5Y 0.82→0.88, 3Y 1.16→1.22, 1Y 2.58→2.87) and cuts max drawdown ~20–55%
-  (1Y 16%→7%). The top pick is genuinely better than the 2nd. Mirrors MAS's "one-pick/day."
-- Rank by **score**, not by risk. A stop-risk filter (drop wide-stop names) was tested and
-  *hurt* (removes winners) — do not use it.
-- Trade-off: fewer trades → less total compounding, but the book is under-utilized at
-  top-1/day, so size up per position (below) to recover return at the better risk profile.
+**Selection (corrected on unbiased point-in-time data, 2026-06-23):**
+- Picks already require **score ≥ 90**, **ADV ≥ ¥80M**, **max 1 per sector**.
+- **Do NOT rank by score / take top-1-by-score.** On the *biased* static set that looked
+  like a win, but on the unbiased point-in-time set it does not beat top-2 (5Y Sharpe 0.44
+  vs 0.46; 3Y 0.62 vs 0.72). The 90+ score is saturated and does not discriminate quality.
+- **The only defensible selection edge is risk-aware, for drawdown control:** top-1/day
+  ranked by *lowest stop-distance* halves the 5Y max drawdown (30%→16%) and lifts full-cycle
+  Sharpe (0.46→0.58) at similar return. But it's neutral-to-slightly-negative on 3Y/1Y — so
+  use it to tame the deep tail, not to boost return.
+- Net: **take top-2 by default; if you want to cap the ~30% drawdown, take 1/day ranked by
+  lowest stop-distance.** Either way, ranking by score buys nothing.
 
 **Entry — strict no-chase (validated as correct):**
 - Place a **buy limit at `max_entry_price`** (= signal entry × 1.02) for the T+1 session.
@@ -67,30 +73,27 @@ ranked, deduped, sector-capped).
 
 ## 2. Position sizing & risk
 
-Validated sim used **20% per position, max 5 concurrent** (≈ up to 100% gross):
+Size for the **true (point-in-time) edge**: ~5.7%/yr over the full cycle, Sharpe 0.46,
+and a **~30% max drawdown** at 20%/pos. This is a thin edge with a deep tail — the
+headline +65% was survivorship. The recent 1Y (Sharpe 2.3) is a bull, not the baseline.
 
-| Window | Total ret | Sharpe | Max DD |
-|--------|-----------|--------|--------|
-| 5Y (incl. bear) | +65% | 0.82 | 19% |
-| 3Y | +65% | 1.16 | 17% |
-| 1Y | +84% | 2.58 | 16% |
-*(survivorship-biased — treat as optimistic)*
+**Recommended sizing (conservative, for a thin edge + deep DD):**
 
-**Recommended phased rollout (mirrors the MAS Sniper discipline):**
-
-- **Phase 1 — live proving (first 4–6 weeks):**
-  - **10–15% per position, max 4 concurrent** (≤ ~60% gross).
-  - Full rule discipline; log fills vs. signal price, slippage, and day-5 exits.
-  - Goal: confirm live fills/slippage match the backtest before adding size.
-- **Phase 2 — scale (only if Phase 1 matches expectations):**
-  - **20% per position, max 5 concurrent.**
-  - Reserve the top of the range for A+ setups only: score ≥ 98, clean liquidity,
-    no binary/earnings event, market not weak at the open.
+- **Phase 1 — paper / proving (first 4–6 weeks):** paper-trade the full rule set; log fills
+  vs. signal price, slippage, day-5 exits. Confirm live matches before risking capital
+  (live Apr–Jun 2026 came in soft — assume the thin number, not the bull).
+- **Phase 2 — small live:** **10% per position, max 4–5 concurrent** (≤ ~50% gross). At a
+  Sharpe ~0.46 / 30%-DD edge, fractional sizing is mandatory — do not run near 100% gross.
+- **Drawdown control:** if the ~30% DD is unacceptable, switch to **1 pick/day ranked by
+  lowest stop-distance** (halves 5Y DD to ~16%) — accepting slightly lower return.
+- **Only scale toward 15–20%** if live performance over a meaningful sample (not one bull
+  quarter) actually matches the point-in-time numbers.
 
 **Hard risk limits:**
-- Per-trade risk ≈ position% × (1.1 × ATR / entry). With ~5% ATR names that's ~0.8–1.1%
-  of book per 15–20% position — keep total open risk sane.
-- If realized drawdown exceeds the backtest's 19%, cut size; the real bear will be deeper.
+- Per-trade risk ≈ position% × (1.1 × ATR / entry). Keep total open risk sane at 10%/pos.
+- The honest full-cycle drawdown is ~30% (PIT) — expect it, and a real bear could be worse.
+- **Benchmark check:** DP made +1% live while CSI 300 did +11% over the same span. Before
+  scaling, confirm the strategy is actually beating just holding the index after costs.
 
 ---
 
