@@ -1,0 +1,49 @@
+{
+  "date": "2026-06-24",
+  "regime": "bull",
+  "universe_size": 999,
+  "picks": [
+    {
+      "ticker": "002281.SZ",
+      "name_cn": "光迅科技",
+      "engine": "alpha_rs_pullback",
+      "score": 98.56,
+      "entry_price": 266.9,
+      "max_entry_price": 272.24,
+      "stop_loss": 249.74,
+      "target_1": 299.66,
+      "target_2": 323.06,
+      "holding_period": 5,
+      "adv_cny": 12821520571.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=99",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 98.53225806451617,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "300661.SZ",
+      "name_cn": "圣邦股份",
+      "engine": "alpha_rs_pullback",
+      "score": 97.88,
+      "entry_price": 137.16,
+      "max_entry_price": 139.9,
+      "stop_loss": 128.42,
+      "target_1": 153.85,
+      "target_2": 165.77,
+      "holding_period": 5,
+      "adv_cny": 2674090403.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=96",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 96.25524475524476,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    }
+  ]
+}
