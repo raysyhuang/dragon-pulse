@@ -49,6 +49,9 @@ class PaperPick:
     stop_risk_pct: float
     net_amount: float | None = None
     amount: float | None = None
+    holding_delta_vol: float | None = None
+    holding_delta_ratio: float | None = None
+    holding_delta_source: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -70,6 +73,9 @@ class PaperPick:
             "stop_risk_pct": self.stop_risk_pct,
             "net_amount": self.net_amount,
             "amount": self.amount,
+            "holding_delta_vol": self.holding_delta_vol,
+            "holding_delta_ratio": self.holding_delta_ratio,
+            "holding_delta_source": self.holding_delta_source,
             "reason_summary": f"北向活跃榜rank={self.rank}, stop风险={self.stop_risk_pct:.1f}%",
         }
 
@@ -139,6 +145,126 @@ def fetch_hsgt_top10_latest(asof_date: str, lookback_days: int = 10) -> tuple[st
     return None, pd.DataFrame(), "; ".join(errors[-5:]) or "no rows"
 
 
+
+def _normalize_cn_code(value: object) -> str:
+    raw = str(value or "").strip().upper()
+    if not raw:
+        return ""
+    if "." in raw:
+        code, exch = raw.split(".", 1)
+        if exch in {"SH", "SZ"}:
+            return f"{code.zfill(6)}.{exch}"
+    digits = "".join(ch for ch in raw if ch.isdigit())
+    if len(digits) >= 6:
+        code = digits[-6:]
+        exch = "SH" if code.startswith("6") else "SZ"
+        return f"{code}.{exch}"
+    return raw
+
+
+def _numeric_or_none(value: object) -> float | None:
+    try:
+        val = float(value)
+    except (TypeError, ValueError):
+        return None
+    return val if pd.notna(val) else None
+
+
+def fetch_holding_delta_map(source_date: str) -> tuple[dict[str, dict], str]:
+    """Best-effort northbound holding-delta fallback via Eastmoney/AkShare.
+
+    This is a replacement candidate for missing hsgt_top10 net_amount fields.
+    If the public Eastmoney wrapper changes or fails, the paper sleeve still
+    emits active-rank picks and records the gap.
+    """
+    try:
+        import akshare as ak  # pyright: ignore[reportMissingModuleSource]
+    except Exception as exc:
+        return {}, f"akshare unavailable: {exc}"
+
+    end = pd.to_datetime(source_date)
+    start = end - timedelta(days=7)
+    try:
+        df = ak.stock_hsgt_stock_statistics_em(
+            symbol="北向持股",
+            start_date=start.strftime("%Y%m%d"),
+            end_date=end.strftime("%Y%m%d"),
+        )
+    except Exception as exc:
+        return {}, f"eastmoney_holding_delta_unavailable: {type(exc).__name__}: {exc}"
+
+    if df is None or df.empty:
+        return {}, "eastmoney_holding_delta_empty"
+
+    df = df.copy()
+    code_col = next((c for c in df.columns if str(c) in {"代码", "股票代码", "SECURITY_CODE", "code", "ts_code"}), None)
+    date_col = next((c for c in df.columns if "日期" in str(c) or "date" in str(c).lower()), None)
+    vol_col = next((c for c in df.columns if any(k in str(c) for k in ["持股数", "持股数量", "持股股数"])), None)
+    ratio_col = next((c for c in df.columns if "持股占" in str(c) or "持股比例" in str(c)), None)
+    if not code_col or not date_col or not vol_col:
+        return {}, "eastmoney_holding_delta_schema_gap:" + ",".join(map(str, df.columns[:20]))
+
+    df["_ticker"] = df[code_col].map(_normalize_cn_code)
+    df["_date"] = pd.to_datetime(df[date_col], errors="coerce")
+    df["_vol"] = pd.to_numeric(df[vol_col], errors="coerce")
+    if ratio_col:
+        df["_ratio"] = pd.to_numeric(df[ratio_col], errors="coerce")
+    else:
+        df["_ratio"] = pd.NA
+    df = df.dropna(subset=["_ticker", "_date", "_vol"]).sort_values(["_ticker", "_date"])
+    latest = df[df["_date"] <= end]
+    if latest.empty:
+        return {}, "eastmoney_holding_delta_no_rows_before_source_date"
+
+    out: dict[str, dict] = {}
+    for ticker, g in latest.groupby("_ticker"):
+        g = g.tail(2)
+        if len(g) < 2:
+            continue
+        prev, cur = g.iloc[0], g.iloc[-1]
+        delta_vol = _numeric_or_none(cur["_vol"] - prev["_vol"])
+        delta_ratio = _numeric_or_none(cur["_ratio"] - prev["_ratio"]) if pd.notna(cur.get("_ratio")) and pd.notna(prev.get("_ratio")) else None
+        out[str(ticker)] = {
+            "holding_delta_vol": delta_vol,
+            "holding_delta_ratio": delta_ratio,
+            "holding_delta_source": "eastmoney_hsgt_stock_statistics",
+            "holding_delta_latest_date": _iso_date(cur["_date"]),
+            "holding_delta_prev_date": _iso_date(prev["_date"]),
+        }
+    return out, "ok" if out else "eastmoney_holding_delta_no_pair_rows"
+
+
+def save_source_probe(date_str: str) -> Path:
+    """Record current HSGT availability/publish-lag evidence for forward tracking."""
+    raw_date, rows, status = fetch_hsgt_top10_latest(date_str, lookback_days=10)
+    source_date = _iso_date(raw_date) if raw_date else None
+    holding_map, holding_status = fetch_holding_delta_map(source_date or date_str)
+    out = PROJECT_ROOT / "outputs" / date_str / f"northbound_source_probe_{date_str}.json"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    rank_le_5 = 0
+    if rows is not None and not rows.empty and "rank" in rows.columns:
+        rank_le_5 = int(pd.to_numeric(rows["rank"], errors="coerce").le(5).sum())
+    net_non_null = 0
+    if rows is not None and not rows.empty and "net_amount" in rows.columns:
+        net_non_null = int(rows["net_amount"].notna().sum())
+    payload = {
+        "date": date_str,
+        "generated_utc": datetime.utcnow().isoformat(),
+        "probe_time_shanghai": pd.Timestamp.now(tz="Asia/Shanghai").isoformat(),
+        "hsgt_top10_status": status,
+        "hsgt_top10_latest_trade_date": source_date,
+        "hsgt_top10_rows": int(len(rows)) if rows is not None else 0,
+        "hsgt_top10_rank_le_5_rows": rank_le_5,
+        "hsgt_top10_columns": list(rows.columns) if rows is not None and not rows.empty else [],
+        "hsgt_top10_net_amount_non_null": net_non_null,
+        "holding_delta_status": holding_status,
+        "holding_delta_rows": len(holding_map),
+        "holding_delta_sample": dict(list(holding_map.items())[:5]),
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    logger.info("Saved northbound source probe: %s", out)
+    return out
+
 def _fetch_ohlcv(tickers: Iterable[str], start: str, end: str) -> dict[str, pd.DataFrame]:
     from src.core.cn_data import download_daily_range
 
@@ -181,6 +307,9 @@ def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
     start = (pd.to_datetime(source_date) - timedelta(days=90)).strftime("%Y-%m-%d")
     data_map = _fetch_ohlcv(candidates, start=start, end=source_date)
     info_map = get_cn_basic_info(candidates, provider_config={"tushare_token_env": "TUSHARE_TOKEN"})
+    holding_delta_map, holding_delta_status = fetch_holding_delta_map(source_date)
+    meta["holding_delta_status"] = holding_delta_status
+    meta["holding_delta_rows"] = len(holding_delta_map)
 
     picks: list[PaperPick] = []
     for _, row in hsgt.iterrows():
@@ -210,8 +339,12 @@ def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
         net_val = float(net_amount) if pd.notna(net_amount) else 0.0
         amount_val = float(amount) if pd.notna(amount) else 0.0
         risk_center_bonus = max(0.0, 20.0 - abs(stop_risk_pct - 5.5) * 8.0)
+        holding_delta = holding_delta_map.get(ticker, {})
+        holding_delta_vol = holding_delta.get("holding_delta_vol")
+        holding_delta_ratio = holding_delta.get("holding_delta_ratio")
         net_bonus = 8.0 if net_val > 0 else 0.0
-        score = max(1.0, 100.0 - (rank - 1) * 7.0 + risk_center_bonus + net_bonus)
+        holding_bonus = 6.0 if holding_delta_vol is not None and holding_delta_vol > 0 else 0.0
+        score = max(1.0, 100.0 - (rank - 1) * 7.0 + risk_center_bonus + net_bonus + holding_bonus)
         info = info_map.get(ticker, {})
         name = str(row.get("name") or info.get("name_cn") or ticker)
         picks.append(PaperPick(
@@ -230,6 +363,9 @@ def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
             stop_risk_pct=round(stop_risk_pct, 2),
             net_amount=float(net_val) if pd.notna(net_amount) else None,
             amount=float(amount_val) if pd.notna(amount) else None,
+            holding_delta_vol=_numeric_or_none(holding_delta_vol),
+            holding_delta_ratio=_numeric_or_none(holding_delta_ratio),
+            holding_delta_source=holding_delta.get("holding_delta_source"),
         ))
 
     picks = sorted(picks, key=lambda p: (-p.score, p.rank, p.ticker))[:top_n]
@@ -269,6 +405,7 @@ def send_preopen_alert(date_str: str, picks: list[PaperPick], meta: dict, path: 
         f"<b>🧪 北向纸面袖珍盘 — {date_str}</b>",
         "状态: <b>PAPER ONLY / 不进实盘龙脉排名</b>",
         f"来源: hsgt_top10 {source_date} | 规则: rank≤5 + stop风险4–7%",
+        f"增持替代源: {meta.get('holding_delta_status', 'n/a')} | 发布探针: 已记录",
         "",
     ]
     if not picks:
@@ -283,6 +420,8 @@ def send_preopen_alert(date_str: str, picks: list[PaperPick], meta: dict, path: 
             lines.append(
                 f"   止损: ¥{p.stop_loss:.2f} | 目标: ¥{p.target_1:.2f} | 持仓: {p.holding_period}天 | stop风险: {p.stop_risk_pct:.1f}%"
             )
+            if p.holding_delta_vol is not None:
+                lines.append(f"   北向持股变化: {p.holding_delta_vol:+.0f}股")
             lines.append("")
     lines.append("用途: 2–4周forward paper，验证fill/开盘追高/5D bracket/发布滞后。")
 
@@ -363,7 +502,7 @@ def send_open_check(date_str: str) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Northbound active risk-band paper sleeve")
     parser.add_argument("--date", default=pd.Timestamp.now(tz="Asia/Shanghai").strftime("%Y-%m-%d"))
-    parser.add_argument("--mode", choices=["preopen", "open_check"], default="preopen")
+    parser.add_argument("--mode", choices=["preopen", "open_check", "source_probe"], default="preopen")
     parser.add_argument("--top-n", type=int, default=5)
     parser.add_argument("--no-alert", action="store_true")
     args = parser.parse_args()
@@ -371,7 +510,11 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     if args.mode == "open_check":
         return send_open_check(args.date)
+    if args.mode == "source_probe":
+        save_source_probe(args.date)
+        return 0
 
+    save_source_probe(args.date)
     picks, meta = build_picks(args.date, top_n=args.top_n)
     path = save_watchlist(args.date, picks, meta)
     logger.info("Saved northbound paper watchlist: %s (%d picks)", path, len(picks))

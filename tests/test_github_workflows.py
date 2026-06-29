@@ -15,6 +15,7 @@ def test_cn_morning_workflow_has_same_day_preopen_scan_and_open_check():
     assert jobs["preflight"]["if"] == "github.event.schedule == '35 1 * * 1-5' || inputs.mode == 'open_check'"
     assert jobs["northbound-paper-preopen"]["if"] == "always() && (github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'northbound_paper_preopen')"
     assert jobs["northbound-paper-open-check"]["if"] == "always() && (github.event.schedule == '35 1 * * 1-5' || inputs.mode == 'northbound_paper_open_check')"
+    assert jobs["northbound-source-probe"]["if"] == "github.event.schedule == '0 4 * * 1-5' || github.event.schedule == '30 7 * * 1-5' || github.event.schedule == '0 9 * * 1-5'"
 
     preopen_run = "\n".join(
         step.get("run", "") for step in jobs["preopen-scan"]["steps"]
@@ -40,3 +41,9 @@ def test_cn_morning_workflow_has_same_day_preopen_scan_and_open_check():
     )
     assert "python scripts/northbound_paper_sleeve.py --mode open_check" in nb_open_run
     assert "northbound_paper_execution_check_${TRADE_DATE}.json" in nb_open_run
+
+    nb_probe_run = "\n".join(
+        step.get("run", "") for step in jobs["northbound-source-probe"]["steps"]
+    )
+    assert "python scripts/northbound_paper_sleeve.py --mode source_probe" in nb_probe_run
+    assert "northbound_source_probe_${TRADE_DATE}_${PROBE_SLOT}.json" in nb_probe_run

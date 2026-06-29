@@ -8,10 +8,14 @@ on:
     # 09:35 Shanghai = 01:35 UTC (weekdays).
     # Reuses the same-day watchlist and sends GO/CANCEL using live open prices.
     - cron: "35 1 * * 1-5"
+    # Northbound source-lag probes: 12:00, 15:30, 17:00 Shanghai.
+    - cron: "0 4 * * 1-5"
+    - cron: "30 7 * * 1-5"
+    - cron: "0 9 * * 1-5"
   workflow_dispatch:
     inputs:
       mode:
-        description: "preopen_scan sends fresh watchlist; open_check validates same-day watchlist"
+        description: "preopen_scan/open_check/northbound paper modes"
         required: true
         default: "preopen_scan"
         type: choice
@@ -178,11 +182,70 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           TRADE_DATE="${{ steps.date.outputs.trade_date }}"
           git add "outputs/${TRADE_DATE}/northbound_paper_watchlist_${TRADE_DATE}.json" 2>/dev/null || true
+          git add "outputs/${TRADE_DATE}/northbound_source_probe_${TRADE_DATE}.json" 2>/dev/null || true
           git add "outputs/${TRADE_DATE}/.telegram_sent_"* 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No northbound paper outputs to commit"
           else
             git commit -m "auto: northbound paper feed for ${TRADE_DATE}"
+            git push origin HEAD:main || {
+              git fetch origin main
+              git rebase origin/main
+              git push origin HEAD:main
+            }
+          fi
+
+  northbound-source-probe:
+    name: Northbound Source Timing Probe
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    if: github.event.schedule == '0 4 * * 1-5' || github.event.schedule == '30 7 * * 1-5' || github.event.schedule == '0 9 * * 1-5'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Compute trading date
+        id: date
+        run: |
+          TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
+          PROBE_SLOT=$(TZ=Asia/Shanghai date +%H%M)
+          echo "trade_date=${TRADE_DATE}" >> "$GITHUB_OUTPUT"
+          echo "probe_slot=${PROBE_SLOT}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run northbound source probe
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          python scripts/northbound_paper_sleeve.py --mode source_probe --date "${{ steps.date.outputs.trade_date }}"
+
+      - name: Commit northbound source probe
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          PROBE_SLOT="${{ steps.date.outputs.probe_slot }}"
+          SRC="outputs/${TRADE_DATE}/northbound_source_probe_${TRADE_DATE}.json"
+          DEST="outputs/${TRADE_DATE}/northbound_source_probe_${TRADE_DATE}_${PROBE_SLOT}.json"
+          if [ -f "${SRC}" ]; then cp "${SRC}" "${DEST}"; fi
+          git add "${SRC}" "${DEST}" 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No northbound source probe outputs to commit"
+          else
+            git commit -m "auto: northbound source probe for ${TRADE_DATE} ${PROBE_SLOT}"
             git push origin HEAD:main || {
               git fetch origin main
               git rebase origin/main
