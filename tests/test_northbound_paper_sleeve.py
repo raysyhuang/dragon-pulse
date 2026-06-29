@@ -29,7 +29,6 @@ def test_build_picks_filters_rank_and_stop_risk(monkeypatch):
     monkeypatch.setattr(module, "fetch_hsgt_top10_latest", lambda asof_date: ("20260626", hsgt, "ok"))
 
     idx = pd.date_range("2026-05-01", periods=30, freq="D")
-    # ATR=5, close=100 -> 1.1*ATR/close=5.5%, inside 4-7% band.
     good_df = pd.DataFrame({"Open": 100, "High": 102.5, "Low": 97.5, "Close": 100, "Volume": 1_000_000}, index=idx)
     # ATR=1, close=100 -> 1.1%, outside risk band.
     low_risk_df = pd.DataFrame({"Open": 100, "High": 100.5, "Low": 99.5, "Close": 100, "Volume": 1_000_000}, index=idx)
@@ -53,6 +52,8 @@ def test_build_picks_filters_rank_and_stop_risk(monkeypatch):
     assert pick.to_dict()["paper_only"] is True
     assert pick.to_dict()["status"] == "PAPER_TRACK_ONLY"
     assert pick.to_dict()["holding_delta_vol"] == 10_000.0
+    assert pick.to_dict()["northbound_flow_confirmed"] is True
+    assert pick.to_dict()["promotion_eligible"] is False
     assert meta["holding_delta_status"] == "ok"
 
 
@@ -120,3 +121,16 @@ def test_source_probe_records_top10_and_holding_delta_status(tmp_path, monkeypat
     assert data["hsgt_top10_net_amount_non_null"] == 0
     assert data["holding_delta_status"] == "ok"
     assert data["holding_delta_rows"] == 1
+
+
+def test_true_atr14_includes_gap_risk():
+    module = load_northbound_module()
+    idx = pd.date_range("2026-05-01", periods=20, freq="D")
+    close = pd.Series([100.0] * 19 + [110.0], index=idx)
+    high = pd.Series([101.0] * 19 + [111.0], index=idx)
+    low = pd.Series([99.0] * 19 + [109.0], index=idx)
+
+    atr = module._compute_true_atr14(high, low, close)
+
+    # Last bar's high-low range is only 2, but true range captures the 100→110 gap.
+    assert atr > 2.0

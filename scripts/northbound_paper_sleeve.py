@@ -76,6 +76,12 @@ class PaperPick:
             "holding_delta_vol": self.holding_delta_vol,
             "holding_delta_ratio": self.holding_delta_ratio,
             "holding_delta_source": self.holding_delta_source,
+            "northbound_flow_confirmed": bool(
+                (self.net_amount is not None and self.net_amount > 0)
+                or (self.holding_delta_vol is not None and self.holding_delta_vol > 0)
+            ),
+            "promotion_eligible": False,
+            "promotion_blocker": "Paper-only active-rank lead until net_amount or holding-delta works and PIT/publish-lag gates pass",
             "reason_summary": f"北向活跃榜rank={self.rank}, stop风险={self.stop_risk_pct:.1f}%",
         }
 
@@ -168,6 +174,21 @@ def _numeric_or_none(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return val if pd.notna(val) else None
+
+
+def _compute_true_atr14(high_s: pd.Series, low_s: pd.Series, close_s: pd.Series) -> float:
+    """Compute Wilder-style true range mean over 14 bars.
+
+    The bracket replay used ATR-style stop risk. A simple high-low average
+    understates gap risk, so include previous close in true range.
+    """
+    prev_close = close_s.shift(1)
+    tr = pd.concat([
+        high_s - low_s,
+        (high_s - prev_close).abs(),
+        (low_s - prev_close).abs(),
+    ], axis=1).max(axis=1)
+    return float(tr.tail(14).mean())
 
 
 def fetch_holding_delta_map(source_date: str) -> tuple[dict[str, dict], str]:
@@ -326,7 +347,7 @@ def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
         if len(close_s) < 20 or len(high_s) < 20 or len(low_s) < 20:
             continue
         close = float(close_s.iloc[-1])
-        atr14 = float((high_s - low_s).tail(14).mean())
+        atr14 = _compute_true_atr14(high_s, low_s, close_s)
         if close <= 0 or atr14 <= 0:
             continue
         stop_risk_pct = 1.1 * atr14 / close * 100.0

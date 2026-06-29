@@ -142,8 +142,10 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write
-    needs: [preopen-scan]
-    if: always() && (github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'northbound_paper_preopen')
+    # Deliberately independent of the 240-min Dragon Pulse scan. This paper
+    # feed only needs hsgt_top10 + OHLCV and should not miss 09:35 if the full
+    # live scan runs long.
+    if: github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'northbound_paper_preopen'
     steps:
       - uses: actions/checkout@v4
         with:
