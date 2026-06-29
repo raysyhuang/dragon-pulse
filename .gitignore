@@ -18,6 +18,7 @@ __pycache__/
 
 # Outputs (optional - uncomment if you don't want to track outputs)
 # outputs/
+outputs/research/
 
 # Cache files
 *.cache
