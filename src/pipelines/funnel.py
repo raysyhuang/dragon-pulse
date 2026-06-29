@@ -20,6 +20,8 @@ from src.signals.mean_reversion import (
 )
 from src.signals.sniper import score_sniper
 from src.signals.alpha_candidates import (
+    score_accumulation_breakout_alpha,
+    score_limitup_continuation_alpha,
     score_rs_pullback_alpha,
     score_sniper_breakout_alpha,
 )
@@ -133,6 +135,14 @@ def build_engine_candidates(
     run_alpha = alpha_config.get("enabled", False)
     alpha_engines = set(alpha_config.get("engines", []))
 
+    def alpha_engine_enabled(name: str) -> bool:
+        """Require both engines-list membership and per-engine opt-in.
+
+        This keeps disabled research blocks from becoming live just because
+        someone appends the engine name to alpha_candidates.engines.
+        """
+        return name in alpha_engines and bool((alpha_config.get(name) or {}).get("enabled", False))
+
     all_signals: list[tuple[str, object]] = []
 
     for ticker, feat_df, feats in feat_items:
@@ -187,7 +197,7 @@ def build_engine_candidates(
 
             # Research alpha candidates (disabled by default; not legacy Sniper/MR).
             if run_alpha and csi300_df is not None:
-                if "rs_pullback" in alpha_engines:
+                if alpha_engine_enabled("rs_pullback"):
                     rs_cfg = alpha_config.get("rs_pullback", {}) or {}
                     rs_signal = score_rs_pullback_alpha(
                         ticker=ticker,
@@ -207,7 +217,7 @@ def build_engine_candidates(
                     if rs_signal:
                         all_signals.append(("alpha_rs_pullback", rs_signal))
 
-                if "sniper_breakout" in alpha_engines:
+                if alpha_engine_enabled("sniper_breakout"):
                     bo_cfg = alpha_config.get("sniper_breakout", {}) or {}
                     bo_signal = score_sniper_breakout_alpha(
                         ticker=ticker,
@@ -226,6 +236,52 @@ def build_engine_candidates(
                     )
                     if bo_signal:
                         all_signals.append(("alpha_sniper_breakout", bo_signal))
+
+                if alpha_engine_enabled("limitup_continuation"):
+                    lu_cfg = alpha_config.get("limitup_continuation", {}) or {}
+                    lu_signal = score_limitup_continuation_alpha(
+                        ticker=ticker,
+                        df=feat_df,
+                        regime=regime,
+                        csi300_df=csi300_df,
+                        is_st=is_st,
+                        regimes=tuple(lu_cfg.get("regimes", ["bull"])),
+                        score_floor=float(lu_cfg.get("score_floor", 78.0)),
+                        max_entry_pct=float(lu_cfg.get("max_entry_pct", 0.02)),
+                        min_adv_cny=float(lu_cfg.get("min_adv_cny", 80_000_000)),
+                        stop_atr_mult=float(lu_cfg.get("stop_atr_mult", 1.25)),
+                        target_atr_mult=float(lu_cfg.get("target_atr_mult", 2.4)),
+                        target_2_atr_mult=float(lu_cfg.get("target_2_atr_mult", 3.8)),
+                        holding_period=int(lu_cfg.get("holding_period", 4)),
+                        max_atr_pct=float(lu_cfg.get("max_atr_pct", 7.5)),
+                        min_rs20=float(lu_cfg.get("min_rs20", 3.0)),
+                        min_post_impulse_hold=float(lu_cfg.get("min_post_impulse_hold", -0.075)),
+                        max_post_impulse_extension=float(lu_cfg.get("max_post_impulse_extension", 0.055)),
+                        min_stop_risk_pct=float(lu_cfg.get("min_stop_risk_pct", 0.0)),
+                        max_stop_risk_pct=float(lu_cfg.get("max_stop_risk_pct", 99.0)),
+                    )
+                    if lu_signal:
+                        all_signals.append(("alpha_limitup_continuation", lu_signal))
+
+                if alpha_engine_enabled("accumulation_breakout"):
+                    acc_cfg = alpha_config.get("accumulation_breakout", {}) or {}
+                    acc_signal = score_accumulation_breakout_alpha(
+                        ticker=ticker,
+                        df=feat_df,
+                        regime=regime,
+                        csi300_df=csi300_df,
+                        is_st=is_st,
+                        regimes=tuple(acc_cfg.get("regimes", ["bull"])),
+                        score_floor=float(acc_cfg.get("score_floor", 76.0)),
+                        max_entry_pct=float(acc_cfg.get("max_entry_pct", 0.025)),
+                        min_adv_cny=float(acc_cfg.get("min_adv_cny", 80_000_000)),
+                        stop_atr_mult=float(acc_cfg.get("stop_atr_mult", 1.2)),
+                        target_atr_mult=float(acc_cfg.get("target_atr_mult", 2.3)),
+                        target_2_atr_mult=float(acc_cfg.get("target_2_atr_mult", 3.6)),
+                        holding_period=int(acc_cfg.get("holding_period", 5)),
+                    )
+                    if acc_signal:
+                        all_signals.append(("alpha_accumulation_breakout", acc_signal))
 
         except Exception:
             continue

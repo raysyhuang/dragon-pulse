@@ -113,12 +113,13 @@ sniper:
     csi300_symbol: "000300.SH"
 
 # =============================================================================
-# RS PULLBACK ALPHA CORE — bull-gated paper/daily core; Sniper remains quarantined
+# RS PULLBACK ALPHA CORE — bull-gated paper/daily core; Sniper research sleeve available but not promoted
 # =============================================================================
 alpha_candidates:
   enabled: true
   engines: ["rs_pullback"]
   rs_pullback:
+    enabled: true
     regimes: ["bull"]
     score_floor: 90
     max_entry_pct: 0.02
@@ -129,14 +130,57 @@ alpha_candidates:
     holding_period: 5
   sniper_breakout:
     enabled: false
-    regimes: ["bull", "bear", "choppy"]
-    score_floor: 74
+    regimes: ["bull"]
+    score_floor: 82
     max_entry_pct: 0.03
-    min_adv_cny: 80000000
-    stop_atr_mult: 1.6
-    target_atr_mult: 3.2
-    target_2_atr_mult: 4.7
+    min_adv_cny: 120000000
+    stop_atr_mult: 1.35
+    target_atr_mult: 2.8
+    target_2_atr_mult: 4.2
     holding_period: 5
+  limitup_continuation:
+    enabled: false
+    regimes: ["bull"]
+    score_floor: 78
+    max_entry_pct: 0.02
+    min_adv_cny: 80000000
+    stop_atr_mult: 1.25
+    target_atr_mult: 2.4
+    target_2_atr_mult: 3.8
+    holding_period: 4
+  accumulation_breakout:
+    enabled: false
+    regimes: ["bull"]
+    score_floor: 76
+    max_entry_pct: 0.025
+    min_adv_cny: 80000000
+    stop_atr_mult: 1.2
+    target_atr_mult: 2.3
+    target_2_atr_mult: 3.6
+    holding_period: 5
+
+# =============================================================================
+# EXTERNAL PAPER SLEEVES — research manifests only, never live-ranked by scanner
+# =============================================================================
+external_paper_sleeves:
+  enabled: true
+  sleeves:
+    northbound_active_riskband_paper:
+      enabled: true
+      source: "tushare.hsgt_top10 + daily OHLCV"
+      rule: "parallel paper feed: northbound active rank<=5, conservative T+1 no-chase fill, stop-risk 4-7%, 5D bracket replay"
+      status: "parallel_paper_feed_only"
+      validation_gate: "Bracket replay passed only as paper lead; still requires PIT/survivorship-clean walk-forward and hsgt_top10 publication-lag confirmation before any promotion"
+      promotion_blockers:
+        - "Below MAS Sniper benchmark after bracket replay: 51.98% WR / +1.681% avg / PF 1.728 vs ~80% WR / +3.9% avg / PF 3.6"
+        - "Needs walk-forward / out-of-sample validation before any production use"
+        - "Depends on northbound active endpoint availability and publication lag"
+      artifacts:
+        summary_csv: "/tmp/dp_alpha_event_search_20260629/northbound_composite/northbound_composite_summary.csv"
+        events_csv: "/tmp/dp_alpha_event_search_20260629/northbound_composite/northbound_composite_events.csv"
+        bracket_summary_csv: "/tmp/dp_alpha_event_search_20260629/northbound_bracket_replay/northbound_bracket_summary.csv"
+        bracket_events_csv: "/tmp/dp_alpha_event_search_20260629/northbound_bracket_replay/northbound_bracket_events.csv"
+        note: "references/northbound-active-riskband-paper-2026-06.md"
 
 # =============================================================================
 # PORTFOLIO & RISK SETTINGS — Variable Book Size

@@ -8,8 +8,10 @@ import pandas as pd
 
 from scripts.backtest_1yr import (
     apply_score_floor,
+    apply_ticker_cooldowns,
     evaluate_pick,
     parse_regime_set,
+    rank_picks,
     resolve_backtest_engines,
 )
 
@@ -164,3 +166,34 @@ def test_backtest_no_chase_fills_at_next_open_when_within_max_entry():
     assert result["entry_price"] == 10.15
     assert result["exit_reason"] == "target_hit"
     assert result["pnl_pct"] == 8.37
+
+
+def test_backtest_pick_rank_modes_order_by_risk_and_reward():
+    wide_high_score = SimpleNamespace(score=99.0, entry_price=10.0, stop_loss=9.0, target_1=11.0)
+    tight_lower_score = SimpleNamespace(score=90.0, entry_price=10.0, stop_loss=9.8, target_1=10.5)
+    high_rr_mid_score = SimpleNamespace(score=95.0, entry_price=10.0, stop_loss=9.5, target_1=12.0)
+    candidates = [
+        ("alpha", wide_high_score),
+        ("alpha", tight_lower_score),
+        ("alpha", high_rr_mid_score),
+    ]
+
+    assert rank_picks(candidates, "score")[0][1] is wide_high_score
+    assert rank_picks(candidates, "lowrisk")[0][1] is tight_lower_score
+    assert rank_picks(candidates, "rr")[0][1] is high_rr_mid_score
+    assert rank_picks(candidates, "lowrisk_rr")[0][1] is tight_lower_score
+
+
+def test_backtest_ticker_cooldown_filters_active_cooldowns_only():
+    active = SimpleNamespace(ticker="000001.SZ", score=99.0)
+    expired = SimpleNamespace(ticker="000002.SZ", score=98.0)
+    never_seen = SimpleNamespace(ticker="000003.SZ", score=97.0)
+    candidates = [("alpha", active), ("alpha", expired), ("alpha", never_seen)]
+
+    filtered = apply_ticker_cooldowns(
+        candidates,
+        day_index=5,
+        cooldown_until={"000001.SZ": 5, "000002.SZ": 4},
+    )
+
+    assert [sig.ticker for _, sig in filtered] == ["000002.SZ", "000003.SZ"]

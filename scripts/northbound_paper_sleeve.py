@@ -1,0 +1,384 @@
+#!/usr/bin/env python3
+"""Northbound active risk-band paper sleeve.
+
+This is a quarantined forward paper tracker for the June 2026 northbound
+research lead. It deliberately writes separate paper artifacts and sends a
+clearly-labelled paper alert; it does not feed Dragon Pulse live ranking,
+execution_watchlist, or production alpha engines.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import logging
+import os
+import sys
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Iterable
+
+import pandas as pd
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+from src.core.alerts import AlertConfig, AlertManager, _ticker_display  # noqa: E402
+from src.core.cn_data import get_cn_basic_info  # noqa: E402
+from scripts.morning_check import fetch_open_prices, run_preflight  # noqa: E402
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PaperPick:
+    ticker: str
+    name_cn: str
+    rank: int
+    signal_date: str
+    source_trade_date: str
+    entry_price: float
+    max_entry_price: float
+    stop_loss: float
+    target_1: float
+    target_2: float
+    holding_period: int
+    score: float
+    stop_risk_pct: float
+    net_amount: float | None = None
+    amount: float | None = None
+
+    def to_dict(self) -> dict:
+        return {
+            "ticker": self.ticker,
+            "name_cn": self.name_cn,
+            "engine": "northbound_active_riskband_paper",
+            "paper_only": True,
+            "status": "PAPER_TRACK_ONLY",
+            "rank": self.rank,
+            "signal_date": self.signal_date,
+            "source_trade_date": self.source_trade_date,
+            "entry_price": self.entry_price,
+            "max_entry_price": self.max_entry_price,
+            "stop_loss": self.stop_loss,
+            "target_1": self.target_1,
+            "target_2": self.target_2,
+            "holding_period": self.holding_period,
+            "score": self.score,
+            "stop_risk_pct": self.stop_risk_pct,
+            "net_amount": self.net_amount,
+            "amount": self.amount,
+            "reason_summary": f"北向活跃榜rank={self.rank}, stop风险={self.stop_risk_pct:.1f}%",
+        }
+
+
+def _yyyymmdd(date_str: str) -> str:
+    return pd.to_datetime(date_str).strftime("%Y%m%d")
+
+
+def _iso_date(value) -> str:
+    return pd.to_datetime(str(value)).strftime("%Y-%m-%d")
+
+
+def _token() -> str | None:
+    return os.environ.get("TUSHARE_TOKEN")
+
+
+def fetch_hsgt_top10_latest(asof_date: str, lookback_days: int = 10) -> tuple[str | None, pd.DataFrame, str]:
+    """Fetch latest available hsgt_top10 rows at or before asof_date.
+
+    Tushare endpoint behavior varies by account/version, so try both generic
+    and market_type-specific calls, then union/dedupe rows.
+    """
+    import tushare as ts  # pyright: ignore[reportMissingModuleSource]
+
+    token = _token()
+    if not token:
+        return None, pd.DataFrame(), "missing TUSHARE_TOKEN"
+
+    pro = ts.pro_api(token=token)
+    end = pd.to_datetime(asof_date)
+    errors: list[str] = []
+
+    for offset in range(0, lookback_days + 1):
+        day = end - timedelta(days=offset)
+        trade_date = day.strftime("%Y%m%d")
+        frames: list[pd.DataFrame] = []
+        calls = [({}, "generic"), ({"market_type": "1"}, "沪股通"), ({"market_type": "3"}, "深股通")]
+        for kwargs, label in calls:
+            try:
+                df = pro.hsgt_top10(trade_date=trade_date, **kwargs)
+                if df is not None and not df.empty:
+                    df = df.copy()
+                    df["_call_label"] = label
+                    frames.append(df)
+            except Exception as exc:  # keep trying other dates/call shapes
+                errors.append(f"{trade_date}/{label}: {exc}")
+
+        if not frames:
+            continue
+
+        out = pd.concat(frames, ignore_index=True)
+        if "ts_code" not in out.columns:
+            errors.append(f"{trade_date}: missing ts_code column")
+            continue
+        out["ts_code"] = out["ts_code"].astype(str).str.upper()
+        if "rank" in out.columns:
+            out["rank"] = pd.to_numeric(out["rank"], errors="coerce")
+        else:
+            out["rank"] = 999
+        if "net_amount" in out.columns:
+            out["net_amount"] = pd.to_numeric(out["net_amount"], errors="coerce")
+        if "amount" in out.columns:
+            out["amount"] = pd.to_numeric(out["amount"], errors="coerce")
+        out = out.sort_values(["rank", "ts_code"]).drop_duplicates("ts_code", keep="first")
+        return trade_date, out, "ok"
+
+    return None, pd.DataFrame(), "; ".join(errors[-5:]) or "no rows"
+
+
+def _fetch_ohlcv(tickers: Iterable[str], start: str, end: str) -> dict[str, pd.DataFrame]:
+    from src.core.cn_data import download_daily_range
+
+    data_map, report = download_daily_range(
+        list(tickers),
+        start=start,
+        end=end,
+        # Use unadjusted prices for forward paper alerts; qfq-adjusted prices can
+        # be split/dividend-adjusted and are not the executable screen price.
+        provider_config={"primary": "akshare", "backup": "tushare", "adjust": "none", "tushare_token_env": "TUSHARE_TOKEN"},
+    )
+    if report.get("bad_tickers"):
+        logger.info("OHLCV unavailable for %d northbound names", len(report.get("bad_tickers", [])))
+    return data_map
+
+
+def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
+    source_trade_date_raw, hsgt, status = fetch_hsgt_top10_latest(asof_date)
+    meta = {
+        "asof_date": asof_date,
+        "source_trade_date": _iso_date(source_trade_date_raw) if source_trade_date_raw else None,
+        "source_status": status,
+        "paper_only": True,
+        "rule": "northbound active rank<=5, stop-risk 4-7%, conservative T+1 no-chase, 5D bracket replay tracker",
+    }
+    if hsgt.empty or source_trade_date_raw is None:
+        return [], meta
+
+    # Research rule: northbound active rank<=5. Keep both Shanghai/Shenzhen active lists,
+    # deduped by code. Later filters enforce risk band and tradability.
+    rank_raw = hsgt["rank"] if "rank" in hsgt.columns else pd.Series(999, index=hsgt.index)
+    rank_series = pd.Series(pd.to_numeric(rank_raw, errors="coerce"), index=hsgt.index)
+    hsgt = hsgt[rank_series.le(5)].copy()
+    if hsgt.empty:
+        meta["source_status"] = "no rank<=5 rows"
+        return [], meta
+
+    candidates = pd.Series(hsgt["ts_code"]).dropna().astype(str).str.upper().drop_duplicates().tolist()
+    source_date = _iso_date(source_trade_date_raw)
+    start = (pd.to_datetime(source_date) - timedelta(days=90)).strftime("%Y-%m-%d")
+    data_map = _fetch_ohlcv(candidates, start=start, end=source_date)
+    info_map = get_cn_basic_info(candidates, provider_config={"tushare_token_env": "TUSHARE_TOKEN"})
+
+    picks: list[PaperPick] = []
+    for _, row in hsgt.iterrows():
+        ticker = str(row.get("ts_code", "")).upper()
+        df = data_map.get(ticker, pd.DataFrame())
+        if df.empty or len(df) < 20:
+            continue
+        close_col = "Close" if "Close" in df.columns else "close"
+        high_col = "High" if "High" in df.columns else "high"
+        low_col = "Low" if "Low" in df.columns else "low"
+        close_s = pd.to_numeric(df[close_col], errors="coerce").dropna()
+        high_s = pd.to_numeric(df[high_col], errors="coerce").dropna()
+        low_s = pd.to_numeric(df[low_col], errors="coerce").dropna()
+        if len(close_s) < 20 or len(high_s) < 20 or len(low_s) < 20:
+            continue
+        close = float(close_s.iloc[-1])
+        atr14 = float((high_s - low_s).tail(14).mean())
+        if close <= 0 or atr14 <= 0:
+            continue
+        stop_risk_pct = 1.1 * atr14 / close * 100.0
+        if stop_risk_pct < 4.0 or stop_risk_pct > 7.0:
+            continue
+
+        rank = int(row.get("rank") or 999)
+        net_amount = row.get("net_amount") if "net_amount" in row else None
+        amount = row.get("amount") if "amount" in row else None
+        net_val = float(net_amount) if pd.notna(net_amount) else 0.0
+        amount_val = float(amount) if pd.notna(amount) else 0.0
+        risk_center_bonus = max(0.0, 20.0 - abs(stop_risk_pct - 5.5) * 8.0)
+        net_bonus = 8.0 if net_val > 0 else 0.0
+        score = max(1.0, 100.0 - (rank - 1) * 7.0 + risk_center_bonus + net_bonus)
+        info = info_map.get(ticker, {})
+        name = str(row.get("name") or info.get("name_cn") or ticker)
+        picks.append(PaperPick(
+            ticker=ticker,
+            name_cn=name,
+            rank=rank,
+            signal_date=asof_date,
+            source_trade_date=source_date,
+            entry_price=round(close, 2),
+            max_entry_price=round(close * 1.02, 2),
+            stop_loss=round(close - 1.1 * atr14, 2),
+            target_1=round(close + 2.1 * atr14, 2),
+            target_2=round(close + 3.6 * atr14, 2),
+            holding_period=5,
+            score=round(score, 2),
+            stop_risk_pct=round(stop_risk_pct, 2),
+            net_amount=float(net_val) if pd.notna(net_amount) else None,
+            amount=float(amount_val) if pd.notna(amount) else None,
+        ))
+
+    picks = sorted(picks, key=lambda p: (-p.score, p.rank, p.ticker))[:top_n]
+    meta["source_rows"] = int(len(hsgt))
+    meta["riskband_picks"] = int(len(picks))
+    return picks, meta
+
+
+def artifact_path(date_str: str) -> Path:
+    return PROJECT_ROOT / "outputs" / date_str / f"northbound_paper_watchlist_{date_str}.json"
+
+
+def save_watchlist(date_str: str, picks: list[PaperPick], meta: dict) -> Path:
+    out = artifact_path(date_str)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "date": date_str,
+        "generated_utc": datetime.utcnow().isoformat(),
+        "sleeve": "northbound_active_riskband_paper",
+        "paper_only": True,
+        "status": "PAPER_TRACK_ONLY",
+        "meta": meta,
+        "picks": [p.to_dict() for p in picks],
+    }
+    out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return out
+
+
+def send_preopen_alert(date_str: str, picks: list[PaperPick], meta: dict, path: Path) -> None:
+    alert_config = AlertConfig(enabled=True, channels=["telegram"])
+    if not alert_config.telegram_bot_token or not alert_config.telegram_chat_id:
+        logger.info("Telegram not configured; saved artifact only: %s", path)
+        return
+
+    source_date = meta.get("source_trade_date") or "n/a"
+    lines = [
+        f"<b>🧪 北向纸面袖珍盘 — {date_str}</b>",
+        "状态: <b>PAPER ONLY / 不进实盘龙脉排名</b>",
+        f"来源: hsgt_top10 {source_date} | 规则: rank≤5 + stop风险4–7%",
+        "",
+    ]
+    if not picks:
+        lines.append(f"今日无北向纸面候选。数据状态: {meta.get('source_status')}")
+    else:
+        for i, p in enumerate(picks, 1):
+            display = _ticker_display(p.ticker, p.name_cn)
+            lines.append(f"🧪 <b>{i}. {display}</b> [纸面]")
+            lines.append(
+                f"   评分: {p.score:.0f} | rank: {p.rank} | 入场: ¥{p.entry_price:.2f} 上限=¥{p.max_entry_price:.2f}"
+            )
+            lines.append(
+                f"   止损: ¥{p.stop_loss:.2f} | 目标: ¥{p.target_1:.2f} | 持仓: {p.holding_period}天 | stop风险: {p.stop_risk_pct:.1f}%"
+            )
+            lines.append("")
+    lines.append("用途: 2–4周forward paper，验证fill/开盘追高/5D bracket/发布滞后。")
+
+    AlertManager(alert_config).send_alert(
+        title=f"北向纸面袖珍盘 — {date_str}",
+        message="\n".join(lines),
+        data={"asof": date_str},
+        priority="low",
+    )
+
+
+def send_open_check(date_str: str) -> int:
+    path = artifact_path(date_str)
+    if not path.exists():
+        logger.error("Missing northbound paper watchlist: %s", path)
+        return 1
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    picks = payload.get("picks", [])
+    if not picks:
+        logger.info("No northbound paper picks to open-check.")
+        return 0
+
+    open_prices = fetch_open_prices([p.get("ticker", "") for p in picks])
+    if not open_prices:
+        logger.warning("Open prices unavailable; skip northbound paper open check for now.")
+        return 0
+    results = run_preflight(picks=picks, open_prices=open_prices, prev_volumes={})
+
+    out = PROJECT_ROOT / "outputs" / date_str / f"northbound_paper_execution_check_{date_str}.json"
+    out.write_text(json.dumps({
+        "date": date_str,
+        "generated_utc": datetime.utcnow().isoformat(),
+        "sleeve": "northbound_active_riskband_paper",
+        "paper_only": True,
+        "results": [r.__dict__ for r in results],
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    alert_config = AlertConfig(enabled=True, channels=["telegram"])
+    if not alert_config.telegram_bot_token or not alert_config.telegram_chat_id:
+        return 0
+
+    result_map = {r.ticker: r for r in results}
+    go = [r for r in results if r.action == "GO"]
+    warn = [r for r in results if r.action == "WARN"]
+    cancel = [r for r in results if r.action == "CANCEL"]
+    lines = [
+        f"<b>🧪 北向纸面袖珍盘 — {date_str} 开盘检查</b>",
+        "状态: <b>PAPER ONLY / 不进实盘龙脉排名</b>",
+        "",
+    ]
+    action_cn = {"GO": "纸面执行", "WARN": "纸面注意", "CANCEL": "纸面取消"}
+    icon = {"GO": "✅", "WARN": "⚠️", "CANCEL": "❌"}
+    for i, pick in enumerate(picks, 1):
+        r = result_map.get(pick.get("ticker"))
+        if r is None:
+            continue
+        display = _ticker_display(r.ticker, r.name_cn)
+        lines.append(f"{icon.get(r.action, '?')} <b>{i}. {display}</b> [{action_cn.get(r.action, r.action)}]")
+        lines.append(
+            f"   入场: ¥{r.entry_price:.2f} 上限=¥{float(pick.get('max_entry_price', 0)):.2f} | "
+            f"止损: ¥{float(pick.get('stop_loss', 0)):.2f} | 目标: ¥{float(pick.get('target_1', 0)):.2f}"
+        )
+        lines.append(f"   开盘: ¥{r.open_price:.2f} (跳空: {r.gap_pct:+.1f}%)")
+        for reason in r.reasons:
+            lines.append(f"   → {reason}")
+        lines.append("")
+    lines.append(f"📊 纸面执行: {len(go)} | 注意: {len(warn)} | 取消: {len(cancel)}")
+
+    AlertManager(alert_config).send_alert(
+        title=f"北向纸面袖珍盘 — {date_str} 开盘检查",
+        message="\n".join(lines),
+        data={"asof": date_str},
+        priority="low",
+    )
+    return 0
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Northbound active risk-band paper sleeve")
+    parser.add_argument("--date", default=pd.Timestamp.now(tz="Asia/Shanghai").strftime("%Y-%m-%d"))
+    parser.add_argument("--mode", choices=["preopen", "open_check"], default="preopen")
+    parser.add_argument("--top-n", type=int, default=5)
+    parser.add_argument("--no-alert", action="store_true")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    if args.mode == "open_check":
+        return send_open_check(args.date)
+
+    picks, meta = build_picks(args.date, top_n=args.top_n)
+    path = save_watchlist(args.date, picks, meta)
+    logger.info("Saved northbound paper watchlist: %s (%d picks)", path, len(picks))
+    if not args.no_alert:
+        send_preopen_alert(args.date, picks, meta, path)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

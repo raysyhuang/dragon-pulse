@@ -11,6 +11,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import sys
@@ -52,9 +53,118 @@ from src.signals.mean_reversion import (
 )
 from src.signals.sniper import score_sniper
 from src.signals.alpha_candidates import (
+    score_accumulation_breakout_alpha,
+    score_limitup_continuation_alpha,
     score_rs_pullback_alpha,
     score_sniper_breakout_alpha,
 )
+
+
+def _safe_float(value, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _stable_price_fingerprint(data_map: dict[str, pd.DataFrame]) -> str:
+    """Hash compact OHLCV facts so reruns can detect provider/cache drift."""
+    digest = hashlib.sha256()
+    for ticker in sorted(data_map):
+        df = data_map.get(ticker, pd.DataFrame())
+        digest.update(ticker.encode("utf-8"))
+        if df.empty:
+            digest.update(b"|empty\n")
+            continue
+        cols = [c for c in ("Open", "High", "Low", "Close", "Volume", "open", "high", "low", "close", "volume") if c in df.columns]
+        compact = df[cols].copy() if cols else df.copy()
+        compact.index = pd.to_datetime(compact.index).strftime("%Y-%m-%d")
+        digest.update(compact.to_csv(float_format="%.6f").encode("utf-8"))
+    return digest.hexdigest()
+
+
+def _snapshot_path(snapshot_dir: Path, ticker: str) -> Path:
+    safe = ticker.replace("/", "_").replace("\\", "_").replace(":", "_")
+    return snapshot_dir / f"{safe}.csv"
+
+
+def _read_price_snapshot(snapshot_dir: Path, ticker: str) -> pd.DataFrame:
+    path = _snapshot_path(snapshot_dir, ticker)
+    if not path.exists():
+        return pd.DataFrame()
+    try:
+        df = pd.read_csv(path, index_col=0, parse_dates=True)
+        df.index.name = "Date"
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
+def _write_price_snapshot(snapshot_dir: Path, ticker: str, df: pd.DataFrame) -> None:
+    if df.empty:
+        return
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    out = df.copy()
+    out.index = pd.to_datetime(out.index).strftime("%Y-%m-%d")
+    out.to_csv(_snapshot_path(snapshot_dir, ticker))
+
+
+def _load_price_snapshot(snapshot_dir: Path, tickers: list[str]) -> tuple[dict[str, pd.DataFrame], list[str]]:
+    data: dict[str, pd.DataFrame] = {}
+    missing: list[str] = []
+    for ticker in tickers:
+        df = _read_price_snapshot(snapshot_dir, ticker)
+        if df.empty:
+            missing.append(ticker)
+        else:
+            data[ticker] = df
+    return data, missing
+
+
+def _risk_metrics(sig) -> tuple[float, float, float]:
+    """Return stop distance %, R:R to target_1, and entry extension %."""
+    entry = _safe_float(getattr(sig, "entry_price", None))
+    stop = _safe_float(getattr(sig, "stop_loss", None))
+    target = _safe_float(getattr(sig, "target_1", None))
+    max_entry = _safe_float(getattr(sig, "max_entry_price", None), entry)
+    stop_dist_pct = ((entry - stop) / entry * 100.0) if entry > 0 and stop > 0 else 999.0
+    reward_risk = ((target - entry) / (entry - stop)) if target > entry and entry > stop else 0.0
+    entry_ext_pct = ((max_entry - entry) / entry * 100.0) if entry > 0 and max_entry > 0 else 999.0
+    return stop_dist_pct, reward_risk, entry_ext_pct
+
+
+def rank_picks(picks: list[tuple[str, object]], rank_mode: str = "score") -> list[tuple[str, object]]:
+    """Rank candidate picks for allocator ordering.
+
+    score: current behavior, highest signal score first.
+    lowrisk: prefer the tightest stop distance, then higher score.
+    rr: prefer highest target_1 reward/risk, then higher score.
+    lowrisk_rr: prefer low stop distance, then high reward/risk, then score.
+    """
+    if rank_mode == "score":
+        return sorted(picks, key=lambda x: (-getattr(x[1], "score", 0.0),))
+    if rank_mode == "lowrisk":
+        return sorted(picks, key=lambda x: (_risk_metrics(x[1])[0], -getattr(x[1], "score", 0.0)))
+    if rank_mode == "rr":
+        return sorted(picks, key=lambda x: (-_risk_metrics(x[1])[1], -getattr(x[1], "score", 0.0)))
+    if rank_mode == "lowrisk_rr":
+        return sorted(picks, key=lambda x: (_risk_metrics(x[1])[0], -_risk_metrics(x[1])[1], -getattr(x[1], "score", 0.0)))
+    raise ValueError(f"Unknown pick rank mode: {rank_mode}")
+
+
+def apply_ticker_cooldowns(
+    picks: list[tuple[str, object]],
+    day_index: int,
+    cooldown_until: dict[str, int],
+) -> list[tuple[str, object]]:
+    """Remove candidates whose ticker is still in a research cooldown window."""
+    return [
+        (engine, sig)
+        for engine, sig in picks
+        if int(cooldown_until.get(getattr(sig, "ticker", ""), -1)) < day_index
+    ]
 
 logger = logging.getLogger(__name__)
 
@@ -421,12 +531,21 @@ def main():
                         help="Point-in-time universe rebalance cadence in months")
     parser.add_argument("--outputs-root", default="outputs",
                         help="Outputs root used when universe-source=watchlist")
+    parser.add_argument("--price-snapshot-dir", default="",
+                        help="Optional CSV price snapshot directory. Existing ticker CSVs are reused; downloaded data is written back for deterministic reruns.")
     parser.add_argument("--allowed-regimes", default="",
                         help="Comma-separated regimes to scan: bull,choppy,bear. Empty means all.")
     parser.add_argument("--excluded-regimes", default="",
                         help="Comma-separated regimes to skip: bull,choppy,bear. Empty means none.")
     parser.add_argument("--min-score-floor", type=float, default=None,
                         help="Optional global score floor applied before pick allocation.")
+    parser.add_argument("--pick-rank-mode", default="score",
+                        choices=["score", "lowrisk", "rr", "lowrisk_rr"],
+                        help="Candidate ordering before top-N/acceptance allocation.")
+    parser.add_argument("--ticker-cooldown-days", type=int, default=0,
+                        help="Research-only: skip tickers picked in the prior N trading days.")
+    parser.add_argument("--post-stop-cooldown-days", type=int, default=0,
+                        help="Research-only: if a pick stops out, skip that ticker for N trading days.")
     args = parser.parse_args()
     allowed_regimes = parse_regime_set(args.allowed_regimes)
     excluded_regimes = parse_regime_set(args.excluded_regimes)
@@ -436,6 +555,8 @@ def main():
         parser.error(f"Unknown regime(s): {', '.join(sorted(invalid_regimes))}")
     if args.min_score_floor is not None and not 0 <= args.min_score_floor <= 100:
         parser.error("--min-score-floor must be between 0 and 100")
+    if args.ticker_cooldown_days < 0 or args.post_stop_cooldown_days < 0:
+        parser.error("cooldown days must be non-negative")
 
     logging.basicConfig(
         level=logging.INFO,
@@ -529,12 +650,25 @@ def main():
     # Download CSI 300 once
     csi_cfg = config.get("mean_reversion", {}).get("regime", {}) or config.get("sniper", {}).get("regime", {}) or {}
     csi_symbol = csi_cfg.get("csi300_symbol", "000300.SH")
+    snapshot_dir = Path(args.price_snapshot_dir) if args.price_snapshot_dir else None
+    price_snapshot_mode = "off"
+    if snapshot_dir:
+        price_snapshot_mode = "read_write"
+        logger.info("Price snapshot mode: %s", snapshot_dir)
+
     logger.info("Downloading CSI 300 (%s) for %s to %s...", csi_symbol, dl_start_str, dl_end_str)
-    csi300_data, _ = download_daily_range_fn(
-        tickers=[csi_symbol], start=dl_start_str, end=dl_end_str,
-        provider_config=provider_config,
-    )
-    csi300_full = csi300_data.get(csi_symbol, pd.DataFrame())
+    if snapshot_dir:
+        csi300_full = _read_price_snapshot(snapshot_dir, csi_symbol)
+    else:
+        csi300_full = pd.DataFrame()
+    if csi300_full.empty:
+        csi300_data, _ = download_daily_range_fn(
+            tickers=[csi_symbol], start=dl_start_str, end=dl_end_str,
+            provider_config=provider_config,
+        )
+        csi300_full = csi300_data.get(csi_symbol, pd.DataFrame())
+        if snapshot_dir and not csi300_full.empty:
+            _write_price_snapshot(snapshot_dir, csi_symbol, csi300_full)
     if not csi300_full.empty:
         csi300_full = csi300_full.rename(
             columns={c: c.lower() for c in csi300_full.columns if c in ("Open", "High", "Low", "Close", "Volume")}
@@ -544,10 +678,27 @@ def main():
     # Bulk download all universe tickers
     logger.info("Bulk downloading OHLCV for %d tickers (%s to %s)...", len(universe), dl_start_str, dl_end_str)
     t0 = time.time()
-    data_map, report = download_daily_range_fn(
-        tickers=universe, start=dl_start_str, end=dl_end_str,
-        provider_config=provider_config,
-    )
+    snapshot_data: dict[str, pd.DataFrame] = {}
+    snapshot_missing = list(universe)
+    if snapshot_dir:
+        snapshot_data, snapshot_missing = _load_price_snapshot(snapshot_dir, universe)
+        logger.info(
+            "Price snapshot reuse: %d hit, %d missing",
+            len(snapshot_data),
+            len(snapshot_missing),
+        )
+    if snapshot_missing:
+        downloaded_map, report = download_daily_range_fn(
+            tickers=snapshot_missing, start=dl_start_str, end=dl_end_str,
+            provider_config=provider_config,
+        )
+        if snapshot_dir:
+            for ticker, df in downloaded_map.items():
+                _write_price_snapshot(snapshot_dir, ticker, df)
+        data_map = {**snapshot_data, **downloaded_map}
+    else:
+        report = {"bad_tickers": [], "reasons": {}}
+        data_map = snapshot_data
     dl_time = time.time() - t0
     logger.info("Download complete: %d OK, %d failed (%.1f min)",
                 len(data_map), len(report.get("bad_tickers", [])), dl_time / 60)
@@ -571,6 +722,11 @@ def main():
     mr_config = config.get("mean_reversion", {})
     sniper_config = config.get("sniper", {})
     alpha_config = config.get("alpha_candidates", {}) or {}
+    alpha_engines = set(alpha_config.get("engines", []))
+
+    def alpha_engine_enabled(name: str) -> bool:
+        """Require both engines-list membership and per-engine opt-in for research alphas."""
+        return name in alpha_engines and bool((alpha_config.get(name) or {}).get("enabled", False))
     sma_short = int(get_config_value(config, "mean_reversion", "regime", "sma_short", default=20))
     sma_long = int(get_config_value(config, "mean_reversion", "regime", "sma_long", default=50))
 
@@ -616,6 +772,7 @@ def main():
     all_results = []
     day_summaries = []
     dumped_picks = []  # pinned pick set for reproducible exit-logic replay
+    cooldown_until: dict[str, int] = {}
     t_start = time.time()
 
     # Engine filter (computed once). Mirrors live scanner config gates.
@@ -728,9 +885,8 @@ def main():
 
                 # Research alpha candidates (disabled by default; must be explicitly enabled and requested).
                 if run_alpha:
-                    alpha_engines = set(alpha_config.get("engines", []))
                     is_st = info_map.get(ticker, {}).get("is_st", False)
-                    if "rs_pullback" in alpha_engines:
+                    if alpha_engine_enabled("rs_pullback"):
                         rs_cfg = alpha_config.get("rs_pullback", {}) or {}
                         rs_signal = score_rs_pullback_alpha(
                             ticker=ticker,
@@ -750,7 +906,7 @@ def main():
                         if rs_signal:
                             all_signals.append(("alpha_rs_pullback", rs_signal))
 
-                    if "sniper_breakout" in alpha_engines:
+                    if alpha_engine_enabled("sniper_breakout"):
                         bo_cfg = alpha_config.get("sniper_breakout", {}) or {}
                         bo_signal = score_sniper_breakout_alpha(
                             ticker=ticker,
@@ -766,9 +922,59 @@ def main():
                             target_atr_mult=float(bo_cfg.get("target_atr_mult", 3.2)),
                             target_2_atr_mult=float(bo_cfg.get("target_2_atr_mult", 4.7)),
                             holding_period=int(bo_cfg.get("holding_period", 5)),
+                            min_stop_risk_pct=float(bo_cfg.get("min_stop_risk_pct", 0.0)),
+                            max_stop_risk_pct=float(bo_cfg.get("max_stop_risk_pct", 99.0)),
                         )
                         if bo_signal:
                             all_signals.append(("alpha_sniper_breakout", bo_signal))
+
+                    if alpha_engine_enabled("limitup_continuation"):
+                        lu_cfg = alpha_config.get("limitup_continuation", {}) or {}
+                        lu_signal = score_limitup_continuation_alpha(
+                            ticker=ticker,
+                            df=hist_df,
+                            regime=regime,
+                            csi300_df=csi_slice,
+                            is_st=is_st,
+                            regimes=tuple(lu_cfg.get("regimes", ["bull"])),
+                            score_floor=float(lu_cfg.get("score_floor", 78.0)),
+                            max_entry_pct=float(lu_cfg.get("max_entry_pct", 0.02)),
+                            min_adv_cny=float(lu_cfg.get("min_adv_cny", 80_000_000)),
+                            stop_atr_mult=float(lu_cfg.get("stop_atr_mult", 1.25)),
+                            target_atr_mult=float(lu_cfg.get("target_atr_mult", 2.4)),
+                            target_2_atr_mult=float(lu_cfg.get("target_2_atr_mult", 3.8)),
+                            holding_period=int(lu_cfg.get("holding_period", 4)),
+                            max_atr_pct=float(lu_cfg.get("max_atr_pct", 7.5)),
+                            min_rs20=float(lu_cfg.get("min_rs20", 3.0)),
+                            min_post_impulse_hold=float(lu_cfg.get("min_post_impulse_hold", -0.075)),
+                            max_post_impulse_extension=float(lu_cfg.get("max_post_impulse_extension", 0.055)),
+                        )
+                        if lu_signal:
+                            all_signals.append(("alpha_limitup_continuation", lu_signal))
+
+                    if alpha_engine_enabled("accumulation_breakout"):
+                        acc_cfg = alpha_config.get("accumulation_breakout", {}) or {}
+                        acc_signal = score_accumulation_breakout_alpha(
+                            ticker=ticker,
+                            df=hist_df,
+                            regime=regime,
+                            csi300_df=csi_slice,
+                            is_st=is_st,
+                            regimes=tuple(acc_cfg.get("regimes", ["bull"])),
+                            score_floor=float(acc_cfg.get("score_floor", 76.0)),
+                            max_entry_pct=float(acc_cfg.get("max_entry_pct", 0.025)),
+                            min_adv_cny=float(acc_cfg.get("min_adv_cny", 80_000_000)),
+                            stop_atr_mult=float(acc_cfg.get("stop_atr_mult", 1.2)),
+                            target_atr_mult=float(acc_cfg.get("target_atr_mult", 2.3)),
+                            target_2_atr_mult=float(acc_cfg.get("target_2_atr_mult", 3.6)),
+                            holding_period=int(acc_cfg.get("holding_period", 5)),
+                            min_breakout_proximity=float(acc_cfg.get("min_breakout_proximity", 0.985)),
+                            max_sma20_extension=float(acc_cfg.get("max_sma20_extension", 1.075)),
+                            min_rvol=float(acc_cfg.get("min_rvol", 1.15)),
+                            max_dryup=float(acc_cfg.get("max_dryup", 1.15)),
+                        )
+                        if acc_signal:
+                            all_signals.append(("alpha_accumulation_breakout", acc_signal))
 
             except Exception:
                 continue
@@ -780,9 +986,10 @@ def main():
             if existing is None or sig.score > existing[1].score:
                 best[sig.ticker] = (engine, sig)
 
-        # Sort by score desc
-        sorted_picks = sorted(best.values(), key=lambda x: (-x[1].score,))
+        # Sort by configured selection priority before top-N / acceptance allocation.
+        sorted_picks = rank_picks(list(best.values()), args.pick_rank_mode)
         sorted_picks = apply_score_floor(sorted_picks, args.min_score_floor)
+        sorted_picks = apply_ticker_cooldowns(sorted_picks, i, cooldown_until)
 
         # --- Pick selection: three modes ---
         # Defaults; overridden by acceptance paths below
@@ -960,6 +1167,12 @@ def main():
             eval_result["subtype"] = getattr(sig, "subtype", None)
             all_results.append(eval_result)
 
+            cooldown_ticker = getattr(sig, "ticker", "")
+            if args.ticker_cooldown_days > 0 and cooldown_ticker:
+                cooldown_until[cooldown_ticker] = max(cooldown_until.get(cooldown_ticker, -1), i + args.ticker_cooldown_days)
+            if eval_result.get("exit_reason") == "stop_hit" and args.post_stop_cooldown_days > 0 and cooldown_ticker:
+                cooldown_until[cooldown_ticker] = max(cooldown_until.get(cooldown_ticker, -1), i + args.post_stop_cooldown_days)
+
             if eval_result["exit_reason"] == "target_hit":
                 wins += 1
             elif eval_result["exit_reason"] == "stop_hit":
@@ -992,8 +1205,83 @@ def main():
     logger.info("Scan loop complete: %.1f min (%.2fs/day avg)",
                 total_time / 60, total_time / max(len(trading_days), 1))
 
+    suffix = f"_{args.label}" if args.label else ""
+    acceptance_mode_counts: dict[str, int] = {}
+    breadth_suppressed_days = 0
+    for d in day_summaries:
+        m = d.get("acceptance_mode", "off")
+        if m == "breadth_suppressed":
+            breadth_suppressed_days += 1
+        else:
+            acceptance_mode_counts[m] = acceptance_mode_counts.get(m, 0) + 1
+
     if not all_results:
         logger.warning("No results to summarize.")
+        summary = {
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "config_path": args.config,
+            "label": args.label,
+            "start": args.start,
+            "end": args.end,
+            "period": f"{args.start} to {args.end}",
+            "exit_mode": args.exit_mode,
+            "entry_mode": args.entry_mode,
+            "mr_target_mode": args.mr_target,
+            "engines": args.engines,
+            "acceptance_mode": args.acceptance_mode,
+            "universe_source": args.universe_source,
+            "outputs_root": args.outputs_root if args.universe_source == "watchlist" else None,
+            "allowed_regimes": sorted(allowed_regimes),
+            "excluded_regimes": sorted(excluded_regimes),
+            "min_score_floor": args.min_score_floor,
+            "pick_rank_mode": args.pick_rank_mode,
+            "ticker_cooldown_days": args.ticker_cooldown_days,
+            "post_stop_cooldown_days": args.post_stop_cooldown_days,
+            "trading_days_scanned": len(trading_days),
+            "regime_filtered_days": regime_filtered_days,
+            "days_with_picks": 0,
+            "zero_pick_days": len(trading_days),
+            "zero_pick_days_pct": 1.0 if trading_days else 0.0,
+            "avg_picks_per_active_day": 0.0,
+            "total_picks": 0,
+            "entry_skipped_no_chase": 0,
+            "target_hits": 0,
+            "stop_hits": 0,
+            "hold_expired": 0,
+            "pnl_win_rate": 0.0,
+            "target_hit_rate": 0.0,
+            "avg_win_pct": 0.0,
+            "avg_loss_pct": 0.0,
+            "true_expectancy_pct": 0.0,
+            "weighted_expectancy_pct": 0.0,
+            "hold_expired_positive_pct": 0.0,
+            "day1_stop_count": 0,
+            "profitable_days_pct": 0.0,
+            "exit_day_distribution": {},
+            "max_drawdown_pct": 0.0,
+            "cumulative_pnl_pct": 0.0,
+            "final_equity_multiple": 1.0,
+            "total_time_min": round(total_time / 60, 1),
+            "breadth_suppressed_days": breadth_suppressed_days,
+            "acceptance_mode_counts": acceptance_mode_counts,
+            "price_data_fingerprint": _stable_price_fingerprint(data_map),
+            "price_snapshot_mode": price_snapshot_mode,
+            "price_snapshot_dir": str(snapshot_dir) if snapshot_dir else None,
+            "download_bad_tickers": sorted(report.get("bad_tickers", [])),
+            "download_bad_ticker_count": len(report.get("bad_tickers", [])),
+            "per_engine": {},
+            "per_regime": {},
+            "per_subtype": {},
+        }
+        summary_path = out_dir / f"backtest_summary{suffix}.json"
+        summary_path.write_text(json.dumps(summary, indent=2, default=str), encoding="utf-8")
+        detail_path = out_dir / f"backtest_detail{suffix}.csv"
+        pd.DataFrame(all_results).to_csv(detail_path, index=False)
+        daily_path = out_dir / f"backtest_daily{suffix}.csv"
+        pd.DataFrame(day_summaries).to_csv(daily_path, index=False)
+        logger.info("Summary: %s", summary_path)
+        logger.info("Detail: %s", detail_path)
+        logger.info("Daily: %s", daily_path)
         return 0
 
     df = pd.DataFrame(all_results)
@@ -1043,17 +1331,6 @@ def main():
     zero_pick_days = len(trading_days) - days_with_picks
     zero_pick_days_pct = zero_pick_days / len(trading_days) if len(trading_days) > 0 else 0
     avg_picks_per_active_day = total / days_with_picks if days_with_picks > 0 else 0
-
-    # Acceptance mode distribution (how many days in each mode)
-    # breadth_suppressed is tracked separately — market-quality gate, not allocator decision
-    acceptance_mode_counts: dict[str, int] = {}
-    breadth_suppressed_days = 0
-    for d in day_summaries:
-        m = d.get("acceptance_mode", "off")
-        if m == "breadth_suppressed":
-            breadth_suppressed_days += 1
-        else:
-            acceptance_mode_counts[m] = acceptance_mode_counts.get(m, 0) + 1
 
     # Per-engine breakdown
     engine_stats = {}
@@ -1126,7 +1403,6 @@ def main():
     max_dd = float(-drawdown_series.min()) * 100  # positive percentage
     cumulative_pnl_pct = float(equity.iloc[-1] - 1) * 100
 
-    suffix = f"_{args.label}" if args.label else ""
     summary = {
         "created_at": datetime.utcnow().isoformat() + "Z",
         "config_path": args.config,
@@ -1146,6 +1422,9 @@ def main():
         "allowed_regimes": sorted(allowed_regimes),
         "excluded_regimes": sorted(excluded_regimes),
         "min_score_floor": args.min_score_floor,
+        "pick_rank_mode": args.pick_rank_mode,
+        "ticker_cooldown_days": args.ticker_cooldown_days,
+        "post_stop_cooldown_days": args.post_stop_cooldown_days,
         "trading_days_scanned": len(trading_days),
         "regime_filtered_days": regime_filtered_days,
         "days_with_picks": days_with_picks,
@@ -1173,6 +1452,11 @@ def main():
         "total_time_min": round(total_time / 60, 1),
         "breadth_suppressed_days": breadth_suppressed_days,
         "acceptance_mode_counts": acceptance_mode_counts,
+        "price_data_fingerprint": _stable_price_fingerprint(data_map),
+        "price_snapshot_mode": price_snapshot_mode,
+        "price_snapshot_dir": str(snapshot_dir) if snapshot_dir else None,
+        "download_bad_tickers": sorted(report.get("bad_tickers", [])),
+        "download_bad_ticker_count": len(report.get("bad_tickers", [])),
         "per_engine": engine_stats,
         "per_regime": regime_stats,
         "per_subtype": subtype_stats,
