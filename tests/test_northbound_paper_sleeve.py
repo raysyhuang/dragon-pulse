@@ -121,6 +121,9 @@ def test_source_probe_records_top10_and_holding_delta_status(tmp_path, monkeypat
     assert data["hsgt_top10_net_amount_non_null"] == 0
     assert data["holding_delta_status"] == "ok"
     assert data["holding_delta_rows"] == 1
+    assert data["data_quality"] == "flow_confirmed_but_lagged"
+    assert data["flow_confirmed"] is True
+    assert any("net_amount" in gap for gap in data["data_gaps"])
 
 
 def test_true_atr14_includes_gap_risk():
@@ -134,3 +137,43 @@ def test_true_atr14_includes_gap_risk():
 
     # Last bar's high-low range is only 2, but true range captures the 100→110 gap.
     assert atr > 2.0
+
+
+def test_data_quality_marks_active_rank_only_when_flow_missing():
+    module = load_northbound_module()
+
+    quality = module.assess_data_quality(
+        asof_date="2026-06-29",
+        source_trade_date="2026-06-26",
+        source_status="ok",
+        net_amount_non_null=0,
+        holding_delta_status="eastmoney_holding_delta_unavailable: TypeError",
+        holding_delta_rows=0,
+    )
+
+    assert quality["data_quality"] == "active_rank_only"
+    assert quality["flow_confirmed"] is False
+    assert "成交活跃" in quality["label"]
+    assert any("active-rank turnover only" in gap for gap in quality["data_gaps"])
+    assert any("older than" in gap for gap in quality["data_gaps"])
+
+
+def test_build_picks_meta_exposes_data_quality_gaps(monkeypatch):
+    module = load_northbound_module()
+    hsgt = pd.DataFrame([
+        {"ts_code": "600001.SH", "name": "北向A", "rank": 1, "net_amount": None, "amount": 500.0},
+    ])
+    monkeypatch.setattr(module, "fetch_hsgt_top10_latest", lambda asof_date: ("20260626", hsgt, "ok"))
+    idx = pd.date_range("2026-05-01", periods=30, freq="D")
+    good_df = pd.DataFrame({"Open": 100, "High": 102.5, "Low": 97.5, "Close": 100, "Volume": 1_000_000}, index=idx)
+    monkeypatch.setattr(module, "_fetch_ohlcv", lambda tickers, start, end: {"600001.SH": good_df})
+    monkeypatch.setattr(module, "get_cn_basic_info", lambda tickers, provider_config=None: {"600001.SH": {"name_cn": "北向A"}})
+    monkeypatch.setattr(module, "fetch_holding_delta_map", lambda source_date: ({}, "eastmoney_holding_delta_unavailable: TypeError"))
+
+    picks, meta = module.build_picks("2026-06-29", top_n=5)
+
+    assert len(picks) == 1
+    assert meta["data_quality"] == "active_rank_only"
+    assert meta["flow_confirmed"] is False
+    assert any("net_amount" in gap for gap in meta["data_gaps"])
+    assert picks[0].to_dict()["northbound_flow_confirmed"] is False

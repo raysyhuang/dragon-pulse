@@ -176,6 +176,43 @@ def _numeric_or_none(value: object) -> float | None:
     return val if pd.notna(val) else None
 
 
+def assess_data_quality(
+    *,
+    asof_date: str,
+    source_trade_date: str | None,
+    source_status: str,
+    net_amount_non_null: int,
+    holding_delta_status: str,
+    holding_delta_rows: int,
+) -> dict:
+    """Grade whether northbound evidence is flow-confirmed or active-rank-only."""
+    gaps: list[str] = []
+    if source_status != "ok":
+        gaps.append(f"hsgt_top10 unavailable/degraded: {source_status}")
+    if source_trade_date and source_trade_date < asof_date:
+        gaps.append(f"latest hsgt_top10 trade_date {source_trade_date} is older than asof {asof_date}")
+    if net_amount_non_null <= 0:
+        gaps.append("hsgt_top10 net_amount/buy/sell are not populated; active-rank turnover only")
+    if holding_delta_rows <= 0 or holding_delta_status != "ok":
+        gaps.append(f"holding-delta replacement unavailable: {holding_delta_status}")
+
+    flow_confirmed = net_amount_non_null > 0 or (holding_delta_status == "ok" and holding_delta_rows > 0)
+    if source_status != "ok":
+        grade = "unavailable"
+    elif flow_confirmed and not any("older than" in g for g in gaps):
+        grade = "flow_confirmed"
+    elif flow_confirmed:
+        grade = "flow_confirmed_but_lagged"
+    else:
+        grade = "active_rank_only"
+    return {
+        "data_quality": grade,
+        "flow_confirmed": flow_confirmed,
+        "data_gaps": gaps,
+        "label": "北向活跃榜/成交活跃纸面跟踪" if not flow_confirmed else "北向资金流确认纸面跟踪",
+    }
+
+
 def _compute_true_atr14(high_s: pd.Series, low_s: pd.Series, close_s: pd.Series) -> float:
     """Compute Wilder-style true range mean over 14 bars.
 
@@ -282,6 +319,14 @@ def save_source_probe(date_str: str) -> Path:
         "holding_delta_rows": len(holding_map),
         "holding_delta_sample": dict(list(holding_map.items())[:5]),
     }
+    payload.update(assess_data_quality(
+        asof_date=date_str,
+        source_trade_date=source_date,
+        source_status=status,
+        net_amount_non_null=net_non_null,
+        holding_delta_status=holding_status,
+        holding_delta_rows=len(holding_map),
+    ))
     out.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     logger.info("Saved northbound source probe: %s", out)
     return out
@@ -331,6 +376,15 @@ def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
     holding_delta_map, holding_delta_status = fetch_holding_delta_map(source_date)
     meta["holding_delta_status"] = holding_delta_status
     meta["holding_delta_rows"] = len(holding_delta_map)
+    net_amount_non_null = int(pd.Series(hsgt["net_amount"]).notna().sum()) if "net_amount" in hsgt.columns else 0
+    meta.update(assess_data_quality(
+        asof_date=asof_date,
+        source_trade_date=source_date,
+        source_status=status,
+        net_amount_non_null=net_amount_non_null,
+        holding_delta_status=holding_delta_status,
+        holding_delta_rows=len(holding_delta_map),
+    ))
 
     picks: list[PaperPick] = []
     for _, row in hsgt.iterrows():
@@ -423,10 +477,12 @@ def send_preopen_alert(date_str: str, picks: list[PaperPick], meta: dict, path: 
 
     source_date = meta.get("source_trade_date") or "n/a"
     lines = [
-        f"<b>🧪 北向纸面袖珍盘 — {date_str}</b>",
+        f"<b>🧪 北向活跃榜纸面跟踪 — {date_str}</b>",
         "状态: <b>PAPER ONLY / 不进实盘龙脉排名</b>",
+        f"数据质量: <b>{meta.get('data_quality', 'unknown')}</b> | 标签: {meta.get('label', '北向活跃榜/成交活跃纸面跟踪')}",
         f"来源: hsgt_top10 {source_date} | 规则: rank≤5 + stop风险4–7%",
         f"增持替代源: {meta.get('holding_delta_status', 'n/a')} | 发布探针: 已记录",
+        "缺口: " + "；".join(meta.get("data_gaps", [])[:3]) if meta.get("data_gaps") else "缺口: 无",
         "",
     ]
     if not picks:
