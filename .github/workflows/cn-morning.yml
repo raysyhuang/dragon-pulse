@@ -110,22 +110,7 @@ jobs:
             echo "No same-day pre-open outputs to commit"
           else
             git commit -m "auto: CN pre-open outputs for ${TRADE_DATE}"
-            pushed=false
-            for i in 1 2 3; do
-              if git push origin HEAD:main; then
-                pushed=true
-                break
-              fi
-              echo "Push failed (attempt $i/3), rebasing..."
-              git stash push --include-untracked --message "cn-preopen-rebase-${i}" || true
-              git fetch origin main
-              git rebase origin/main
-              git stash pop || true
-            done
-            if [ "${pushed}" != "true" ]; then
-              echo "Failed to push CN pre-open outputs after 3 attempts"
-              exit 1
-            fi
+            scripts/gha_push_with_rebase.sh main 3
           fi
 
       - name: Upload same-day pre-open outputs artifact
@@ -190,11 +175,7 @@ jobs:
             echo "No northbound paper outputs to commit"
           else
             git commit -m "auto: northbound paper feed for ${TRADE_DATE}"
-            git push origin HEAD:main || {
-              git fetch origin main
-              git rebase origin/main
-              git push origin HEAD:main
-            }
+            scripts/gha_push_with_rebase.sh main 3
           fi
 
   northbound-source-probe:
@@ -248,11 +229,7 @@ jobs:
             echo "No northbound source probe outputs to commit"
           else
             git commit -m "auto: northbound source probe for ${TRADE_DATE} ${PROBE_SLOT}"
-            git push origin HEAD:main || {
-              git fetch origin main
-              git rebase origin/main
-              git push origin HEAD:main
-            }
+            scripts/gha_push_with_rebase.sh main 3
           fi
 
   preflight:
@@ -320,11 +297,7 @@ jobs:
             echo "No check results to commit"
           else
             git commit -m "auto: CN morning check for ${TRADE_DATE}"
-            git push origin HEAD:main || {
-              git fetch origin main
-              git rebase origin/main
-              git push origin HEAD:main
-            }
+            scripts/gha_push_with_rebase.sh main 3
           fi
 
   northbound-paper-open-check:
@@ -378,9 +351,5 @@ jobs:
             echo "No northbound paper check outputs to commit"
           else
             git commit -m "auto: northbound paper open check for ${TRADE_DATE}"
-            git push origin HEAD:main || {
-              git fetch origin main
-              git rebase origin/main
-              git push origin HEAD:main
-            }
+            scripts/gha_push_with_rebase.sh main 3
           fi

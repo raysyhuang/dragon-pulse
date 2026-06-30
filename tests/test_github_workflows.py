@@ -30,20 +30,28 @@ def test_cn_morning_workflow_has_same_day_preopen_scan_and_open_check():
     assert "Missing same-day watchlist" in preflight_run
     assert "sort -t_ -k3 -r | head -1" not in preflight_run
 
+    preopen_run = "\n".join(
+        step.get("run", "") for step in jobs["preopen-scan"]["steps"]
+    )
+    assert "scripts/gha_push_with_rebase.sh main 3" in preopen_run
+
     nb_preopen_run = "\n".join(
         step.get("run", "") for step in jobs["northbound-paper-preopen"]["steps"]
     )
     assert "python scripts/northbound_paper_sleeve.py --mode preopen" in nb_preopen_run
     assert "northbound_paper_watchlist_${TRADE_DATE}.json" in nb_preopen_run
+    assert "scripts/gha_push_with_rebase.sh main 3" in nb_preopen_run
 
     nb_open_run = "\n".join(
         step.get("run", "") for step in jobs["northbound-paper-open-check"]["steps"]
     )
     assert "python scripts/northbound_paper_sleeve.py --mode open_check" in nb_open_run
     assert "northbound_paper_execution_check_${TRADE_DATE}.json" in nb_open_run
+    assert "scripts/gha_push_with_rebase.sh main 3" in nb_open_run
 
     nb_probe_run = "\n".join(
         step.get("run", "") for step in jobs["northbound-source-probe"]["steps"]
     )
     assert "python scripts/northbound_paper_sleeve.py --mode source_probe" in nb_probe_run
     assert "northbound_source_probe_${TRADE_DATE}_${PROBE_SLOT}.json" in nb_probe_run
+    assert "scripts/gha_push_with_rebase.sh main 3" in nb_probe_run
