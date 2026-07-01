@@ -1,0 +1,49 @@
+{
+  "date": "2026-07-01",
+  "regime": "bull",
+  "universe_size": 998,
+  "picks": [
+    {
+      "ticker": "301396.SZ",
+      "name_cn": "宏景科技",
+      "engine": "alpha_rs_pullback",
+      "score": 96.3,
+      "entry_price": 327.5,
+      "max_entry_price": 334.05,
+      "stop_loss": 297.94,
+      "target_1": 383.94,
+      "target_2": 393.0,
+      "holding_period": 5,
+      "adv_cny": 3832604221.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=91",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 91.00450822087333,
+        "trend": 100.0,
+        "volume": 90.0
+      }
+    },
+    {
+      "ticker": "688008.SH",
+      "name_cn": "澜起科技",
+      "engine": "alpha_rs_pullback",
+      "score": 95.85,
+      "entry_price": 315.89,
+      "max_entry_price": 322.21,
+      "stop_loss": 294.11,
+      "target_1": 357.48,
+      "target_2": 379.07,
+      "holding_period": 5,
+      "adv_cny": 188190568.0,
+      "market_cap_cny": null,
+      "reason_summary": "rs=100, trend=100, pull_quality=95",
+      "components": {
+        "rs": 100.0,
+        "pull_quality": 94.5132171823371,
+        "trend": 100.0,
+        "volume": 75.0
+      }
+    }
+  ]
+}
