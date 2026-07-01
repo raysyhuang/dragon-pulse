@@ -109,22 +109,7 @@ jobs:
           else
             TRADE_DATE="${{ steps.date.outputs.trade_date }}"
             git commit -m "auto: CN nightly outputs for ${TRADE_DATE}"
-            pushed=false
-            for i in 1 2 3; do
-              if git push origin HEAD:main; then
-                pushed=true
-                break
-              fi
-              echo "Push failed (attempt $i/3), rebasing..."
-              git stash push --include-untracked --message "cn-nightly-rebase-${i}" || true
-              git fetch origin main
-              git rebase origin/main
-              git stash pop || true
-            done
-            if [ "${pushed}" != "true" ]; then
-              echo "Failed to push CN nightly outputs after 3 attempts"
-              exit 1
-            fi
+            scripts/gha_push_with_rebase.sh main 3
           fi
 
       - name: Upload outputs artifact

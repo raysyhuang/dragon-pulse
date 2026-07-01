@@ -1,38 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Push the current committed HEAD to a GitHub Actions output branch, rebasing
+# the commit on top of the latest remote tip if another scheduled job pushed
+# first. Call this AFTER `git commit`; the artifact changes live in HEAD, not
+# in the index. This avoids the bug where a failed push followed by checking
+# `git diff --cached` concludes there is "nothing to push" and silently drops
+# the output commit.
 BRANCH="${1:-main}"
 MAX_ATTEMPTS="${2:-3}"
 
-pushed=false
 for i in $(seq 1 "${MAX_ATTEMPTS}"); do
   if git push origin "HEAD:${BRANCH}"; then
-    pushed=true
-    break
+    exit 0
   fi
 
-  echo "Push failed (attempt ${i}/${MAX_ATTEMPTS}), rebasing while preserving staged outputs..."
-  staged_list="$(mktemp)"
-  git diff --cached --name-only > "${staged_list}"
-
-  if [ ! -s "${staged_list}" ]; then
-    echo "No staged files remain after failed push; nothing to push."
-    pushed=true
-    break
-  fi
-
-  git stash push --staged --message "gha-staged-output-rebase-${i}" || true
+  echo "Push failed (attempt ${i}/${MAX_ATTEMPTS}); rebasing committed outputs onto origin/${BRANCH}..."
   git fetch origin "${BRANCH}"
   git rebase "origin/${BRANCH}"
-  git stash pop || true
-
-  # Stash pop restores files to the worktree, but not necessarily the index.
-  # Restage exactly the files this job intended to publish.
-  xargs -r git add < "${staged_list}"
-  rm -f "${staged_list}"
 done
 
-if [ "${pushed}" != "true" ]; then
-  echo "Failed to push outputs after ${MAX_ATTEMPTS} attempts"
-  exit 1
-fi
+echo "Failed to push outputs after ${MAX_ATTEMPTS} attempts"
+exit 1
