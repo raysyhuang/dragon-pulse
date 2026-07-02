@@ -4,17 +4,17 @@
   "csi300_last": 4958.98,
   "csi300_sma_short": 4887.44,
   "csi300_sma_long": 4866.7,
-  "market_breadth_pct_above_sma20": 0.5136,
-  "day_quality_score": 77.2,
+  "market_breadth_pct_above_sma20": 0.5333,
+  "day_quality_score": 85.5,
   "day_quality_components": {
-    "breadth": 17.8,
+    "breadth": 19.4,
     "regime": 20.0,
-    "signal_density": 9.4,
+    "signal_density": 16.0,
     "top_score": 25.0,
     "diversity": 5.0
   },
   "acceptance_mode": "full",
   "acceptance_abstained": false,
-  "acceptance_eligible_count": 12,
-  "acceptance_rejected_count": 10
+  "acceptance_eligible_count": 17,
+  "acceptance_rejected_count": 15
 }
