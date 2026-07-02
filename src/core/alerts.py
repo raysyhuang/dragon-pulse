@@ -471,6 +471,12 @@ class AlertManager:
 
         run_id = os.environ.get("GITHUB_RUN_ID", "N/A")
         run_attempt = os.environ.get("GITHUB_RUN_ATTEMPT", "1")
+        # run_id/run_attempt are identical across all jobs in one workflow run,
+        # so include the job id to keep marker filenames unique per job. Without
+        # this, two concurrent jobs write the same marker filename and their
+        # output commits collide (add/add) when the second rebases to push.
+        job_id = os.environ.get("GITHUB_JOB", "local")
+        marker_name = f".telegram_sent_{run_id}_{run_attempt}_{job_id}.txt"
 
         # Retries re-run computation but MUST NOT emit side effects
         if is_retry_attempt():
@@ -485,7 +491,7 @@ class AlertManager:
         # Check for duplicate send marker file
         if asof_date and run_id != "N/A":
             outputs_dir = Path("outputs") / asof_date
-            marker_file = outputs_dir / f".telegram_sent_{run_id}_{run_attempt}.txt"
+            marker_file = outputs_dir / marker_name
             if marker_file.exists():
                 logger.info(f"Telegram alert already sent for run_id={run_id}, attempt={run_attempt}. Skipping.")
                 return True
@@ -528,10 +534,10 @@ class AlertManager:
             if asof_date and run_id != "N/A":
                 outputs_dir = Path("outputs") / asof_date
                 outputs_dir.mkdir(parents=True, exist_ok=True)
-                marker_file = outputs_dir / f".telegram_sent_{run_id}_{run_attempt}.txt"
+                marker_file = outputs_dir / marker_name
                 try:
                     with open(marker_file, "w") as f:
-                        f.write(f"Title: {title}\nRun ID: {run_id}\nAttempt: {run_attempt}\n")
+                        f.write(f"Title: {title}\nRun ID: {run_id}\nAttempt: {run_attempt}\nJob: {job_id}\n")
                     logger.info(f"Created marker file: {marker_file}")
                 except Exception as e:
                     logger.warning(f"Failed to create marker file: {e}")

@@ -17,6 +17,7 @@ def test_telegram_tracking():
     os.environ["GITHUB_WORKFLOW"] = "Test Workflow"
     os.environ["GITHUB_RUN_ID"] = "test_12345"
     os.environ["GITHUB_RUN_ATTEMPT"] = "1"
+    os.environ["GITHUB_JOB"] = "test-job"
     os.environ["GITHUB_SHA"] = "abc123def456789"
     os.environ["TELEGRAM_BOT_TOKEN"] = "test-token"
     os.environ["TELEGRAM_CHAT_ID"] = "test-chat"
@@ -26,9 +27,9 @@ def test_telegram_tracking():
         channels=["telegram"],
     )
     test_date = "2026-01-30"
-    marker_path = Path(f"outputs/{test_date}/.telegram_sent_test_12345_1.txt")
-    marker_path_attempt2 = Path(f"outputs/{test_date}/.telegram_sent_test_12345_2.txt")
-    marker_path_new = Path(f"outputs/{test_date}/.telegram_sent_test_67890_1.txt")
+    marker_path = Path(f"outputs/{test_date}/.telegram_sent_test_12345_1_test-job.txt")
+    marker_path_attempt2 = Path(f"outputs/{test_date}/.telegram_sent_test_12345_2_test-job.txt")
+    marker_path_new = Path(f"outputs/{test_date}/.telegram_sent_test_67890_1_test-job.txt")
 
     for marker in [marker_path, marker_path_attempt2, marker_path_new]:
         if marker.exists():
