@@ -1,0 +1,27 @@
+{
+  "date": "2026-07-08",
+  "generated_utc": "2026-07-08T00:11:13.735575",
+  "sleeve": "northbound_active_riskband_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "meta": {
+    "asof_date": "2026-07-08",
+    "source_trade_date": "2026-07-07",
+    "source_status": "ok",
+    "paper_only": true,
+    "rule": "northbound active rank<=5, stop-risk 4-7%, conservative T+1 no-chase, 5D bracket replay tracker",
+    "holding_delta_status": "eastmoney_holding_delta_unavailable: TypeError: 'NoneType' object is not subscriptable",
+    "holding_delta_rows": 0,
+    "data_quality": "active_rank_only",
+    "flow_confirmed": false,
+    "data_gaps": [
+      "latest hsgt_top10 trade_date 2026-07-07 is older than asof 2026-07-08",
+      "hsgt_top10 net_amount/buy/sell are not populated; active-rank turnover only",
+      "holding-delta replacement unavailable: eastmoney_holding_delta_unavailable: TypeError: 'NoneType' object is not subscriptable"
+    ],
+    "label": "北向活跃榜/成交活跃纸面跟踪",
+    "source_rows": 10,
+    "riskband_picks": 0
+  },
+  "picks": []
+}
