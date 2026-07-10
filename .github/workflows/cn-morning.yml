@@ -8,6 +8,10 @@ on:
     # 09:35 Shanghai = 01:35 UTC (weekdays).
     # Reuses the same-day watchlist and sends GO/CANCEL using live open prices.
     - cron: "35 1 * * 1-5"
+    # 09:55 Shanghai backup for the open check. Retries when the 01:35 run is
+    # lost to runner-acquisition failures or schedule delays; dedup markers
+    # make a duplicate run a no-op.
+    - cron: "55 1 * * 1-5"
     # Northbound source-lag probes: 12:00, 15:30, 17:00 Shanghai.
     - cron: "0 4 * * 1-5"
     - cron: "30 7 * * 1-5"
@@ -31,7 +35,9 @@ env:
   TZ: "Asia/Shanghai"
 
 concurrency:
-  group: cn-morning-${{ github.event.schedule || inputs.mode || 'manual' }}
+  # The 01:35 and 01:55 UTC open-check crons share one group so the backup
+  # run queues behind (never races) a still-running primary check.
+  group: cn-morning-${{ (github.event.schedule == '35 1 * * 1-5' || github.event.schedule == '55 1 * * 1-5') && 'open-check' || github.event.schedule || inputs.mode || 'manual' }}
   cancel-in-progress: false
 
 jobs:
@@ -234,7 +240,7 @@ jobs:
 
   preflight:
     name: 09:35 Open GO/CANCEL Check
-    if: github.event.schedule == '35 1 * * 1-5' || inputs.mode == 'open_check'
+    if: github.event.schedule == '35 1 * * 1-5' || github.event.schedule == '55 1 * * 1-5' || inputs.mode == 'open_check'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -245,8 +251,20 @@ jobs:
           # Pull latest to get nightly outputs
           ref: main
 
+      - name: Lateness guard
+        id: late
+        run: |
+          NOW_HM=$(TZ=Asia/Shanghai date +%H%M)
+          if [ $((10#$NOW_HM)) -gt 1030 ]; then
+            echo "late=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Open check started at ${NOW_HM} Shanghai (past 10:30). A GO/CANCEL verdict is no longer actionable at the open — skipping."
+          else
+            echo "late=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Find latest watchlist
         id: check
+        if: steps.late.outputs.late != 'true'
         run: |
           TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
           WL_FILE="outputs/${TRADE_DATE}/execution_watchlist_${TRADE_DATE}.json"
@@ -307,29 +325,54 @@ jobs:
     permissions:
       contents: write
     needs: [preflight]
-    if: always() && (github.event.schedule == '35 1 * * 1-5' || inputs.mode == 'northbound_paper_open_check')
+    if: always() && (github.event.schedule == '35 1 * * 1-5' || github.event.schedule == '55 1 * * 1-5' || inputs.mode == 'northbound_paper_open_check')
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
 
+      - name: Lateness guard
+        id: late
+        run: |
+          NOW_HM=$(TZ=Asia/Shanghai date +%H%M)
+          if [ $((10#$NOW_HM)) -gt 1030 ]; then
+            echo "late=true" >> "$GITHUB_OUTPUT"
+            echo "::warning::Northbound open check started at ${NOW_HM} Shanghai (past 10:30) — skipping stale check."
+          else
+            echo "late=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Compute trading date
         id: date
+        if: steps.late.outputs.late != 'true'
         run: |
           TRADE_DATE=$(TZ=Asia/Shanghai date +%Y-%m-%d)
           echo "trade_date=${TRADE_DATE}" >> "$GITHUB_OUTPUT"
+          # Cross-run idempotence: the Telegram dedup marker is keyed on
+          # GITHUB_RUN_ID, so a backup-cron run would re-send. Skip when the
+          # primary run already committed today's open check.
+          CHECK_FILE="outputs/${TRADE_DATE}/northbound_paper_execution_check_${TRADE_DATE}.json"
+          if [ -f "${CHECK_FILE}" ]; then
+            echo "done=true" >> "$GITHUB_OUTPUT"
+            echo "Open check already committed for ${TRADE_DATE} — skipping duplicate run."
+          else
+            echo "done=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Set up Python
+        if: steps.late.outputs.late != 'true' && steps.date.outputs.done != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install dependencies
+        if: steps.late.outputs.late != 'true' && steps.date.outputs.done != 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Run northbound paper open check
+        if: steps.late.outputs.late != 'true' && steps.date.outputs.done != 'true'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -340,7 +383,7 @@ jobs:
           python scripts/northbound_paper_sleeve.py --mode open_check --date "${TRADE_DATE}"
 
       - name: Commit northbound paper check outputs
-        if: success()
+        if: success() && steps.late.outputs.late != 'true' && steps.date.outputs.done != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
