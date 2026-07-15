@@ -1,0 +1,55 @@
+{
+  "date": "2026-07-15",
+  "generated_utc": "2026-07-15T00:05:04.164219",
+  "sleeve": "northbound_active_riskband_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "meta": {
+    "asof_date": "2026-07-15",
+    "source_trade_date": "2026-07-14",
+    "source_status": "ok",
+    "paper_only": true,
+    "rule": "northbound active rank<=5, stop-risk 4-7%, conservative T+1 no-chase, 5D bracket replay tracker",
+    "holding_delta_status": "eastmoney_holding_delta_unavailable: TypeError: 'NoneType' object is not subscriptable",
+    "holding_delta_rows": 0,
+    "data_quality": "active_rank_only",
+    "flow_confirmed": false,
+    "data_gaps": [
+      "latest hsgt_top10 trade_date 2026-07-14 is older than asof 2026-07-15",
+      "hsgt_top10 net_amount/buy/sell are not populated; active-rank turnover only",
+      "holding-delta replacement unavailable: eastmoney_holding_delta_unavailable: TypeError: 'NoneType' object is not subscriptable"
+    ],
+    "label": "北向活跃榜/成交活跃纸面跟踪",
+    "source_rows": 10,
+    "riskband_picks": 1
+  },
+  "picks": [
+    {
+      "ticker": "300750.SZ",
+      "name_cn": "宁德时代",
+      "engine": "northbound_active_riskband_paper",
+      "paper_only": true,
+      "status": "PAPER_TRACK_ONLY",
+      "rank": 1,
+      "signal_date": "2026-07-15",
+      "source_trade_date": "2026-07-14",
+      "entry_price": 364.01,
+      "max_entry_price": 371.29,
+      "stop_loss": 347.1,
+      "target_1": 396.29,
+      "target_2": 419.35,
+      "holding_period": 5,
+      "score": 113.16,
+      "stop_risk_pct": 4.65,
+      "net_amount": null,
+      "amount": 9021928752.0,
+      "holding_delta_vol": null,
+      "holding_delta_ratio": null,
+      "holding_delta_source": null,
+      "northbound_flow_confirmed": false,
+      "promotion_eligible": false,
+      "promotion_blocker": "Paper-only active-rank lead until net_amount or holding-delta works and PIT/publish-lag gates pass",
+      "reason_summary": "北向活跃榜rank=1, stop风险=4.7%"
+    }
+  ]
+}
