@@ -26,11 +26,18 @@
 - **Fill rate:** filled eligible picks / eligible picks, reported with the numerator and denominator.
 - **Skipped-entry counterfactual:** every no-chase `CANCEL` receives a separate, explicitly non-realised 5-session replay using the actual next open as a forced hypothetical fill and the originally recorded absolute stop/target levels. It is tagged `counterfactual_only` and is excluded from the realised fill, hit-rate, R, and promotion statistics. Report its bracket outcomes alongside filled outcomes to detect adverse selection by the cap.
 
+## Amendment 1 — 2026-07-17 UTC, before the first native-stamped pick matures
+
+The original same-bar convention was target-first because it mirrored the then-current `evaluate_pick` branch. That engine ordering is inconsistent with its runner branch's conservative intrabar policy and is result-flattering for a kill gate. This amendment supersedes that convention **before the forward readout has mature native observations**.
+
+- **Same-bar convention:** **stop-first**. When a daily bar has `high >= target_1` and `low <= stop_loss`, record `same_bar_stop_first`, use the stop as the terminal exit, and include its realised negative R in the kill-gate median. Report the same-bar count separately in every readout.
+- **Backtest gate:** the current `scripts.backtest_1yr.evaluate_pick(..., exit_mode="target_stop")` target-first ordering is not promotion-valid. It must be repaired to this stop-first rule, with regression coverage for T+1 timing and gap-through-stop behavior, before any backtest result can support promotion. Until then it is research context only.
+
 ## Bracket convention and outcomes
 
-- **Canonical evaluator:** `scripts.backtest_1yr.evaluate_pick`, entry mode `no_chase_next_open`, exit mode `target_stop`.
-- **Same-bar convention:** **target-first**. When a daily bar has `high >= target_1` and `low <= stop_loss`, record the event as `same_bar_target_first` and count it as a target hit. This matches the fixed evaluator's target-before-stop ordering. Report the same-bar count separately in every readout.
-- **Terminal outcome:** `target_hit`, `stop_hit`, `hold_expired`, or `same_bar_target_first`; unresolved/no-data cases remain separate. `target-1-before-stop` and `stop-before-target-1` rates exclude no-data outcomes and state their denominator.
+- **Forward ledger convention:** stop-first as fixed by Amendment 1 above; it does not inherit the current target-first `evaluate_pick` defect.
+- **Canonical evaluator for promotion:** only a repaired `scripts.backtest_1yr.evaluate_pick` whose tested semantics match this document may be used for PIT/backtest promotion evidence.
+- **Terminal outcome:** `target_hit`, `stop_hit`, `hold_expired`, or `same_bar_stop_first`; unresolved/no-data cases remain separate. `target-1-before-stop` and `stop-before-target-1` rates exclude no-data outcomes and state their denominator.
 - **R multiple:** for a filled, terminal observation, `(exit_price - actual_entry_price) / (actual_entry_price - stop_loss)`. Time exits use their 5-session close. Counterfactual outcomes use the same formula but remain outside realised statistics.
 
 ## Pre-committed decisions
@@ -41,10 +48,10 @@ The 2–4 week readout is **not promotion evidence**. Promotion still requires t
 
 Kill the sleeve (stop new paper entries; preserve artifacts) if, after at least 8 mature, non-counterfactual filled observations:
 
-- **6 or more of the first 8** terminal filled observations are `stop_hit` before `target_1`; **or**
+- **6 or more of the first 8** terminal filled observations are `stop_hit` or `same_bar_stop_first` before `target_1`; **or**
 - median realised terminal R is **≤ -0.50R**.
 
-Same-bar events use the target-first convention above. No-chase skips and no-data observations cannot be counted as stop losses.
+Same-bar events use the stop-first convention in Amendment 1 above. No-chase skips and no-data observations cannot be counted as stop losses.
 
 ### Extend
 
@@ -65,6 +72,6 @@ For the full sample and each available `regime_at_signal` group, publish:
 1. watchlists, eligible picks, fills, skips, no-data, and all denominators;
 2. stamp status / source-date lag counts;
 3. open drift percentage and R, including gap-up/flat/gap-down splits;
-4. target, stop, time, same-bar-target-first, and unresolved counts;
+4. target, stop, time, same-bar-stop-first, and unresolved counts;
 5. realised R distribution (median, mean, p10, p90) and the pre-registered decision;
 6. skipped-entry counterfactual outcomes, clearly separated from realised outcomes.
