@@ -59,6 +59,27 @@ from src.signals.alpha_candidates import (
     score_sniper_breakout_alpha,
 )
 
+_TARGET_EXIT_REASONS = {"target_hit", "target_hit_gap"}
+_STOP_EXIT_REASONS = {
+    "gap_stop_open", "same_bar_stop_first", "stop_hit", "stop_hit_gap",
+    "trail_stop", "trail_stop_gap",
+}
+_HOLD_EXIT_REASONS = {"hold_expired", "hold_expired_runner"}
+
+
+def _is_stop_exit(exit_reason: str | None) -> bool:
+    return exit_reason in _STOP_EXIT_REASONS
+
+
+def _daily_outcome_bucket(exit_reason: str | None) -> str:
+    if exit_reason in _TARGET_EXIT_REASONS:
+        return "win"
+    if exit_reason in _STOP_EXIT_REASONS:
+        return "loss"
+    if exit_reason in _HOLD_EXIT_REASONS:
+        return "hold"
+    return "no_data"
+
 
 def _safe_float(value, default: float = 0.0) -> float:
     try:
@@ -260,7 +281,9 @@ def evaluate_pick(
 ) -> dict:
     """Evaluate a single pick against forward price data.
 
-    T+1 rule: no same-day exits. Evaluation starts from day 1.
+    T+1: entry fills at the first forward bar; exits begin on the following
+    bar. The sole entry-bar exception is an open at/below stop, recorded as
+    ``gap_stop_open`` at the open.
 
     Entry modes:
         signal              — legacy: assume fill at signal entry_price
@@ -280,6 +303,10 @@ def evaluate_pick(
         runner_laggard  — runner + cut early if flat/red at the laggard_day close.
     """
     runner_modes = {"runner", "runner_laggard"}
+    if holding_period < 2:
+        raise ValueError("holding_period must be >= 2 under CN T+1")
+    if exit_mode in runner_modes and runner_max_hold < 2:
+        raise ValueError("runner_max_hold must be >= 2 under CN T+1")
     requested_entry_price = float(entry_price)
     result = {
         "ticker": ticker,
@@ -295,8 +322,10 @@ def evaluate_pick(
         "exit_day": None,
         "exit_reason": None,
         "pnl_pct": None,
+        "unrealized_pnl_pct": None,
         "hit_target": False,
         "hit_stop": False,
+        "same_bar_both_touched": False,
     }
 
     if forward_df.empty:
@@ -346,6 +375,17 @@ def evaluate_pick(
     result["actual_entry_price"] = entry_price
     result["entry_status"] = "filled"
 
+    first_open = float(bars.iloc[0][open_col])
+    if first_open <= stop_loss:
+        result.update(
+            exit_price=min(stop_loss, first_open),
+            exit_day=1,
+            exit_reason="gap_stop_open",
+            hit_stop=True,
+        )
+        result["pnl_pct"] = round((result["exit_price"] / entry_price - 1) * 100, 2)
+        return result
+
     # ---- Runner / runner_laggard: let winners run on an ATR trailing stop. ----
     if exit_mode in runner_modes:
         eff_atr = atr if atr and atr > 0 else abs(entry_price - stop_loss)
@@ -357,11 +397,26 @@ def evaluate_pick(
             low = float(row[low_col])
             close = float(row[close_col])
 
+            if day_idx == 1:
+                # CN T+1 prevents entry-bar exits, not next-session trail arming.
+                highest_close = max(highest_close, close)
+                if close >= entry_price * (1 + breakeven_at / 100.0):
+                    engaged = True
+                if engaged and eff_atr > 0:
+                    effective_stop = max(effective_stop, entry_price,
+                                         highest_close - trail_atr * eff_atr)
+                continue
+
             # Conservative intrabar order: stop (Low) before any upside.
             if low <= effective_stop:
-                result["exit_price"] = effective_stop
+                open_px = float(row[open_col])
+                gapped = open_px < effective_stop
+                result["exit_price"] = min(effective_stop, open_px)
                 result["exit_day"] = day_idx
-                result["exit_reason"] = "trail_stop" if engaged else "stop_hit"
+                result["exit_reason"] = (
+                    ("trail_stop_gap" if gapped else "trail_stop") if engaged
+                    else ("stop_hit_gap" if gapped else "stop_hit")
+                )
                 result["hit_stop"] = True
                 break
 
@@ -381,9 +436,13 @@ def evaluate_pick(
                                      highest_close - trail_atr * eff_atr)
         else:
             last_close = float(bars.iloc[-1][close_col])
-            result["exit_price"] = last_close
-            result["exit_day"] = len(bars)
-            result["exit_reason"] = "hold_expired_runner" if engaged else "hold_expired"
+            if len(bars) >= eff_hold:
+                result["exit_price"] = last_close
+                result["exit_day"] = len(bars)
+                result["exit_reason"] = "hold_expired_runner" if engaged else "hold_expired"
+            else:
+                result["unrealized_pnl_pct"] = round((last_close / entry_price - 1) * 100, 2)
+                result["exit_reason"] = "holding_window_incomplete"
 
         if result["exit_price"] is not None and entry_price > 0:
             result["pnl_pct"] = round((result["exit_price"] / entry_price - 1) * 100, 2)
@@ -398,24 +457,39 @@ def evaluate_pick(
         low = float(row[low_col])
         close = float(row[close_col])
 
-        # Trailing stop logic (for sniper or when exit_mode=trailing)
-        if exit_mode == "trailing" and atr > 0:
-            if high >= entry_price + atr and not trailing_activated:
-                effective_stop = entry_price  # move to breakeven
+        if day_idx == 1:
+            # CN T+1 prevents entry-bar exits, not next-session stop arming.
+            if exit_mode == "trailing" and atr > 0 and high >= entry_price + atr:
+                effective_stop = max(effective_stop, entry_price)
                 trailing_activated = True
+            continue
 
-        if high >= target_1:
-            result["exit_price"] = target_1
+        touched_stop = low <= effective_stop
+        touched_target = high >= target_1
+        if touched_stop:
+            result["same_bar_both_touched"] = bool(touched_target)
+            open_px = float(row[open_col])
+            result["exit_price"] = min(effective_stop, open_px)
             result["exit_day"] = day_idx
-            result["exit_reason"] = "target_hit"
-            result["hit_target"] = True
-            break
-        elif low <= effective_stop:
-            result["exit_price"] = effective_stop
-            result["exit_day"] = day_idx
-            result["exit_reason"] = "stop_hit"
+            if touched_target:
+                result["exit_reason"] = "same_bar_stop_first"
+            else:
+                result["exit_reason"] = "stop_hit_gap" if open_px < effective_stop else "stop_hit"
             result["hit_stop"] = True
             break
+        if touched_target:
+            open_px = float(row[open_col])
+            result["exit_price"] = max(target_1, open_px)
+            result["exit_day"] = day_idx
+            result["exit_reason"] = "target_hit_gap" if open_px > target_1 else "target_hit"
+            result["hit_target"] = True
+            break
+
+        # A high observed this bar can only ratchet the stop for the next bar.
+        if exit_mode == "trailing" and atr > 0 and not trailing_activated:
+            if high >= entry_price + atr:
+                effective_stop = max(effective_stop, entry_price)
+                trailing_activated = True
 
         # Profitable-close exit: after day 2, exit if close > entry
         if exit_mode == "profitable_close" and day_idx >= 2 and close > entry_price:
@@ -425,9 +499,13 @@ def evaluate_pick(
             break
     else:
         last_close = float(bars.iloc[-1][close_col])
-        result["exit_price"] = last_close
-        result["exit_day"] = len(bars)
-        result["exit_reason"] = "hold_expired"
+        if len(bars) >= eff_hold:
+            result["exit_price"] = last_close
+            result["exit_day"] = len(bars)
+            result["exit_reason"] = "hold_expired"
+        else:
+            result["unrealized_pnl_pct"] = round((last_close / entry_price - 1) * 100, 2)
+            result["exit_reason"] = "holding_window_incomplete"
 
     if result["exit_price"] is not None and entry_price > 0:
         result["pnl_pct"] = round((result["exit_price"] / entry_price - 1) * 100, 2)
@@ -1170,14 +1248,16 @@ def main():
             cooldown_ticker = getattr(sig, "ticker", "")
             if args.ticker_cooldown_days > 0 and cooldown_ticker:
                 cooldown_until[cooldown_ticker] = max(cooldown_until.get(cooldown_ticker, -1), i + args.ticker_cooldown_days)
-            if eval_result.get("exit_reason") == "stop_hit" and args.post_stop_cooldown_days > 0 and cooldown_ticker:
+            exit_reason = eval_result.get("exit_reason")
+            if _is_stop_exit(exit_reason) and args.post_stop_cooldown_days > 0 and cooldown_ticker:
                 cooldown_until[cooldown_ticker] = max(cooldown_until.get(cooldown_ticker, -1), i + args.post_stop_cooldown_days)
 
-            if eval_result["exit_reason"] == "target_hit":
+            outcome_bucket = _daily_outcome_bucket(exit_reason)
+            if outcome_bucket == "win":
                 wins += 1
-            elif eval_result["exit_reason"] == "stop_hit":
+            elif outcome_bucket == "loss":
                 losses += 1
-            elif eval_result["exit_reason"] == "hold_expired":
+            elif outcome_bucket == "hold":
                 holds += 1
             else:
                 no_data += 1
