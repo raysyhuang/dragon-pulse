@@ -126,6 +126,36 @@ def test_source_probe_records_top10_and_holding_delta_status(tmp_path, monkeypat
     assert any("net_amount" in gap for gap in data["data_gaps"])
 
 
+def test_load_regime_stamp_fails_open_on_non_object_json(tmp_path, monkeypatch):
+    module = load_northbound_module()
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    path = tmp_path / "outputs" / "2026-06-26" / "regime_2026-06-26.json"
+    path.parent.mkdir(parents=True)
+    path.write_text("[]", encoding="utf-8")
+
+    stamp = module.load_regime_stamp("2026-06-26")
+
+    assert stamp["regime_at_signal"] is None
+    assert stamp["breadth_at_signal"] is None
+    assert stamp["regime_stamp_status"].startswith("regime_artifact_unavailable:")
+
+
+def test_holding_delta_parser_error_is_distinguished_from_provider_unavailability(monkeypatch):
+    module = load_northbound_module()
+    fake_akshare = types.SimpleNamespace(
+        stock_hsgt_stock_statistics_em=lambda **kwargs: (_ for _ in ()).throw(
+            TypeError("'NoneType' object is not subscriptable")
+        )
+    )
+    monkeypatch.setitem(sys.modules, "akshare", fake_akshare)
+
+    holdings, status = module.fetch_holding_delta_map("2026-07-15")
+
+    assert holdings == {}
+    assert status.startswith("eastmoney_holding_delta_parser_error: TypeError:")
+    assert "NoneType" in status
+
+
 def test_true_atr14_includes_gap_risk():
     module = load_northbound_module()
     idx = pd.date_range("2026-05-01", periods=20, freq="D")
@@ -169,6 +199,13 @@ def test_build_picks_meta_exposes_data_quality_gaps(monkeypatch):
     monkeypatch.setattr(module, "_fetch_ohlcv", lambda tickers, start, end: {"600001.SH": good_df})
     monkeypatch.setattr(module, "get_cn_basic_info", lambda tickers, provider_config=None: {"600001.SH": {"name_cn": "北向A"}})
     monkeypatch.setattr(module, "fetch_holding_delta_map", lambda source_date: ({}, "eastmoney_holding_delta_unavailable: TypeError"))
+    monkeypatch.setattr(module, "load_regime_stamp", lambda market_date: {
+        "regime_at_signal": "bear",
+        "breadth_at_signal": 0.3656,
+        "regime_market_date": market_date,
+        "regime_stamp_source": "saved_regime_artifact",
+        "regime_stamp_status": "ok",
+    })
 
     picks, meta = module.build_picks("2026-06-29", top_n=5)
 
@@ -176,4 +213,9 @@ def test_build_picks_meta_exposes_data_quality_gaps(monkeypatch):
     assert meta["data_quality"] == "active_rank_only"
     assert meta["flow_confirmed"] is False
     assert any("net_amount" in gap for gap in meta["data_gaps"])
-    assert picks[0].to_dict()["northbound_flow_confirmed"] is False
+    assert meta["regime_at_signal"] == "bear"
+    assert meta["breadth_at_signal"] == 0.3656
+    pick = picks[0].to_dict()
+    assert pick["northbound_flow_confirmed"] is False
+    assert pick["regime_at_signal"] == "bear"
+    assert pick["breadth_at_signal"] == 0.3656

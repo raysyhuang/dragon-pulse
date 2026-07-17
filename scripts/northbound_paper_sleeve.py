@@ -52,6 +52,8 @@ class PaperPick:
     holding_delta_vol: float | None = None
     holding_delta_ratio: float | None = None
     holding_delta_source: str | None = None
+    regime_at_signal: str | None = None
+    breadth_at_signal: float | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -76,6 +78,8 @@ class PaperPick:
             "holding_delta_vol": self.holding_delta_vol,
             "holding_delta_ratio": self.holding_delta_ratio,
             "holding_delta_source": self.holding_delta_source,
+            "regime_at_signal": self.regime_at_signal,
+            "breadth_at_signal": self.breadth_at_signal,
             "northbound_flow_confirmed": bool(
                 (self.net_amount is not None and self.net_amount > 0)
                 or (self.holding_delta_vol is not None and self.holding_delta_vol > 0)
@@ -213,6 +217,35 @@ def assess_data_quality(
     }
 
 
+def load_regime_stamp(market_date: str) -> dict:
+    """Load the latest observable Dragon Pulse market context for a paper entry.
+
+    The feed runs before the T+1 open, so it uses the prior completed market
+    date rather than same-day post-close data. A missing artifact is non-blocking.
+    """
+    path = PROJECT_ROOT / "outputs" / market_date / f"regime_{market_date}.json"
+    stamp = {
+        "regime_at_signal": None,
+        "breadth_at_signal": None,
+        "regime_market_date": market_date,
+        "regime_stamp_source": "saved_regime_artifact",
+    }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("regime artifact must be a JSON object")
+        regime = payload.get("regime")
+        breadth = payload.get("market_breadth_pct_above_sma20")
+        stamp["regime_at_signal"] = str(regime) if regime else None
+        stamp["breadth_at_signal"] = round(float(breadth), 4) if breadth is not None else None
+        stamp["regime_stamp_status"] = "ok"
+    except FileNotFoundError:
+        stamp["regime_stamp_status"] = "regime_artifact_missing"
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+        stamp["regime_stamp_status"] = f"regime_artifact_unavailable: {type(exc).__name__}: {str(exc)[:120]}"
+    return stamp
+
+
 def _compute_true_atr14(high_s: pd.Series, low_s: pd.Series, close_s: pd.Series) -> float:
     """Compute Wilder-style true range mean over 14 bars.
 
@@ -248,8 +281,15 @@ def fetch_holding_delta_map(source_date: str) -> tuple[dict[str, dict], str]:
             start_date=start.strftime("%Y%m%d"),
             end_date=end.strftime("%Y%m%d"),
         )
+    except (TypeError, KeyError, IndexError, AttributeError) as exc:
+        # AkShare/Eastmoney wrapper parsing failed before a DataFrame returned.
+        # Keep the sleeve fail-open, but distinguish this from provider absence.
+        return {}, (
+            f"eastmoney_holding_delta_parser_error: {type(exc).__name__}: "
+            f"{str(exc)[:120]}"
+        )
     except Exception as exc:
-        return {}, f"eastmoney_holding_delta_unavailable: {type(exc).__name__}: {exc}"
+        return {}, f"eastmoney_holding_delta_unavailable: {type(exc).__name__}: {str(exc)[:120]}"
 
     if df is None or df.empty:
         return {}, "eastmoney_holding_delta_empty"
@@ -374,8 +414,10 @@ def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
     data_map = _fetch_ohlcv(candidates, start=start, end=source_date)
     info_map = get_cn_basic_info(candidates, provider_config={"tushare_token_env": "TUSHARE_TOKEN"})
     holding_delta_map, holding_delta_status = fetch_holding_delta_map(source_date)
+    regime_stamp = load_regime_stamp(source_date)
     meta["holding_delta_status"] = holding_delta_status
     meta["holding_delta_rows"] = len(holding_delta_map)
+    meta.update(regime_stamp)
     net_amount_non_null = int(pd.Series(hsgt["net_amount"]).notna().sum()) if "net_amount" in hsgt.columns else 0
     meta.update(assess_data_quality(
         asof_date=asof_date,
@@ -441,6 +483,8 @@ def build_picks(asof_date: str, top_n: int = 5) -> tuple[list[PaperPick], dict]:
             holding_delta_vol=_numeric_or_none(holding_delta_vol),
             holding_delta_ratio=_numeric_or_none(holding_delta_ratio),
             holding_delta_source=holding_delta.get("holding_delta_source"),
+            regime_at_signal=regime_stamp["regime_at_signal"],
+            breadth_at_signal=regime_stamp["breadth_at_signal"],
         ))
 
     picks = sorted(picks, key=lambda p: (-p.score, p.rank, p.ticker))[:top_n]
