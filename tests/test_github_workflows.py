@@ -15,9 +15,9 @@ def test_cn_morning_workflow_has_same_day_preopen_scan_and_open_check():
 
     jobs = workflow["jobs"]
     assert jobs["preopen-scan"]["if"] == "github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'preopen_scan'"
-    assert jobs["preflight"]["if"] == "github.event.schedule == '35 1 * * 1-5' || inputs.mode == 'open_check'"
+    assert jobs["preflight"]["if"] == "github.event.schedule == '35 1 * * 1-5' || github.event.schedule == '55 1 * * 1-5' || inputs.mode == 'open_check'"
     assert jobs["northbound-paper-preopen"]["if"] == "github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'northbound_paper_preopen'"
-    assert jobs["northbound-paper-open-check"]["if"] == "always() && (github.event.schedule == '35 1 * * 1-5' || inputs.mode == 'northbound_paper_open_check')"
+    assert jobs["northbound-paper-open-check"]["if"] == "always() && (github.event.schedule == '35 1 * * 1-5' || github.event.schedule == '55 1 * * 1-5' || inputs.mode == 'northbound_paper_open_check')"
     assert jobs["northbound-source-probe"]["if"] == "github.event.schedule == '0 4 * * 1-5' || github.event.schedule == '30 7 * * 1-5' || github.event.schedule == '0 9 * * 1-5'"
 
     preopen_run = "\n".join(
