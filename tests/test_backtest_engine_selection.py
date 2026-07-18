@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
+
+from src.core.config import load_config
 
 from scripts.backtest_1yr import (
     apply_score_floor,
@@ -66,6 +69,22 @@ def test_backtest_respects_mean_reversion_disable_flag_when_all_requested():
     assert run_sniper is False
     assert alpha_requested is False
     assert run_alpha is False
+
+
+def test_every_phase_a_config_explicitly_enables_requested_mr_engine():
+    config_dir = Path(__file__).parents[1] / "config" / "experiments"
+    configs = [
+        config_dir / f"mr_a{i}_{suffix}.yaml"
+        for i, suffix in enumerate((
+            "baseline", "bull_tight_1", "bull_tight_2", "mr_score_floor_up",
+            "mr_score_floor_up_plus_bull", "rsi_deeper", "rsi_deeper_plus_score",
+            "liquidity_up", "damage_filter", "acceptance_tighter",
+        ))
+    ]
+
+    for config_path in configs:
+        run_mr, *_ = resolve_backtest_engines("mr_only", load_config(str(config_path)))
+        assert run_mr, config_path.name
 
 
 def test_backtest_limit_touch_fills_at_max_entry_when_intraday_low_touches_limit():

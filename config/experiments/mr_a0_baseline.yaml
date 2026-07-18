@@ -1,2 +1,3 @@
-# Phase A baseline: MR-only + live_equiv with current default settings.
-{}
+# Phase A baseline: MR-only + live_equiv with explicit engine enablement.
+mean_reversion:
+  enabled: true
