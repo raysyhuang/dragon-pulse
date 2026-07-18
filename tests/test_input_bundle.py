@@ -125,6 +125,13 @@ def test_manifest_universe_count_mismatch_is_rejected(tmp_path):
         input_bundle.validate_input_bundle(bundle)
 
 
+def test_freezer_data_window_covers_later_listings_without_changing_scan_end():
+    from datetime import date
+    from scripts.freeze_input_bundle import _freeze_data_end
+
+    assert _freeze_data_end(date(2099, 1, 1)) == date(2099, 1, 31)
+
+
 def test_bundle_mode_guard_blocks_provider_calls():
     from src.core.universe import get_top_n_cn_by_market_cap
 
