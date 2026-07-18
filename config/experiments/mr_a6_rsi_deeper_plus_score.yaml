@@ -1,3 +1,4 @@
 mean_reversion:
+  enabled: true
   rsi2_max: 4
   score_floor: 70

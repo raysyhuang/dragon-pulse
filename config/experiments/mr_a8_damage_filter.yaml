@@ -1,2 +1,3 @@
 mean_reversion:
+  enabled: true
   max_single_day_move: 0.08

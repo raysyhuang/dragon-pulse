@@ -1,4 +1,5 @@
 mean_reversion:
+  enabled: true
   score_floor: 70
 
 book_size:

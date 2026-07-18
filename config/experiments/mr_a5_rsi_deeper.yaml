@@ -1,2 +1,3 @@
 mean_reversion:
+  enabled: true
   rsi2_max: 4

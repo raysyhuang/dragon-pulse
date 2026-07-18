@@ -1,3 +1,6 @@
+mean_reversion:
+  enabled: true
+
 book_size:
   bull:
     min_score: 75
