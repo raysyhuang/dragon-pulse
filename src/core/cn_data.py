@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 
 import pandas as pd
 
+from .input_bundle import assert_provider_access_allowed
+
 
 class _ProviderTimeoutError(TimeoutError):
     """Raised when a provider call exceeds the configured wall-clock timeout."""
@@ -277,6 +279,7 @@ def get_cn_basic_info(tickers: list[str], provider_config: Optional[dict] = None
     Best-effort company info (Chinese name, exchange, industry) for CN tickers.
     Returns mapping: ticker -> {"name_cn": str, "exchange": str, "market_cap": float|None, "industry": str|None}
     """
+    assert_provider_access_allowed("get_cn_basic_info")
     if not tickers:
         return {}
     
@@ -608,6 +611,7 @@ def download_daily_range(
     """
     Date-range download for A-shares with AkShare primary and Tushare backup.
     """
+    assert_provider_access_allowed("download_daily_range")
     if interval != "1d":
         raise ValueError("Only daily interval is supported for China A-share adapter.")
 
