@@ -10,7 +10,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -40,6 +40,11 @@ def _write_price(path: Path, frame: pd.DataFrame) -> None:
     data.to_csv(path, float_format="%.10g")
 
 
+def _freeze_data_end(backtest_end: date) -> date:
+    """Cover later-listed current-universe names without changing scan dates."""
+    return max(backtest_end + timedelta(days=30), date.today())
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Freeze a non-PIT Dragon Pulse input bundle")
     parser.add_argument("--output", required=True, help="New bundle directory; must not exist")
@@ -65,7 +70,8 @@ def main() -> int:
     csi_cfg = config.get("mean_reversion", {}).get("regime", {}) or config.get("sniper", {}).get("regime", {}) or {}
     csi_symbol = csi_cfg.get("csi300_symbol", "000300.SH")
     start = datetime.strptime(args.start, "%Y-%m-%d").date() - timedelta(days=420)
-    end = datetime.strptime(args.end, "%Y-%m-%d").date() + timedelta(days=30)
+    backtest_end = datetime.strptime(args.end, "%Y-%m-%d").date()
+    end = _freeze_data_end(backtest_end)
     data_map, report = download_range(
         universe + [csi_symbol], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"),
         provider_config=provider_config,
@@ -96,7 +102,10 @@ def main() -> int:
             "universe_count": len(universe),
             "files": files,
             "composite_sha256": _composite(files),
-            "notes": "cap universe frozen at capture time; NOT historical PIT",
+            "notes": (
+                "cap universe frozen at capture time; NOT historical PIT; "
+                f"price coverage through {end.isoformat()} to retain later-listed current-universe names"
+            ),
         }
         (temp / "manifest.json").write_text(json.dumps(manifest, sort_keys=True, indent=2), encoding="utf-8")
         os.replace(temp, output)
