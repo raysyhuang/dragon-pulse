@@ -2,6 +2,27 @@
 
 **Simple, consolidated momentum trading system with progress indicators.**
 
+## Deployment
+
+This system runs **entirely on GitHub Actions** — there is no Heroku (or other
+always-on server) component. All scheduled scanning and Telegram alerting is
+driven by cron workflows in `.github/workflows/`:
+
+- **`cn-morning.yml`** — pre-open scan + open check (GO/CANCEL), sends the
+  pre-open Telegram watchlist and morning open alert.
+- **`cn-nightly.yml`** — nightly scan (primary 16:30 Shanghai, 18:00 backup).
+
+These workflows send Telegram alerts directly (via the `TELEGRAM_BOT_TOKEN` /
+`TELEGRAM_CHAT_ID` repo secrets) and commit each day's results back into
+`outputs/`. No external web dyno is required.
+
+> **Note on `MAS_TELEGRAM_LOG_URL`:** the alerting code can forward a copy of
+> each sent Telegram message to a central log endpoint. This is best-effort and
+> gated on the `MAS_TELEGRAM_LOG_URL` / `MAS_API_SECRET_KEY` secrets — if those
+> secrets are unset, the forwarding is skipped entirely (no network call, no
+> timeout). Leaving them set but pointing at a dead endpoint will cost up to a
+> 5s timeout per alert, so unset them if the endpoint is retired.
+
 ## Quick Start
 
 ```bash
