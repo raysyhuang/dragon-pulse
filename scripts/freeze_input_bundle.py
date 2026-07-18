@@ -66,7 +66,10 @@ def main() -> int:
     csi_symbol = csi_cfg.get("csi300_symbol", "000300.SH")
     start = datetime.strptime(args.start, "%Y-%m-%d").date() - timedelta(days=420)
     end = datetime.strptime(args.end, "%Y-%m-%d").date() + timedelta(days=30)
-    data_map, report = download_range(universe + [csi_symbol], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"), provider_config)
+    data_map, report = download_range(
+        universe + [csi_symbol], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"),
+        provider_config=provider_config,
+    )
     missing = [ticker for ticker in universe + [csi_symbol] if data_map.get(ticker, pd.DataFrame()).empty]
     if missing:
         raise RuntimeError(f"refusing incomplete bundle; missing price data for: {', '.join(missing[:10])}")
