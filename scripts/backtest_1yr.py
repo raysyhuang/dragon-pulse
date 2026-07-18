@@ -32,6 +32,7 @@ sys.path.insert(0, str(project_root / "src"))
 load_dotenv(project_root / ".env")
 
 from src.core.config import load_config, get_config_value
+from src.core.input_bundle import set_input_mode, validate_input_bundle
 from src.core.data import get_data_functions
 from src.core.universe import (
     get_top_n_cn_by_market_cap,
@@ -609,8 +610,15 @@ def main():
                         help="Point-in-time universe rebalance cadence in months")
     parser.add_argument("--outputs-root", default="outputs",
                         help="Outputs root used when universe-source=watchlist")
-    parser.add_argument("--price-snapshot-dir", default="",
-                        help="Optional CSV price snapshot directory. Existing ticker CSVs are reused; downloaded data is written back for deterministic reruns.")
+    input_source_group = parser.add_mutually_exclusive_group()
+    input_source_group.add_argument(
+        "--price-snapshot-dir", default="",
+        help="Optional CSV price snapshot directory. Existing ticker CSVs are reused; downloaded data is written back for deterministic reruns.",
+    )
+    input_source_group.add_argument(
+        "--input-bundle", default="",
+        help="Immutable offline bundle directory; refuses all provider/cache acquisition paths.",
+    )
     parser.add_argument("--allowed-regimes", default="",
                         help="Comma-separated regimes to scan: bull,choppy,bear. Empty means all.")
     parser.add_argument("--excluded-regimes", default="",
@@ -625,6 +633,20 @@ def main():
     parser.add_argument("--post-stop-cooldown-days", type=int, default=0,
                         help="Research-only: if a pick stops out, skip that ticker for N trading days.")
     args = parser.parse_args()
+    bundle_incompatible_flags = (
+        "--universe-source", "--universe-mode", "--universe-n",
+        "--universe-rebalance-months", "--outputs-root",
+    )
+    if args.input_bundle and any(
+        token == flag or token.startswith(f"{flag}=")
+        for token in sys.argv[1:]
+        for flag in bundle_incompatible_flags
+    ):
+        parser.error("--input-bundle cannot be combined with universe acquisition flags")
+    if args.input_bundle:
+        set_input_mode("bundle")
+    else:
+        set_input_mode("live")
     allowed_regimes = parse_regime_set(args.allowed_regimes)
     excluded_regimes = parse_regime_set(args.excluded_regimes)
     valid_regimes = {"bull", "choppy", "bear"}
@@ -666,135 +688,75 @@ def main():
     logger.info("=" * 60)
 
     # --- One-time setup ---
-    _, download_daily_range_fn, provider_config, _ = get_data_functions(config)
-
-    # Build universe once
-    pit_schedule = None  # set when universe_mode == point_in_time
-    if args.universe_source == "watchlist":
-        logger.info(
-            "Building universe from execution watchlists in %s for %s to %s...",
-            args.outputs_root,
-            args.start,
-            args.end,
-        )
-        universe = load_execution_watchlist_tickers_in_range(
-            args.outputs_root,
-            start_date=args.start,
-            end_date=args.end,
-        )
-        if not universe:
-            logger.error(
-                "No execution watchlist tickers found under %s for %s to %s",
-                args.outputs_root,
-                args.start,
-                args.end,
-            )
-            return 1
-        logger.info("Universe: %d tickers from execution watchlists", len(universe))
-    elif args.universe_mode == "point_in_time":
-        logger.info(
-            "Building POINT-IN-TIME universe: top %d by market cap, rebalanced every %d month(s)...",
-            args.universe_n, args.universe_rebalance_months,
-        )
-        pit_schedule = build_pit_universe_schedule(
-            start_date, end_date, n=args.universe_n,
-            rebalance_months=args.universe_rebalance_months,
-            provider_config=provider_config,
-        )
-        if not pit_schedule:
-            logger.error("Point-in-time universe build returned no members.")
-            return 1
-        union = sorted({t for _, members in pit_schedule for t in members})
-        universe = union
-        logger.info(
-            "Point-in-time universe: %d rebalances, %d unique tickers (union)",
-            len(pit_schedule), len(universe),
-        )
-    else:
-        logger.info("Building universe: top %d A-shares by market cap (static/current)...", args.universe_n)
-        universe = get_top_n_cn_by_market_cap(n=args.universe_n, provider_config=provider_config)
-        logger.info("Universe: %d tickers", len(universe))
-
-    # Download date range: lookback before start through end + max holding buffer
-    max_hold = max(
-        int(config.get("mean_reversion", {}).get("holding_period", 3)),
-        int(config.get("sniper", {}).get("holding_period", 7)),
-    )
-    dl_start = start_date - timedelta(days=LOOKBACK_DAYS)
-    dl_end = end_date + timedelta(days=max_hold + 15)  # buffer for weekends/holidays
-    dl_start_str = dl_start.strftime("%Y-%m-%d")
-    dl_end_str = dl_end.strftime("%Y-%m-%d")
-
-    # Download CSI 300 once
     csi_cfg = config.get("mean_reversion", {}).get("regime", {}) or config.get("sniper", {}).get("regime", {}) or {}
     csi_symbol = csi_cfg.get("csi300_symbol", "000300.SH")
-    snapshot_dir = Path(args.price_snapshot_dir) if args.price_snapshot_dir else None
-    price_snapshot_mode = "off"
-    if snapshot_dir:
-        price_snapshot_mode = "read_write"
-        logger.info("Price snapshot mode: %s", snapshot_dir)
+    bundle = None
+    pit_schedule = None
 
-    logger.info("Downloading CSI 300 (%s) for %s to %s...", csi_symbol, dl_start_str, dl_end_str)
-    if snapshot_dir:
-        csi300_full = _read_price_snapshot(snapshot_dir, csi_symbol)
-    else:
-        csi300_full = pd.DataFrame()
-    if csi300_full.empty:
-        csi300_data, _ = download_daily_range_fn(
-            tickers=[csi_symbol], start=dl_start_str, end=dl_end_str,
-            provider_config=provider_config,
+    if args.input_bundle:
+        bundle = validate_input_bundle(
+            args.input_bundle,
+            acceptance_mode=args.acceptance_mode,
+            support_tickers=(csi_symbol,),
         )
-        csi300_full = csi300_data.get(csi_symbol, pd.DataFrame())
-        if snapshot_dir and not csi300_full.empty:
-            _write_price_snapshot(snapshot_dir, csi_symbol, csi300_full)
-    if not csi300_full.empty:
-        csi300_full = csi300_full.rename(
-            columns={c: c.lower() for c in csi300_full.columns if c in ("Open", "High", "Low", "Close", "Volume")}
-        )
-    logger.info("CSI 300: %d bars", len(csi300_full))
-
-    # Bulk download all universe tickers
-    logger.info("Bulk downloading OHLCV for %d tickers (%s to %s)...", len(universe), dl_start_str, dl_end_str)
-    t0 = time.time()
-    snapshot_data: dict[str, pd.DataFrame] = {}
-    snapshot_missing = list(universe)
-    if snapshot_dir:
-        snapshot_data, snapshot_missing = _load_price_snapshot(snapshot_dir, universe)
-        logger.info(
-            "Price snapshot reuse: %d hit, %d missing",
-            len(snapshot_data),
-            len(snapshot_missing),
-        )
-    if snapshot_missing:
-        downloaded_map, report = download_daily_range_fn(
-            tickers=snapshot_missing, start=dl_start_str, end=dl_end_str,
-            provider_config=provider_config,
-        )
-        if snapshot_dir:
-            for ticker, df in downloaded_map.items():
-                _write_price_snapshot(snapshot_dir, ticker, df)
-        data_map = {**snapshot_data, **downloaded_map}
-    else:
+        universe = bundle.tickers
+        data_map = {ticker: bundle.data_map[ticker] for ticker in universe}
+        csi300_full = bundle.data_map[csi_symbol]
+        info_map = bundle.basic_info
         report = {"bad_tickers": [], "reasons": {}}
-        data_map = snapshot_data
-    dl_time = time.time() - t0
-    logger.info("Download complete: %d OK, %d failed (%.1f min)",
-                len(data_map), len(report.get("bad_tickers", [])), dl_time / 60)
-    if not data_map:
-        logger.error(
-            "Aborting backtest: no OHLCV data downloaded for %d universe tickers. "
-            "This usually indicates a market-data provider or network outage.",
-            len(universe),
-        )
-        return 1
+        snapshot_dir = None
+        price_snapshot_mode = "bundle"
+        logger.info("Input bundle: id=%s hash=%s pit_grade=false (%d tickers)", bundle.bundle_id, bundle.composite_sha256, len(universe))
+    else:
+        _, download_daily_range_fn, provider_config, _ = get_data_functions(config)
+        if args.universe_source == "watchlist":
+            universe = load_execution_watchlist_tickers_in_range(args.outputs_root, start_date=args.start, end_date=args.end)
+            if not universe:
+                logger.error("No execution watchlist tickers found under %s for %s to %s", args.outputs_root, args.start, args.end)
+                return 1
+        elif args.universe_mode == "point_in_time":
+            pit_schedule = build_pit_universe_schedule(start_date, end_date, n=args.universe_n, rebalance_months=args.universe_rebalance_months, provider_config=provider_config)
+            if not pit_schedule:
+                logger.error("Point-in-time universe build returned no members.")
+                return 1
+            universe = sorted({ticker for _, members in pit_schedule for ticker in members})
+        else:
+            universe = get_top_n_cn_by_market_cap(n=args.universe_n, provider_config=provider_config)
 
-    # Fetch basic info for live_equivalent mode (sector cap, limit-down ST detection)
-    info_map: dict[str, dict] = {}
-    if args.acceptance_mode == "live_equivalent":
-        from src.core.cn_data import get_cn_basic_info
-        logger.info("Fetching basic info for %d tickers (live_equivalent mode)...", len(universe))
-        info_map = get_cn_basic_info(universe, provider_config=provider_config)
-        logger.info("Basic info: %d tickers", len(info_map))
+        max_hold = max(int(config.get("mean_reversion", {}).get("holding_period", 3)), int(config.get("sniper", {}).get("holding_period", 7)))
+        dl_start_str = (start_date - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%d")
+        dl_end_str = (end_date + timedelta(days=max_hold + 15)).strftime("%Y-%m-%d")
+        snapshot_dir = Path(args.price_snapshot_dir) if args.price_snapshot_dir else None
+        price_snapshot_mode = "read_write" if snapshot_dir else "off"
+        csi300_full = _read_price_snapshot(snapshot_dir, csi_symbol) if snapshot_dir else pd.DataFrame()
+        if csi300_full.empty:
+            csi300_data, _ = download_daily_range_fn(tickers=[csi_symbol], start=dl_start_str, end=dl_end_str, provider_config=provider_config)
+            csi300_full = csi300_data.get(csi_symbol, pd.DataFrame())
+            if snapshot_dir and not csi300_full.empty:
+                _write_price_snapshot(snapshot_dir, csi_symbol, csi300_full)
+
+        snapshot_data, snapshot_missing = ({}, list(universe))
+        if snapshot_dir:
+            snapshot_data, snapshot_missing = _load_price_snapshot(snapshot_dir, universe)
+        if snapshot_missing:
+            downloaded_map, report = download_daily_range_fn(tickers=snapshot_missing, start=dl_start_str, end=dl_end_str, provider_config=provider_config)
+            if snapshot_dir:
+                for ticker, frame in downloaded_map.items():
+                    _write_price_snapshot(snapshot_dir, ticker, frame)
+            data_map = {**snapshot_data, **downloaded_map}
+        else:
+            report = {"bad_tickers": [], "reasons": {}}
+            data_map = snapshot_data
+        if not data_map:
+            logger.error("Aborting backtest: no OHLCV data downloaded for %d universe tickers.", len(universe))
+            return 1
+
+        info_map: dict[str, dict] = {}
+        if args.acceptance_mode == "live_equivalent":
+            from src.core.cn_data import get_cn_basic_info
+            info_map = get_cn_basic_info(universe, provider_config=provider_config)
+
+    csi300_full = csi300_full.rename(columns={column: column.lower() for column in csi300_full.columns if column in ("Open", "High", "Low", "Close", "Volume")})
 
     # --- Config ---
     mr_config = config.get("mean_reversion", {})
@@ -1295,10 +1257,24 @@ def main():
         else:
             acceptance_mode_counts[m] = acceptance_mode_counts.get(m, 0) + 1
 
+    artifact_input_stamp = {
+        "input_mode": "bundle" if bundle else "live",
+        "bundle_id": bundle.bundle_id if bundle else None,
+        "bundle_composite_sha256": bundle.composite_sha256 if bundle else None,
+        "pit_grade": False if bundle else None,
+    }
+    for result in all_results:
+        result.update(artifact_input_stamp)
+    for day_summary in day_summaries:
+        day_summary.update(artifact_input_stamp)
+    for dumped_pick in dumped_picks:
+        dumped_pick.update(artifact_input_stamp)
+
     if not all_results:
         logger.warning("No results to summarize.")
         summary = {
             "created_at": datetime.utcnow().isoformat() + "Z",
+            **artifact_input_stamp,
             "config_path": args.config,
             "label": args.label,
             "start": args.start,
@@ -1359,6 +1335,10 @@ def main():
         pd.DataFrame(all_results).to_csv(detail_path, index=False)
         daily_path = out_dir / f"backtest_daily{suffix}.csv"
         pd.DataFrame(day_summaries).to_csv(daily_path, index=False)
+        if args.dump_picks:
+            # Preserve the promised provenance artifact even when no day produced picks.
+            pd.DataFrame(dumped_picks, columns=list(artifact_input_stamp)).to_csv(args.dump_picks, index=False)
+            logger.info("Pinned picks (%d): %s", len(dumped_picks), args.dump_picks)
         logger.info("Summary: %s", summary_path)
         logger.info("Detail: %s", detail_path)
         logger.info("Daily: %s", daily_path)
@@ -1485,6 +1465,7 @@ def main():
 
     summary = {
         "created_at": datetime.utcnow().isoformat() + "Z",
+        **artifact_input_stamp,
         "config_path": args.config,
         "label": args.label if hasattr(args, "label") else None,
         "start": args.start,

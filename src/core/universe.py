@@ -8,6 +8,8 @@ from __future__ import annotations
 import os
 import time
 import pandas as pd
+
+from .input_bundle import assert_provider_access_allowed
 import numpy as np
 from pathlib import Path
 from typing import Callable, Optional
@@ -477,6 +479,7 @@ def get_top_n_cn_by_market_cap(
     RuntimeError
         If Tushare ranking cannot be obtained.
     """
+    assert_provider_access_allowed("get_top_n_cn_by_market_cap")
     import os
 
     cfg = provider_config or {}
