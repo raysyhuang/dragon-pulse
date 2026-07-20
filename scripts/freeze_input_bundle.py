@@ -54,6 +54,11 @@ def main() -> int:
     parser.add_argument("--universe-n", type=int, default=1000)
     parser.add_argument("--bundle-id", default="")
     parser.add_argument("--acceptance-mode", choices=["off", "engine_only", "live_equivalent"], default="live_equivalent")
+    parser.add_argument(
+        "--strict-price-window",
+        action="store_true",
+        help="Smoke-only: request exactly --start through --end; do not apply freezer lookback/extension.",
+    )
     args = parser.parse_args()
 
     output = Path(args.output).resolve()
@@ -69,9 +74,13 @@ def main() -> int:
             raise RuntimeError(f"refusing live_equivalent bundle; basic info missing for: {', '.join(missing_basic[:10])}")
     csi_cfg = config.get("mean_reversion", {}).get("regime", {}) or config.get("sniper", {}).get("regime", {}) or {}
     csi_symbol = csi_cfg.get("csi300_symbol", "000300.SH")
-    start = datetime.strptime(args.start, "%Y-%m-%d").date() - timedelta(days=420)
-    backtest_end = datetime.strptime(args.end, "%Y-%m-%d").date()
-    end = _freeze_data_end(backtest_end)
+    requested_start = datetime.strptime(args.start, "%Y-%m-%d").date()
+    requested_end = datetime.strptime(args.end, "%Y-%m-%d").date()
+    if args.strict_price_window:
+        start, end = requested_start, requested_end
+    else:
+        start = requested_start - timedelta(days=420)
+        end = _freeze_data_end(requested_end)
     data_map, report = download_range(
         universe + [csi_symbol], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"),
         provider_config=provider_config,

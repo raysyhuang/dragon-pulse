@@ -42,6 +42,19 @@ def test_freezer_creates_atomic_strict_bundle_without_provider_fallback(tmp_path
     from scripts import freeze_input_bundle
 
     output = tmp_path / "bundle"
+    request_window: dict[str, str] = {}
+    real_get_data_functions = freeze_input_bundle.get_data_functions
+
+    def observe_download_request(config_data):
+        download_daily, download_range, provider_config, market = real_get_data_functions(config_data)
+
+        def observed_download_range(tickers, start, end, provider_config):
+            request_window.update(start=start, end=end)
+            return download_range(tickers, start, end, provider_config=provider_config)
+
+        return download_daily, observed_download_range, provider_config, market
+
+    monkeypatch.setattr(freeze_input_bundle, "get_data_functions", observe_download_request)
     config = tmp_path / "smoke-config.yaml"
     config.write_text(
         """market:\n  region: CN\ndata:\n  china:\n    primary: akshare\n    backup: ''\n    adjust: qfq\n    tushare_token_env: TUSHARE_TOKEN\nmean_reversion:\n  regime:\n    csi300_symbol: '000300.SH'\n""",
@@ -62,15 +75,23 @@ def test_freezer_creates_atomic_strict_bundle_without_provider_fallback(tmp_path
             "--universe-n", "2",
             "--bundle-id", "network-smoke",
             "--acceptance-mode", "live_equivalent",
+            "--strict-price-window",
         ],
     )
 
     try:
         assert freeze_input_bundle.main() == 0
     except RuntimeError as exc:
-        if str(exc).startswith(("Cannot build market-cap-ranked universe", "refusing incomplete bundle")):
-            pytest.skip("network smoke test could not reach an authenticated live provider; check credentials and connectivity")
+        if str(exc).startswith((
+            "Cannot build market-cap-ranked universe",
+            "refusing incomplete bundle",
+            "refusing live_equivalent bundle; basic info missing for:",
+        )):
+            pytest.skip("network smoke test could not obtain required live provider data; check credentials and connectivity")
         raise
+
+    assert request_window == {"start": start.isoformat(), "end": end.isoformat()}
+    assert (date.fromisoformat(request_window["end"]) - date.fromisoformat(request_window["start"])).days <= 5
 
     manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
     tickers = pd.read_csv(output / "universe.csv")["ticker"].tolist()
