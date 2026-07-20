@@ -54,6 +54,11 @@ def main() -> int:
     parser.add_argument("--universe-n", type=int, default=1000)
     parser.add_argument("--bundle-id", default="")
     parser.add_argument("--acceptance-mode", choices=["off", "engine_only", "live_equivalent"], default="live_equivalent")
+    parser.add_argument(
+        "--strict-price-window",
+        action="store_true",
+        help="Smoke-only: request exactly --start through --end; do not apply freezer lookback/extension.",
+    )
     args = parser.parse_args()
 
     output = Path(args.output).resolve()
@@ -69,9 +74,13 @@ def main() -> int:
             raise RuntimeError(f"refusing live_equivalent bundle; basic info missing for: {', '.join(missing_basic[:10])}")
     csi_cfg = config.get("mean_reversion", {}).get("regime", {}) or config.get("sniper", {}).get("regime", {}) or {}
     csi_symbol = csi_cfg.get("csi300_symbol", "000300.SH")
-    start = datetime.strptime(args.start, "%Y-%m-%d").date() - timedelta(days=420)
-    backtest_end = datetime.strptime(args.end, "%Y-%m-%d").date()
-    end = _freeze_data_end(backtest_end)
+    requested_start = datetime.strptime(args.start, "%Y-%m-%d").date()
+    requested_end = datetime.strptime(args.end, "%Y-%m-%d").date()
+    if args.strict_price_window:
+        start, end = requested_start, requested_end
+    else:
+        start = requested_start - timedelta(days=420)
+        end = _freeze_data_end(requested_end)
     data_map, report = download_range(
         universe + [csi_symbol], start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"),
         provider_config=provider_config,
@@ -93,6 +102,10 @@ def main() -> int:
         for ticker in sorted(universe + [csi_symbol]):
             _write_price(prices / f"{ticker}.csv", data_map[ticker])
         files = {item.relative_to(temp).as_posix(): _sha256(item) for item in sorted(temp.rglob("*")) if item.is_file()}
+        price_providers = {
+            f"prices/{ticker}.csv": report["providers"][ticker]
+            for ticker in sorted(universe + [csi_symbol])
+        }
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=project_root, text=True).strip()
         manifest = {
             "bundle_id": args.bundle_id or f"dp-ab-{datetime.utcnow().strftime('%Y-%m-%dT%H%M%SZ')}",
@@ -102,6 +115,11 @@ def main() -> int:
             "universe_count": len(universe),
             "files": files,
             "composite_sha256": _composite(files),
+            "price_providers": price_providers,
+            "provider_fallbacks": sorted(
+                path for path, provider in price_providers.items()
+                if provider != str(provider_config.get("primary", "akshare")).lower()
+            ),
             "notes": (
                 "cap universe frozen at capture time; NOT historical PIT; "
                 f"price coverage through {end.isoformat()} to retain later-listed current-universe names"

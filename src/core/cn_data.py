@@ -633,6 +633,7 @@ def download_daily_range(
     progress_interval = int((provider_config or {}).get("progress_interval", 50))
 
     data_map: dict[str, pd.DataFrame] = {}
+    providers_used: dict[str, str] = {}
     bad_tickers: list[str] = []
     reasons: dict[str, str] = {}
     disabled_backups: set[str] = set()
@@ -661,6 +662,7 @@ def download_daily_range(
         code, exch = _split_cn_symbol(ticker)
         df_out = pd.DataFrame()
         last_err = ""
+        provider_used = ""
         for idx, provider in enumerate(providers):
             provider_name = provider.lower()
             if idx > 0 and provider_name in disabled_backups:
@@ -692,6 +694,7 @@ def download_daily_range(
                     continue
                 if _validate_df(df_out):
                     provider_timeout_failures[provider_name] = 0
+                    provider_used = provider_name
                     break
             except Exception as e:
                 last_err = str(e)
@@ -721,6 +724,7 @@ def download_daily_range(
             reasons.setdefault(ticker, last_err or "No valid data returned")
         else:
             data_map[ticker] = df_out
+            providers_used[ticker] = provider_used
 
         if (
             progress_interval > 0
@@ -764,4 +768,8 @@ def download_daily_range(
             "; ".join(f"{t}: {r}" for t, r in zip(sample, sample_reasons)),
         )
 
-    return data_map, {"bad_tickers": bad_tickers, "reasons": reasons}
+    return data_map, {
+        "bad_tickers": bad_tickers,
+        "reasons": reasons,
+        "providers": providers_used,
+    }
