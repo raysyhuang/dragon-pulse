@@ -33,68 +33,10 @@ scripts/run_mr_phase_a_ablation.sh 5y
 scripts/run_mr_phase_a_ablation.sh 1y mr_a4_mr_score_floor_up_plus_bull
 ```
 
-## Phase B: requires one code change first
+## Phase B: blocked by the controlling preregistration
 
-Execution is blocked pending the frozen [Phase B preregistration and preflight checklist](PHASE_B_PREREGISTRATION.md). It defines the candidate set, mandatory explicit activation and exit-wiring proof, binding/duplicate rules, artifact hashes, and abort policy; it is the controlling document for any future Phase B run.
+**Do not execute Phase B from this matrix.** The frozen [Phase B preregistration and preflight checklist](PHASE_B_PREREGISTRATION.md) is the sole controlling document for candidate labels, exact keys, baseline requirement, execution manifest, binding/duplicate rules, selection rule, promotion boundary, and abort criteria.
 
-Current issue:
-- MR exit config exists in [`config/default.yaml`](/Users/rayhuang/Documents/Python%20Project/dragon-pulse/config/default.yaml#L58)
-- but the scorer still hardcodes exits in [`mean_reversion.py`](/Users/rayhuang/Documents/Python%20Project/dragon-pulse/src/signals/mean_reversion.py#L183)
+Phase B remains blocked until its explicit activation and exit-wiring assertions pass. In particular, the current default has MR disabled and the scorer must prove every configured exit key reaches the emitted signal and the evaluator. No outcome-driven `best combo`, Phase-A gate substitution, 3Y decision rule, qualitative exception, or ad hoc runner argument is authorized by this historical planning matrix.
 
-Wire these config keys into the engine before running Phase B:
-- `mean_reversion.stop_atr_mult`
-- `mean_reversion.target_1_atr_mult`
-- `mean_reversion.target_2_atr_mult`
-- `mean_reversion.max_entry_atr_mult`
-- `mean_reversion.holding_period`
-
-Planned labels once wired:
-- `mr_b1_wider_payoff`
-- `mr_b2_asymmetry_max`
-- `mr_b3_hold_longer`
-- `mr_b4_entry_chase_down`
-- `mr_b5_full_best_combo`
-
-Suggested parameter sets:
-
-`mr_b1_wider_payoff`
-```yaml
-mean_reversion:
-  stop_atr_mult: 1.0
-  target_1_atr_mult: 2.0
-  target_2_atr_mult: 3.0
-  holding_period: 4
-```
-
-`mr_b2_asymmetry_max`
-```yaml
-mean_reversion:
-  stop_atr_mult: 0.8
-  target_1_atr_mult: 2.0
-  target_2_atr_mult: 3.5
-  holding_period: 4
-```
-
-`mr_b3_hold_longer`
-```yaml
-mean_reversion:
-  holding_period: 5
-```
-
-`mr_b4_entry_chase_down`
-```yaml
-mean_reversion:
-  max_entry_atr_mult: 0.1
-```
-
-`mr_b5_full_best_combo`
-- combine the best Phase A gate set with the best Phase B exit set
-
-## Promotion rule
-
-Promote only if `3Y` and `5Y` both improve on:
-- `avg return / trade`
-- `profit factor`
-- `true_expectancy_pct`
-
-Win rate can soften a bit, but only if payoff asymmetry improves enough to make portfolio metrics better.
+The existing runner is not itself an authorization to execute: before any run it must be separately reviewed so the approved manifest contains the explicitly activated baseline and an allowlisted candidate set.
