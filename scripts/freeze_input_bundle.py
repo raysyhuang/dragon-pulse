@@ -93,6 +93,10 @@ def main() -> int:
         for ticker in sorted(universe + [csi_symbol]):
             _write_price(prices / f"{ticker}.csv", data_map[ticker])
         files = {item.relative_to(temp).as_posix(): _sha256(item) for item in sorted(temp.rglob("*")) if item.is_file()}
+        price_providers = {
+            f"prices/{ticker}.csv": report["providers"][ticker]
+            for ticker in sorted(universe + [csi_symbol])
+        }
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=project_root, text=True).strip()
         manifest = {
             "bundle_id": args.bundle_id or f"dp-ab-{datetime.utcnow().strftime('%Y-%m-%dT%H%M%SZ')}",
@@ -102,6 +106,11 @@ def main() -> int:
             "universe_count": len(universe),
             "files": files,
             "composite_sha256": _composite(files),
+            "price_providers": price_providers,
+            "provider_fallbacks": sorted(
+                path for path, provider in price_providers.items()
+                if provider != str(provider_config.get("primary", "akshare")).lower()
+            ),
             "notes": (
                 "cap universe frozen at capture time; NOT historical PIT; "
                 f"price coverage through {end.isoformat()} to retain later-listed current-universe names"
