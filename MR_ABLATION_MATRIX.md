@@ -35,6 +35,8 @@ scripts/run_mr_phase_a_ablation.sh 1y mr_a4_mr_score_floor_up_plus_bull
 
 ## Phase B: requires one code change first
 
+Execution is blocked pending the frozen [Phase B preregistration and preflight checklist](PHASE_B_PREREGISTRATION.md). It defines the candidate set, mandatory explicit activation and exit-wiring proof, binding/duplicate rules, artifact hashes, and abort policy; it is the controlling document for any future Phase B run.
+
 Current issue:
 - MR exit config exists in [`config/default.yaml`](/Users/rayhuang/Documents/Python%20Project/dragon-pulse/config/default.yaml#L58)
 - but the scorer still hardcodes exits in [`mean_reversion.py`](/Users/rayhuang/Documents/Python%20Project/dragon-pulse/src/signals/mean_reversion.py#L183)
