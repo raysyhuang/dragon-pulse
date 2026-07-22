@@ -901,6 +901,25 @@ def compute_hit10_backtest(
             )
 
     perf_detail = pd.DataFrame(rows)
+    if perf_detail.empty:
+        # No priced picks in range (e.g. every forward-price fetch failed because
+        # the price source was unavailable). Degrade gracefully instead of crashing
+        # on the groupby / column access below by giving the frame its expected
+        # columns so aggregations resolve to empty/zero.
+        perf_detail = pd.DataFrame(
+            columns=[
+                "baseline_date",
+                "ticker",
+                "in_weekly_top5",
+                "weekly_rank",
+                "in_pro30",
+                "in_movers",
+                "entry_close",
+                "max_forward_price",
+                "max_return_pct",
+                "hit10",
+            ]
+        )
 
     # Aggregations
     def _hit_rate(df: pd.DataFrame) -> float | None:

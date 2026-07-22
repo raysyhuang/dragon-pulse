@@ -101,6 +101,41 @@ def test_send_preopen_alert_labels_paper_only(monkeypatch, tmp_path):
     assert "forward paper" in msg
 
 
+def test_send_preopen_alert_flags_unconfirmed_flow_loudly(monkeypatch, tmp_path):
+    module = load_northbound_module()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    pick = module.PaperPick(
+        ticker="600001.SH", name_cn="北向A", rank=1, signal_date="2026-06-29", source_trade_date="2026-06-26",
+        entry_price=100.0, max_entry_price=102.0, stop_loss=94.5, target_1=110.5, target_2=118.0,
+        holding_period=5, score=120.0, stop_risk_pct=5.5,
+    )
+
+    # Unconfirmed flow (active-rank-only): expect a loud banner + escalated priority.
+    with patch("src.core.alerts.AlertManager.send_alert", return_value={"telegram": True}) as send_alert:
+        module.send_preopen_alert(
+            "2026-06-29",
+            [pick],
+            {"source_trade_date": "2026-06-26", "flow_confirmed": False, "data_quality": "active_rank_only"},
+            tmp_path / "x.json",
+        )
+    msg = send_alert.call_args.kwargs["message"]
+    assert "流向未确认" in msg
+    assert send_alert.call_args.kwargs["priority"] == "normal"
+
+    # Confirmed flow: no banner, stays low priority.
+    with patch("src.core.alerts.AlertManager.send_alert", return_value={"telegram": True}) as send_alert:
+        module.send_preopen_alert(
+            "2026-06-29",
+            [pick],
+            {"source_trade_date": "2026-06-26", "flow_confirmed": True, "data_quality": "flow_confirmed"},
+            tmp_path / "x.json",
+        )
+    msg = send_alert.call_args.kwargs["message"]
+    assert "流向未确认" not in msg
+    assert send_alert.call_args.kwargs["priority"] == "low"
+
+
 def test_source_probe_records_top10_and_holding_delta_status(tmp_path, monkeypatch):
     module = load_northbound_module()
     monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)

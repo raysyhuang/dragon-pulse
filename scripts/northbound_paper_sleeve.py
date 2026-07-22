@@ -520,9 +520,19 @@ def send_preopen_alert(date_str: str, picks: list[PaperPick], meta: dict, path: 
         return
 
     source_date = meta.get("source_trade_date") or "n/a"
+    flow_confirmed = bool(meta.get("flow_confirmed"))
     lines = [
         f"<b>🧪 北向活跃榜纸面跟踪 — {date_str}</b>",
         "状态: <b>PAPER ONLY / 不进实盘龙脉排名</b>",
+    ]
+    if not flow_confirmed:
+        # Surface the flow-data outage loudly instead of quietly running on
+        # active-rank turnover only — a reader must not mistake these candidates
+        # for northbound-flow-confirmed picks.
+        lines.append(
+            "⚠️ <b>流向未确认</b>：北向净买入/增持数据缺失，仅活跃榜/成交额 — 请谨慎解读候选"
+        )
+    lines += [
         f"数据质量: <b>{meta.get('data_quality', 'unknown')}</b> | 标签: {meta.get('label', '北向活跃榜/成交活跃纸面跟踪')}",
         f"来源: hsgt_top10 {source_date} | 规则: rank≤5 + stop风险4–7%",
         f"增持替代源: {meta.get('holding_delta_status', 'n/a')} | 发布探针: 已记录",
@@ -550,7 +560,9 @@ def send_preopen_alert(date_str: str, picks: list[PaperPick], meta: dict, path: 
         title=f"北向纸面袖珍盘 — {date_str}",
         message="\n".join(lines),
         data={"asof": date_str},
-        priority="low",
+        # Escalate an unconfirmed-flow run so the degraded state is not buried
+        # under the low-priority 📊 icon.
+        priority="low" if flow_confirmed else "normal",
     )
 
 
