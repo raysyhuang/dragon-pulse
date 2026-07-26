@@ -41,3 +41,4 @@ env/
 * 2
 * 2.*
 outputs/paper_lab/xsec_cache/
+outputs/qlib_experiment/daily_cache/
