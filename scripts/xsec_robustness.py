@@ -52,11 +52,18 @@ def factor_series(i, base_n, vol_m, mom_m, base_lo=0):
     p_now = PX[d].reindex(base)
     mom = p_now / PX[DATES[max(0, i - mom_m)]].reindex(base) - 1
     rev = p_now / PX[DATES[max(0, i - 1)]].reindex(base) - 1   # 1-step return (short-term reversal)
-    window = PX[[DATES[j] for j in range(max(0, i - vol_m), i + 1)]].reindex(base)
-    vol = window.pct_change(axis=1).std(axis=1)
+    wdates = [DATES[j] for j in range(max(0, i - vol_m), i + 1)]
+    window = PX[wdates].reindex(base)
+    sret = window.pct_change(axis=1).iloc[:, 1:]              # base x (window-1) stock returns
+    vol = sret.std(axis=1)
+    # IVOL: residual vol vs CSI300 = total vol * sqrt(1 - corr(stock,market)^2)
+    mkt = pd.Series([CSI[CSI.index <= pd.Timestamp(x)].iloc[-1] for x in wdates]).pct_change().values[1:]
+    mkt = pd.Series(mkt, index=sret.columns)
+    corr = sret.apply(lambda r: r.corr(mkt), axis=1)
+    ivol = vol * np.sqrt((1 - corr ** 2).clip(lower=0))
     bb = b.reindex(base)
     value = _z(-bb["pb"]) + _z(-bb["pe_ttm"]) + _z(bb["dv_ttm"])
-    f = pd.DataFrame({"vol": vol, "mom": mom, "rev": rev, "value": value})
+    f = pd.DataFrame({"vol": vol, "ivol": ivol, "mom": mom, "rev": rev, "value": value})
     f["multifactor"] = _z(f["mom"]) + _z(-f["vol"]) + _z(f["value"])
     return f.dropna(subset=["vol"])
 
