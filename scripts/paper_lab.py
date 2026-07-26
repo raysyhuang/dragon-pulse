@@ -133,6 +133,16 @@ def sleeve_timed(panel, cal, index, s=50, l=200):
     return (pos * d["ret"].fillna(0.0) - _switch_cost(pos)).fillna(0.0)
 
 
+def sleeve_timed_vt(panel, cal, index, s=50, l=200, target_vol=0.20):
+    """Trend-timing + volatility targeting: exposure = min(1x, target/realized-20d-vol)
+    when in a bull trend, else cash. Tames the raw-timing drawdown at ~equal Sharpe."""
+    d = panel[index].reindex(cal)
+    bull = ((d["close"] > d[f"sma{s}"]) & (d[f"sma{s}"] > d[f"sma{l}"])).shift(1).fillna(False).astype(float)
+    rvol = (d["ret"].rolling(20).std() * np.sqrt(252)).shift(1)
+    pos = (bull * (target_vol / rvol).clip(upper=1.0)).fillna(0.0)
+    return (pos * d["ret"].fillna(0.0) - _switch_cost(pos)).fillna(0.0)
+
+
 def sleeve_rotation(panel, cal):
     """Dual momentum: hold the index with highest 126d momentum among those in a
     50>200 uptrend; else cash. Signal from close[t], held t+1."""
@@ -155,9 +165,10 @@ def sleeve_rotation(panel, cal):
     return (ret - switch).fillna(0.0)
 
 
-# Focused watchlist: the one robust survivor + the two benchmarks it must beat.
+# Focused watchlist: the tradable package + the raw survivor + the two benchmarks.
 SLEEVES = {
-    "ChiNext timed 50/200": lambda p, c: sleeve_timed(p, c, "ChiNext"),  # robust survivor (Sharpe 0.71)
+    "ChiNext timed VT20 (tradable)": lambda p, c: sleeve_timed_vt(p, c, "ChiNext", target_vol=0.20),  # packaged: DD-tamed
+    "ChiNext timed 50/200": lambda p, c: sleeve_timed(p, c, "ChiNext"),  # raw survivor (Sharpe 0.71, 42% DD)
     "ChiNext buy&hold": lambda p, c: sleeve_buyhold(p, c, "ChiNext"),    # benchmark: what timing adds
     "CSI300 buy&hold": lambda p, c: sleeve_buyhold(p, c, "CSI300"),      # benchmark: "just buy the ETF"
 }

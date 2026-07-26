@@ -10,6 +10,16 @@
     "1Y_maxDD%":16.6
   },
   {
+    "sleeve":"ChiNext timed VT20 (tradable)",
+    "CAGR%":7.5,
+    "Sharpe":0.67,
+    "maxDD%":32.0,
+    "total%":122.9,
+    "1Y_CAGR%":25.0,
+    "1Y_Sharpe":1.3,
+    "1Y_maxDD%":12.1
+  },
+  {
     "sleeve":"ChiNext buy&hold",
     "CAGR%":8.0,
     "Sharpe":0.4,
@@ -20,16 +30,6 @@
     "1Y_maxDD%":21.6
   },
   {
-    "sleeve":"Index rotation (dual-mom)",
-    "CAGR%":5.4,
-    "Sharpe":0.34,
-    "maxDD%":54.7,
-    "total%":78.8,
-    "1Y_CAGR%":24.8,
-    "1Y_Sharpe":0.85,
-    "1Y_maxDD%":26.0
-  },
-  {
     "sleeve":"CSI300 buy&hold",
     "CAGR%":2.5,
     "Sharpe":0.22,
@@ -38,85 +38,5 @@
     "1Y_CAGR%":15.9,
     "1Y_Sharpe":0.93,
     "1Y_maxDD%":10.5
-  },
-  {
-    "sleeve":"xsec:momentum_timed",
-    "CAGR%":1.9,
-    "Sharpe":0.19,
-    "maxDD%":31.9,
-    "total%":15.6,
-    "1Y_CAGR%":35.3,
-    "1Y_Sharpe":1.22,
-    "1Y_maxDD%":12.5
-  },
-  {
-    "sleeve":"xsec:multifactor",
-    "CAGR%":1.1,
-    "Sharpe":0.15,
-    "maxDD%":21.9,
-    "total%":8.7,
-    "1Y_CAGR%":-2.6,
-    "1Y_Sharpe":-0.32,
-    "1Y_maxDD%":6.7
-  },
-  {
-    "sleeve":"CSI300 timed 50\/200",
-    "CAGR%":0.9,
-    "Sharpe":0.14,
-    "maxDD%":29.0,
-    "total%":10.6,
-    "1Y_CAGR%":4.7,
-    "1Y_Sharpe":0.41,
-    "1Y_maxDD%":11.6
-  },
-  {
-    "sleeve":"xsec:low_vol",
-    "CAGR%":0.6,
-    "Sharpe":0.11,
-    "maxDD%":25.4,
-    "total%":4.7,
-    "1Y_CAGR%":-3.5,
-    "1Y_Sharpe":-0.45,
-    "1Y_maxDD%":7.3
-  },
-  {
-    "sleeve":"xsec:momentum",
-    "CAGR%":-1.3,
-    "Sharpe":0.1,
-    "maxDD%":67.5,
-    "total%":-9.4,
-    "1Y_CAGR%":35.2,
-    "1Y_Sharpe":1.21,
-    "1Y_maxDD%":12.5
-  },
-  {
-    "sleeve":"xsec:value",
-    "CAGR%":0.4,
-    "Sharpe":0.09,
-    "maxDD%":30.9,
-    "total%":2.9,
-    "1Y_CAGR%":0.7,
-    "1Y_Sharpe":0.16,
-    "1Y_maxDD%":4.2
-  },
-  {
-    "sleeve":"xsec:low_vol_timed",
-    "CAGR%":-1.6,
-    "Sharpe":-0.28,
-    "maxDD%":15.8,
-    "total%":-11.5,
-    "1Y_CAGR%":-3.4,
-    "1Y_Sharpe":-0.44,
-    "1Y_maxDD%":7.3
-  },
-  {
-    "sleeve":"xsec:multifactor_timed",
-    "CAGR%":-2.8,
-    "Sharpe":-0.47,
-    "maxDD%":21.5,
-    "total%":-19.2,
-    "1Y_CAGR%":-2.6,
-    "1Y_Sharpe":-0.32,
-    "1Y_maxDD%":6.7
   }
 ]
