@@ -63,6 +63,39 @@ def _index_daily(code: str, tok: str) -> pd.DataFrame:
     return df.drop_duplicates("trade_date").sort_values("trade_date").reset_index(drop=True)
 
 
+def refresh_indices() -> None:
+    """Extend cached index CSVs forward with new trading days (Tushare, LOCAL only).
+
+    Index sleeves update daily; the factor sleeve updates quarterly via
+    `python scripts/xsec_sleeves.py` (resumes from its per-date cache, adds new quarters).
+    """
+    tok = _token()
+    today = pd.Timestamp.now(tz="Asia/Shanghai").strftime("%Y%m%d")
+    for name, code in INDICES.items():
+        f = CACHE / f"index_{name}.csv"
+        if not f.exists():
+            _index_daily(code, tok).to_csv(f, index=False)
+            continue
+        cur = pd.read_csv(f, parse_dates=["trade_date"])
+        start = (cur["trade_date"].max() + pd.Timedelta(days=1)).strftime("%Y%m%d")
+        if start > today:
+            print(f"  {name}: up to date ({cur['trade_date'].max().date()})")
+            continue
+        body = json.dumps({"api_name": "index_daily", "token": tok,
+                           "params": {"ts_code": code, "start_date": start, "end_date": today}, "fields": ""}).encode()
+        req = urllib.request.Request("http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
+        r = json.loads(urllib.request.urlopen(req, timeout=40).read())
+        if r.get("code") == 0 and r["data"]["items"]:
+            new = pd.DataFrame(r["data"]["items"], columns=r["data"]["fields"])
+            new["trade_date"] = pd.to_datetime(new["trade_date"])
+            out = pd.concat([cur, new], ignore_index=True).drop_duplicates("trade_date").sort_values("trade_date")
+            out["close"] = pd.to_numeric(out["close"], errors="coerce")
+            out.to_csv(f, index=False)
+            print(f"  {name}: +{len(new)} days -> {out['trade_date'].max().date()}")
+        else:
+            print(f"  {name}: no new data")
+
+
 def load_panel() -> dict[str, pd.DataFrame]:
     CACHE.mkdir(parents=True, exist_ok=True)
     tok = None
@@ -150,13 +183,17 @@ def _xsec_rows() -> list[dict]:
     if not f.exists():
         return []
     eq = pd.read_csv(f, index_col=0, parse_dates=True)
+    # infer periods/year from median rebalance spacing (monthly=12, quarterly=4)
+    gap = eq.index.to_series().diff().dt.days.median()
+    ppy = int(round(365.0 / gap)) if gap and gap > 0 else 12
+    per_1y = max(2, int(round(ppy)))
     rows = []
     for col in eq.columns:
         if col == "CSI300":
             continue  # already represented by the daily buy&hold sleeve
         rr = eq[col].pct_change().dropna()
-        m = _metrics(rr, ppy=12)
-        last1y = _metrics(rr.iloc[-12:], ppy=12)
+        m = _metrics(rr, ppy=ppy)
+        last1y = _metrics(rr.iloc[-per_1y:], ppy=ppy)
         rows.append({"sleeve": f"xsec:{col}", **m,
                      "1Y_CAGR%": last1y["CAGR%"], "1Y_Sharpe": last1y["Sharpe"], "1Y_maxDD%": last1y["maxDD%"]})
     return rows
@@ -165,8 +202,12 @@ def _xsec_rows() -> list[dict]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--alert", action="store_true")
+    ap.add_argument("--update", action="store_true", help="extend cached index data forward (Tushare, local)")
     args = ap.parse_args()
 
+    if args.update:
+        print("Refreshing index sleeves forward...")
+        refresh_indices()
     panel = load_panel()
     cal = panel["CSI300"].loc[START:].index
     rows = []

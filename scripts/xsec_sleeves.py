@@ -35,6 +35,7 @@ BASE_N = 300          # tradable base universe by circ mkt cap
 HOLD_FRAC = 0.10      # top decile
 MOM_WEEKS = 6         # months of momentum lookback (monthly grid)
 VOL_WEEKS = 6         # months for volatility (monthly grid)
+REBAL_MONTHS = 3      # quarterly rebalance — robustness sweep: quarterly >> monthly, lower cost
 
 
 def _token() -> str:
@@ -119,7 +120,7 @@ def main() -> int:
     wk = pd.to_datetime(weekly)
     reb = [weekly[j] for j in range(len(weekly))
            if j + 1 == len(weekly) or wk[j].month != wk[j + 1].month]
-    reb = [d for d in reb if d in basics]
+    reb = [d for d in reb if d in basics][::REBAL_MONTHS]   # quarterly (robust config)
 
     csi = pd.read_csv(CACHE / "index_CSI300.csv", parse_dates=["trade_date"]).set_index("trade_date")["close"]
 
@@ -193,14 +194,15 @@ def main() -> int:
     out = pd.DataFrame(equity, index=pd.to_datetime(dates_out))
     out.to_csv(CACHE / "xsec_equity.csv")
     print(f"\nCross-sectional sleeves — {dates_out[0]}..{dates_out[-1]} ({len(reb)} rebalances)\n")
+    ppy = 12 / REBAL_MONTHS
     rows = []
     for s in equity:
         e = np.array(equity[s]); rr = np.diff(e) / e[:-1]
         dd = (1 - e / np.maximum.accumulate(e)).max()
-        yrs = len(rr) / 12.0
+        yrs = len(rr) / ppy
         rows.append({"sleeve": s, "total%": round((e[-1] - 1) * 100, 1),
                      "CAGR%": round((e[-1] ** (1 / yrs) - 1) * 100, 1) if yrs > 0 and e[-1] > 0 else -100,
-                     "Sharpe": round(rr.mean() / rr.std() * np.sqrt(12), 2) if rr.std() > 0 else 0,
+                     "Sharpe": round(rr.mean() / rr.std() * np.sqrt(ppy), 2) if rr.std() > 0 else 0,
                      "maxDD%": round(dd * 100, 1),
                      "avg_turnover%": round(np.mean(turnover[s]) * 100, 0) if s in turnover else 0})
     board = pd.DataFrame(rows).sort_values("total%", ascending=False)
