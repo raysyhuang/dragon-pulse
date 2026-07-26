@@ -14,7 +14,9 @@ cd "$(dirname "$0")/.."
 
 echo "=== paper lab refresh $(date '+%Y-%m-%d %H:%M') ==="
 # Focused watchlist = ChiNext-timing (robust survivor) + IVOL (stock-selection survivor) + benchmarks.
-# 1) factor sleeve: extend IVOL/factors forward (resumes from per-date cache; adds new quarter-ends)
-PYTHONWARNINGS=ignore python3 scripts/xsec_sleeves.py --months 96 2>/dev/null | tail -1
+# 1) factor sleeve: extend IVOL/factors forward (resumes from per-date cache; adds new quarter-ends).
+# --months 150 = FULL available history. Do not shorten: a shorter window silently reverts to the
+# flattering sub-period (IVOL reads 0.31 on 8y vs its honest full-history 0.40 ~= CSI300 tie).
+PYTHONWARNINGS=ignore python3 scripts/xsec_sleeves.py --months 150 2>/dev/null | tail -1
 # 2) index sleeves: fetch new trading days + print the combined leaderboard (incl. xsec:ivol)
 PYTHONWARNINGS=ignore python3 scripts/paper_lab.py --update 2>/dev/null

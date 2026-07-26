@@ -245,7 +245,10 @@ def main() -> int:
     print(f"PAPER LAB leaderboard — {cal.min().date()}..{cal.max().date()} (cost {COST_BPS_SIDE:.0f}bps/switch)\n")
     pd.set_option("display.width", 200)
     print(board.to_string(index=False))
-    print("\nStock-picking sleeves (top-1/top-2) tracked separately in outputs/top1_paper/summary.json.")
+    print("\nNOTE: xsec:* sleeves are QUARTERLY-sampled; index sleeves are DAILY. Sharpe is annualized from")
+    print("      different frequencies, so xsec vs index Sharpe is NOT apples-to-apples (quarterly inflates).")
+    print("      Like-for-like (same harness): IVOL 0.40 vs CSI300 0.39 over 2015-2026 — a TIE, not an edge.")
+    print("Stock-picking sleeves (top-1/top-2) tracked separately in outputs/top1_paper/summary.json.")
 
     if args.alert:
         try:
