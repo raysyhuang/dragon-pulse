@@ -13,7 +13,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "=== paper lab refresh $(date '+%Y-%m-%d %H:%M') ==="
-# 1) factor sleeve: extend forward (resumes from per-date cache; adds new quarter-ends)
-PYTHONWARNINGS=ignore python3 scripts/xsec_sleeves.py --months 84 2>/dev/null | tail -1
-# 2) index sleeves: fetch new trading days + print the combined leaderboard
+# Focused watchlist = ChiNext-timing (the robust survivor) + benchmarks.
+# Fetch new trading days and print the leaderboard.
 PYTHONWARNINGS=ignore python3 scripts/paper_lab.py --update 2>/dev/null
+
+# Archived factor sleeves (failed robustness) can be refreshed for the record with:
+#   python3 scripts/xsec_sleeves.py --months 84   # then: python3 scripts/paper_lab.py --all

@@ -155,12 +155,17 @@ def sleeve_rotation(panel, cal):
     return (ret - switch).fillna(0.0)
 
 
+# Focused watchlist: the one robust survivor + the two benchmarks it must beat.
 SLEEVES = {
-    "CSI300 buy&hold": lambda p, c: sleeve_buyhold(p, c, "CSI300"),
-    "ChiNext buy&hold": lambda p, c: sleeve_buyhold(p, c, "ChiNext"),
-    "CSI300 timed 50/200": lambda p, c: sleeve_timed(p, c, "CSI300"),
-    "ChiNext timed 50/200": lambda p, c: sleeve_timed(p, c, "ChiNext"),
-    "Index rotation (dual-mom)": sleeve_rotation,
+    "ChiNext timed 50/200": lambda p, c: sleeve_timed(p, c, "ChiNext"),  # robust survivor (Sharpe 0.71)
+    "ChiNext buy&hold": lambda p, c: sleeve_buyhold(p, c, "ChiNext"),    # benchmark: what timing adds
+    "CSI300 buy&hold": lambda p, c: sleeve_buyhold(p, c, "CSI300"),      # benchmark: "just buy the ETF"
+}
+
+# Archived — did NOT survive robustness (shown only with --all; data/code kept for the record).
+ARCHIVED = {
+    "CSI300 timed 50/200": lambda p, c: sleeve_timed(p, c, "CSI300"),   # timing fails on CSI300
+    "Index rotation (dual-mom)": sleeve_rotation,                        # mediocre (0.34)
 }
 
 
@@ -203,6 +208,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--alert", action="store_true")
     ap.add_argument("--update", action="store_true", help="extend cached index data forward (Tushare, local)")
+    ap.add_argument("--all", action="store_true", help="also show archived sleeves that failed robustness")
     args = ap.parse_args()
 
     if args.update:
@@ -210,14 +216,16 @@ def main() -> int:
         refresh_indices()
     panel = load_panel()
     cal = panel["CSI300"].loc[START:].index
+    active = {**SLEEVES, **ARCHIVED} if args.all else SLEEVES
     rows = []
-    for name, fn in SLEEVES.items():
+    for name, fn in active.items():
         ret = fn(panel, cal).reindex(cal).fillna(0.0)
         full = _metrics(ret)
         last1y = _metrics(ret.iloc[-252:])
         rows.append({"sleeve": name, **{f"{k}": v for k, v in full.items()},
                      "1Y_CAGR%": last1y["CAGR%"], "1Y_Sharpe": last1y["Sharpe"], "1Y_maxDD%": last1y["maxDD%"]})
-    rows += _xsec_rows()
+    if args.all:
+        rows += _xsec_rows()
     board = pd.DataFrame(rows).sort_values("Sharpe", ascending=False)
     CACHE.mkdir(parents=True, exist_ok=True)
     board.to_csv(CACHE / "leaderboard.csv", index=False)
