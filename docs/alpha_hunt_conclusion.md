@@ -76,6 +76,8 @@ changing this answer.
 - `scripts/xsec_robustness.py` — factor robustness sweeps (basket/universe/cost/window)
 - `scripts/regime_timing_study.py` — index trend-timing robustness
 - `scripts/chinext_timing_strategy.py` — the packaged survivor (vol-targeted)
+- `scripts/qlib_experiment/pull_daily.py` — daily OHLCV pull for an N-stock universe (resumable)
+- `scripts/qlib_experiment/wf_ml.py` — purged walk-forward ML (Alpha158-style features → LightGBM → rank-IC/ICIR + top/bottom/universe control portfolios vs CSI300; `--horizon`)
 
 ## Addendum — qlib-methodology ML/TS experiment (2026-07-26)
 
