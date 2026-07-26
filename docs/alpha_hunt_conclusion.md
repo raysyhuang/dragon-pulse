@@ -76,3 +76,23 @@ changing this answer.
 - `scripts/xsec_robustness.py` — factor robustness sweeps (basket/universe/cost/window)
 - `scripts/regime_timing_study.py` — index trend-timing robustness
 - `scripts/chinext_timing_strategy.py` — the packaged survivor (vol-targeted)
+
+## Addendum — qlib-methodology ML/TS experiment (2026-07-26)
+
+Tested the model-class hypothesis: Alpha158-style daily features -> LightGBM ->
+purged walk-forward (3y train / 6mo test, embargo=horizon) -> OOS rank-IC + cost-aware
+top-decile portfolio vs CSI300. Universe = fixed top-400 by mkt cap (survivorship bias
+that FLATTERS the model). Scripts: `scripts/qlib_experiment/`.
+
+Result (horizon 10d, 13 folds, 850k rows, 2016-2026):
+- **OOS rank-IC = -0.002, ICIR -0.02, 51% positive** — ZERO predictive skill.
+- Portfolio: top-decile +23.7% / Sharpe 0.85 vs CSI300 +4% / 0.31 — LOOKS great, but
+  **bottom-decile +24.8% (beats top)** and equal-wt universe +12.5%. The "outperformance"
+  is entirely survivorship + equal-weight-vs-cap-weight, ZERO from the model.
+
+Verdict: ML/TS on daily A-share data learns nothing that generalizes, yet produces a
+backtest that looks like +20% alpha — the textbook ML-in-finance trap. Only rank-IC and
+the top-vs-bottom control caught it; the equity curve alone would have "discovered" a
+fake alpha. Deeper models / more features won't create signal a strong learner reads as
+zero; a PIT universe would make the flattering number WORSE. Model class does not change
+the conclusion. (Untested corner: shorter horizons.)

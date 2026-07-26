@@ -79,7 +79,7 @@ def main():
     csi = pd.read_csv(ROOT / "outputs" / "paper_lab" / "index_CSI300.csv", parse_dates=["trade_date"]).set_index("trade_date")["close"]
 
     TRAIN_D, TEST_D, EMBARGO = 252 * 3, 126, H + 3
-    all_ic, port_ret, port_dates = [], [], []
+    all_ic, port_ret, bot_ret, uni_ret, port_dates = [], [], [], [], []
     fold = 0
     start = TRAIN_D + EMBARGO
     while start + TEST_D <= len(dates):
@@ -101,16 +101,18 @@ def main():
                 ic = spearmanr(g["pred"], g["label"]).correlation
                 if not np.isnan(ic):
                     all_ic.append(ic)
-        # non-overlapping H-day portfolio: long top decile by pred
+        # non-overlapping H-day portfolios: top decile, bottom decile, full universe (controls)
         te_sorted = sorted(ted["date"].unique())
         for k in range(0, len(te_sorted), H):
             d = te_sorted[k]
             g = ted[ted["date"] == d]
             n = max(5, int(len(g) * 0.10))
-            top = g.nlargest(n, "pred")
-            r = top["label"].mean()  # label already = forward H-day return
-            if not np.isnan(r):
-                port_ret.append(r - 2 * COST_BPS / 10000.0)  # round-trip cost
+            rt = g.nlargest(n, "pred")["label"].mean()
+            rb = g.nsmallest(n, "pred")["label"].mean()
+            ru = g["label"].mean()
+            if not np.isnan(rt):
+                cst = 2 * COST_BPS / 10000.0
+                port_ret.append(rt - cst); bot_ret.append(rb - cst); uni_ret.append(ru - cst)
                 port_dates.append(pd.Timestamp(d))
         fold += 1
         start += TEST_D
@@ -132,9 +134,15 @@ def main():
         c0 = csi[csi.index <= port_dates[i]].iloc[-1]; c1 = csi[csi.index <= port_dates[i + 1]].iloc[-1]
         cr.append(c1 / c0 - 1)
     ceq = np.cumprod(1 + np.array(cr))
-    print("\n=== top-decile portfolio (net of costs) vs CSI300, walk-forward OOS ===")
-    print(f"  strategy: CAGR {(eq[-1]**(1/yrs)-1)*100:+.1f}%  Sharpe {pr.mean()/pr.std()*np.sqrt(ppy):+.2f}  maxDD {dd*100:.1f}%  ({len(pr)} trades)")
-    print(f"  CSI300  : CAGR {(ceq[-1]**(1/yrs)-1)*100:+.1f}%  Sharpe {np.mean(cr)/np.std(cr)*np.sqrt(ppy):+.2f}")
+    def stat(x):
+        x = np.array(x); e = np.cumprod(1 + x)
+        return (e[-1] ** (1 / yrs) - 1) * 100, x.mean() / x.std() * np.sqrt(ppy)
+    tc, ts = stat(port_ret); bc, bs = stat(bot_ret); uc, us = stat(uni_ret)
+    print("\n=== portfolios (net of costs) vs CSI300, walk-forward OOS ===")
+    print(f"  MODEL top-decile : CAGR {tc:+.1f}%  Sharpe {ts:+.2f}  maxDD {dd*100:.1f}%  ({len(pr)} trades)")
+    print(f"  MODEL bot-decile : CAGR {bc:+.1f}%  Sharpe {bs:+.2f}   <- if ~= top, model has NO skill")
+    print(f"  equal-wt universe: CAGR {uc:+.1f}%  Sharpe {us:+.2f}   <- survivorship+equal-wt baseline")
+    print(f"  CSI300 (cap-wt)  : CAGR {(ceq[-1]**(1/yrs)-1)*100:+.1f}%  Sharpe {np.mean(cr)/np.std(cr)*np.sqrt(ppy):+.2f}")
 
 
 if __name__ == "__main__":
