@@ -10,6 +10,26 @@
     "1Y_maxDD%":16.6
   },
   {
+    "sleeve":"xsec:low_vol",
+    "CAGR%":5.8,
+    "Sharpe":0.48,
+    "maxDD%":17.1,
+    "total%":44.0,
+    "1Y_CAGR%":-1.6,
+    "1Y_Sharpe":-0.06,
+    "1Y_maxDD%":12.1
+  },
+  {
+    "sleeve":"xsec:multifactor",
+    "CAGR%":5.2,
+    "Sharpe":0.45,
+    "maxDD%":20.5,
+    "total%":38.8,
+    "1Y_CAGR%":2.0,
+    "1Y_Sharpe":0.21,
+    "1Y_maxDD%":11.2
+  },
+  {
     "sleeve":"ChiNext buy&hold",
     "CAGR%":8.0,
     "Sharpe":0.4,
@@ -18,6 +38,16 @@
     "1Y_CAGR%":59.0,
     "1Y_Sharpe":1.56,
     "1Y_maxDD%":21.6
+  },
+  {
+    "sleeve":"xsec:value",
+    "CAGR%":4.8,
+    "Sharpe":0.37,
+    "maxDD%":20.7,
+    "total%":35.4,
+    "1Y_CAGR%":-1.0,
+    "1Y_Sharpe":0.02,
+    "1Y_maxDD%":12.5
   },
   {
     "sleeve":"Index rotation (dual-mom)",
@@ -48,5 +78,15 @@
     "1Y_CAGR%":4.7,
     "1Y_Sharpe":0.41,
     "1Y_maxDD%":11.6
+  },
+  {
+    "sleeve":"xsec:momentum",
+    "CAGR%":-6.4,
+    "Sharpe":-0.04,
+    "maxDD%":70.8,
+    "total%":-34.8,
+    "1Y_CAGR%":12.7,
+    "1Y_Sharpe":0.55,
+    "1Y_maxDD%":40.8
   }
 ]

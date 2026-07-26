@@ -131,17 +131,35 @@ SLEEVES = {
 }
 
 
-def _metrics(ret: pd.Series) -> dict:
+def _metrics(ret: pd.Series, ppy: int = 252) -> dict:
     r = ret.values
     eq = np.cumprod(1 + r)
-    yrs = len(r) / 252.0
+    yrs = len(r) / ppy
     dd = (1 - eq / np.maximum.accumulate(eq)).max()
     return {
         "CAGR%": round((eq[-1] ** (1 / yrs) - 1) * 100, 1) if yrs > 0 and eq[-1] > 0 else -100,
-        "Sharpe": round(r.mean() / r.std() * np.sqrt(252), 2) if r.std() > 0 else 0,
+        "Sharpe": round(r.mean() / r.std() * np.sqrt(ppy), 2) if r.std() > 0 else 0,
         "maxDD%": round(dd * 100, 1),
         "total%": round((eq[-1] - 1) * 100, 1),
     }
+
+
+def _xsec_rows() -> list[dict]:
+    """Fold in cross-sectional stock-alpha sleeves (monthly equity from xsec_sleeves.py)."""
+    f = CACHE / "xsec_equity.csv"
+    if not f.exists():
+        return []
+    eq = pd.read_csv(f, index_col=0, parse_dates=True)
+    rows = []
+    for col in eq.columns:
+        if col == "CSI300":
+            continue  # already represented by the daily buy&hold sleeve
+        rr = eq[col].pct_change().dropna()
+        m = _metrics(rr, ppy=12)
+        last1y = _metrics(rr.iloc[-12:], ppy=12)
+        rows.append({"sleeve": f"xsec:{col}", **m,
+                     "1Y_CAGR%": last1y["CAGR%"], "1Y_Sharpe": last1y["Sharpe"], "1Y_maxDD%": last1y["maxDD%"]})
+    return rows
 
 
 def main() -> int:
@@ -158,6 +176,7 @@ def main() -> int:
         last1y = _metrics(ret.iloc[-252:])
         rows.append({"sleeve": name, **{f"{k}": v for k, v in full.items()},
                      "1Y_CAGR%": last1y["CAGR%"], "1Y_Sharpe": last1y["Sharpe"], "1Y_maxDD%": last1y["maxDD%"]})
+    rows += _xsec_rows()
     board = pd.DataFrame(rows).sort_values("Sharpe", ascending=False)
     CACHE.mkdir(parents=True, exist_ok=True)
     board.to_csv(CACHE / "leaderboard.csv", index=False)
