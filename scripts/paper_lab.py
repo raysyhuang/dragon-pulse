@@ -235,8 +235,9 @@ def main() -> int:
         last1y = _metrics(ret.iloc[-252:])
         rows.append({"sleeve": name, **{f"{k}": v for k, v in full.items()},
                      "1Y_CAGR%": last1y["CAGR%"], "1Y_Sharpe": last1y["Sharpe"], "1Y_maxDD%": last1y["maxDD%"]})
-    if args.all:
-        rows += _xsec_rows()
+    xrows = _xsec_rows()
+    # IVOL survived robustness -> always on the focused board; other factor sleeves only with --all.
+    rows += xrows if args.all else [r for r in xrows if r["sleeve"] == "xsec:ivol"]
     board = pd.DataFrame(rows).sort_values("Sharpe", ascending=False)
     CACHE.mkdir(parents=True, exist_ok=True)
     board.to_csv(CACHE / "leaderboard.csv", index=False)

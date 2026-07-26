@@ -35,6 +35,7 @@ BASE_N = 300          # tradable base universe by circ mkt cap
 HOLD_FRAC = 0.10      # top decile
 MOM_WEEKS = 6         # months of momentum lookback (monthly grid)
 VOL_WEEKS = 6         # months for volatility (monthly grid)
+IVOL_WEEKS = 12       # months for idiosyncratic-vol / market-corr (needs a longer, stabler window)
 REBAL_MONTHS = 3      # quarterly rebalance — robustness sweep: quarterly >> monthly, lower cost
 
 
@@ -120,7 +121,9 @@ def main() -> int:
     wk = pd.to_datetime(weekly)
     reb = [weekly[j] for j in range(len(weekly))
            if j + 1 == len(weekly) or wk[j].month != wk[j + 1].month]
-    reb = [d for d in reb if d in basics][::REBAL_MONTHS]   # quarterly (robust config)
+    # require full warmup so every factor (incl. 12mo IVOL) uses a complete window — no
+    # partial-window early rebalances contaminating the estimates.
+    reb = [d for d in reb if d in basics and weekly.index(d) >= IVOL_WEEKS][::REBAL_MONTHS]
 
     csi = pd.read_csv(CACHE / "index_CSI300.csv", parse_dates=["trade_date"]).set_index("trade_date")["close"]
 
@@ -134,14 +137,21 @@ def main() -> int:
         rev = p_now / px[cols[max(0, j - 1)]].reindex(base) - 1   # 1-month return (short-term reversal)
         wret = px[cols[max(0, j - VOL_WEEKS):j + 1]].reindex(base).pct_change(axis=1)
         vol = wret.std(axis=1)
+        # IVOL: residual vol vs CSI300 = total_vol * sqrt(1 - corr(stock,market)^2), 12mo window
+        iw = cols[max(0, j - IVOL_WEEKS):j + 1]
+        iret = px[iw].reindex(base).pct_change(axis=1).iloc[:, 1:]
+        mkt = pd.Series([csi[csi.index <= pd.Timestamp(x)].iloc[-1] for x in iw]).pct_change().values[1:]
+        mkt = pd.Series(mkt, index=iret.columns)
+        icorr = iret.apply(lambda r: r.corr(mkt), axis=1)
+        ivol = iret.std(axis=1) * np.sqrt((1 - icorr ** 2).clip(lower=0))
         b = base_b.reindex(base)
         value = _z(-b["pb"]) + _z(-b["pe_ttm"]) + _z(b["dv_ttm"])
-        f = pd.DataFrame({"mom": mom, "rev": rev, "vol": vol, "value": value})
+        f = pd.DataFrame({"mom": mom, "rev": rev, "vol": vol, "ivol": ivol, "value": value})
         f["multifactor"] = _z(f["mom"]) + _z(-f["vol"]) + _z(f["value"])
         return f.dropna(subset=["mom", "vol"])
 
-    SLEEVES = {"momentum": ("mom", False), "reversal": ("rev", True), "low_vol": ("vol", True),
-               "value": ("value", False), "multifactor": ("multifactor", False)}
+    SLEEVES = {"ivol": ("ivol", True), "momentum": ("mom", False), "reversal": ("rev", True),
+               "low_vol": ("vol", True), "value": ("value", False), "multifactor": ("multifactor", False)}
     TIMED = ["low_vol", "multifactor", "momentum"]  # factor basket + CSI300 bull-regime overlay
     ROUNDTRIP_BPS = 30.0                      # commission+stamp+slippage on turned-over fraction
 
