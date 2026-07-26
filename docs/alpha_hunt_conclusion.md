@@ -95,4 +95,4 @@ backtest that looks like +20% alpha — the textbook ML-in-finance trap. Only ra
 the top-vs-bottom control caught it; the equity curve alone would have "discovered" a
 fake alpha. Deeper models / more features won't create signal a strong learner reads as
 zero; a PIT universe would make the flattering number WORSE. Model class does not change
-the conclusion. (Untested corner: shorter horizons.)
+the conclusion. Confirmed at both 10-day and 5-day horizons (H=5: IC -0.003, top-decile +12.3% vs bottom-decile +12.0% — same zero-skill result).
