@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-07",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "601857.SH",
+    "name_cn": "中国石油",
+    "score": 95.0,
+    "entry_price": 11.27,
+    "max_entry_price": 11.31,
+    "stop_loss": 10.93,
+    "target_1": 11.96,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "601857.SH",
+      "name_cn": "中国石油",
+      "score": 95.0,
+      "entry_price": 11.27,
+      "max_entry_price": 11.31,
+      "stop_loss": 10.93,
+      "target_1": 11.96,
+      "holding_period": 3
+    },
+    {
+      "ticker": "600989.SH",
+      "name_cn": "宝丰能源",
+      "score": 94.47,
+      "entry_price": 28.1,
+      "max_entry_price": 28.24,
+      "stop_loss": 26.72,
+      "target_1": 30.21,
+      "holding_period": 3
+    }
+  ]
+}

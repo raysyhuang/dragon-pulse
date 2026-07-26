@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-27",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "300199.SZ",
+    "name_cn": "翰宇药业",
+    "score": 98.75,
+    "entry_price": 25.34,
+    "max_entry_price": 25.85,
+    "stop_loss": 23.91,
+    "target_1": 28.07,
+    "holding_period": 5
+  },
+  "top2": [
+    {
+      "ticker": "300199.SZ",
+      "name_cn": "翰宇药业",
+      "score": 98.75,
+      "entry_price": 25.34,
+      "max_entry_price": 25.85,
+      "stop_loss": 23.91,
+      "target_1": 28.07,
+      "holding_period": 5
+    },
+    {
+      "ticker": "300661.SZ",
+      "name_cn": "圣邦股份",
+      "score": 98.03,
+      "entry_price": 116.66,
+      "max_entry_price": 118.99,
+      "stop_loss": 108.72,
+      "target_1": 131.82,
+      "holding_period": 5
+    }
+  ]
+}

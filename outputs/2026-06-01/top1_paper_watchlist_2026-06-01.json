@@ -1,0 +1,40 @@
+{
+  "date": "2026-06-01",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "688146.SH",
+    "name_cn": "中船特气",
+    "score": 98.45,
+    "entry_price": 174.66,
+    "max_entry_price": 178.15,
+    "stop_loss": 156.79,
+    "target_1": 208.77,
+    "holding_period": 5
+  },
+  "top2": [
+    {
+      "ticker": "688146.SH",
+      "name_cn": "中船特气",
+      "score": 98.45,
+      "entry_price": 174.66,
+      "max_entry_price": 178.15,
+      "stop_loss": 156.79,
+      "target_1": 208.77,
+      "holding_period": 5
+    },
+    {
+      "ticker": "300502.SZ",
+      "name_cn": "新易盛",
+      "score": 96.98,
+      "entry_price": 706.45,
+      "max_entry_price": 720.58,
+      "stop_loss": 661.19,
+      "target_1": 792.86,
+      "holding_period": 5
+    }
+  ]
+}

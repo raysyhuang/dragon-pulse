@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-22",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "choppy",
+  "top1": {
+    "ticker": "600233.SH",
+    "name_cn": "圆通速递",
+    "score": 96.0,
+    "entry_price": 18.71,
+    "max_entry_price": 18.78,
+    "stop_loss": 18.04,
+    "target_1": 19.21,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "600233.SH",
+      "name_cn": "圆通速递",
+      "score": 96.0,
+      "entry_price": 18.71,
+      "max_entry_price": 18.78,
+      "stop_loss": 18.04,
+      "target_1": 19.21,
+      "holding_period": 3
+    },
+    {
+      "ticker": "601118.SH",
+      "name_cn": "海南橡胶",
+      "score": 96.0,
+      "entry_price": 6.2,
+      "max_entry_price": 6.24,
+      "stop_loss": 5.85,
+      "target_1": 6.77,
+      "holding_period": 3
+    }
+  ]
+}

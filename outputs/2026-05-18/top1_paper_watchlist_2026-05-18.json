@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-18",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "000792.SZ",
+    "name_cn": "盐湖股份",
+    "score": 96.0,
+    "entry_price": 33.35,
+    "max_entry_price": 33.52,
+    "stop_loss": 31.78,
+    "target_1": 35.16,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "000792.SZ",
+      "name_cn": "盐湖股份",
+      "score": 96.0,
+      "entry_price": 33.35,
+      "max_entry_price": 33.52,
+      "stop_loss": 31.78,
+      "target_1": 35.16,
+      "holding_period": 3
+    },
+    {
+      "ticker": "002176.SZ",
+      "name_cn": "江特电机",
+      "score": 96.0,
+      "entry_price": 13.26,
+      "max_entry_price": 13.34,
+      "stop_loss": 12.48,
+      "target_1": 13.94,
+      "holding_period": 3
+    }
+  ]
+}

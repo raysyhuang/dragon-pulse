@@ -1,0 +1,30 @@
+{
+  "date": "2026-05-04",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "600498.SH",
+    "name_cn": "烽火通信",
+    "score": 89.0,
+    "entry_price": 46.68,
+    "max_entry_price": 47.03,
+    "stop_loss": 43.4,
+    "target_1": 50.87,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "600498.SH",
+      "name_cn": "烽火通信",
+      "score": 89.0,
+      "entry_price": 46.68,
+      "max_entry_price": 47.03,
+      "stop_loss": 43.4,
+      "target_1": 50.87,
+      "holding_period": 3
+    }
+  ]
+}

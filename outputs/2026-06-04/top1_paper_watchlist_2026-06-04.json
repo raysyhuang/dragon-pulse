@@ -1,0 +1,40 @@
+{
+  "date": "2026-06-04",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "688700.SH",
+    "name_cn": "东威科技",
+    "score": 98.43,
+    "entry_price": 87.0,
+    "max_entry_price": 88.74,
+    "stop_loss": 79.21,
+    "target_1": 101.88,
+    "holding_period": 5
+  },
+  "top2": [
+    {
+      "ticker": "688700.SH",
+      "name_cn": "东威科技",
+      "score": 98.43,
+      "entry_price": 87.0,
+      "max_entry_price": 88.74,
+      "stop_loss": 79.21,
+      "target_1": 101.88,
+      "holding_period": 5
+    },
+    {
+      "ticker": "600667.SH",
+      "name_cn": "太极实业",
+      "score": 97.02,
+      "entry_price": 14.87,
+      "max_entry_price": 15.17,
+      "stop_loss": 13.71,
+      "target_1": 17.09,
+      "holding_period": 5
+    }
+  ]
+}

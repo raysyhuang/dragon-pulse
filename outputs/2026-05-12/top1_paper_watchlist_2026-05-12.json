@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-12",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "600309.SH",
+    "name_cn": "万华化学",
+    "score": 96.0,
+    "entry_price": 83.29,
+    "max_entry_price": 83.57,
+    "stop_loss": 80.59,
+    "target_1": 84.99,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "600309.SH",
+      "name_cn": "万华化学",
+      "score": 96.0,
+      "entry_price": 83.29,
+      "max_entry_price": 83.57,
+      "stop_loss": 80.59,
+      "target_1": 84.99,
+      "holding_period": 3
+    },
+    {
+      "ticker": "600938.SH",
+      "name_cn": "中国海油",
+      "score": 96.0,
+      "entry_price": 36.19,
+      "max_entry_price": 36.3,
+      "stop_loss": 35.12,
+      "target_1": 36.69,
+      "holding_period": 3
+    }
+  ]
+}

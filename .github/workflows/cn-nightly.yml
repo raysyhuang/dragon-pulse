@@ -98,6 +98,16 @@ jobs:
             cat "${WL_FILE}" | python -m json.tool | head -30
           fi
 
+      - name: Top-1/day paper track (A/B vs live top-2 + CSI300)
+        if: steps.check.outputs.skip != 'true'
+        continue-on-error: true
+        run: |
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          # Non-invasive: post-processes the watchlist above; does NOT touch live ranking.
+          python scripts/top1_paper_track.py record --date "${TRADE_DATE}"
+          python scripts/top1_paper_track.py evaluate --date "${TRADE_DATE}"
+          python scripts/top1_paper_track.py report
+
       - name: Commit outputs
         if: steps.check.outputs.skip != 'true' && success()
         run: |

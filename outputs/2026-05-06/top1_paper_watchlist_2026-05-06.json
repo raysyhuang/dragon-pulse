@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-06",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "601963.SH",
+    "name_cn": "重庆银行",
+    "score": 96.0,
+    "entry_price": 10.47,
+    "max_entry_price": 10.5,
+    "stop_loss": 10.2,
+    "target_1": 10.65,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "601963.SH",
+      "name_cn": "重庆银行",
+      "score": 96.0,
+      "entry_price": 10.47,
+      "max_entry_price": 10.5,
+      "stop_loss": 10.2,
+      "target_1": 10.65,
+      "holding_period": 3
+    },
+    {
+      "ticker": "600292.SH",
+      "name_cn": "电投水电",
+      "score": 95.0,
+      "entry_price": 15.11,
+      "max_entry_price": 15.17,
+      "stop_loss": 14.58,
+      "target_1": 15.56,
+      "holding_period": 3
+    }
+  ]
+}

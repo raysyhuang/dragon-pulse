@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-26",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "000333.SZ",
+    "name_cn": "美的集团",
+    "score": 95.14,
+    "entry_price": 79.55,
+    "max_entry_price": 79.71,
+    "stop_loss": 77.99,
+    "target_1": 80.53,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "000333.SZ",
+      "name_cn": "美的集团",
+      "score": 95.14,
+      "entry_price": 79.55,
+      "max_entry_price": 79.71,
+      "stop_loss": 77.99,
+      "target_1": 80.53,
+      "holding_period": 3
+    },
+    {
+      "ticker": "300750.SZ",
+      "name_cn": "宁德时代",
+      "score": 95.0,
+      "entry_price": 402.5,
+      "max_entry_price": 403.93,
+      "stop_loss": 388.91,
+      "target_1": 408.58,
+      "holding_period": 3
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "date": "2026-06-23",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "301200.SZ",
+    "name_cn": "大族数控",
+    "score": 98.96,
+    "entry_price": 338.96,
+    "max_entry_price": 345.74,
+    "stop_loss": 315.46,
+    "target_1": 383.83,
+    "holding_period": 5
+  },
+  "top2": [
+    {
+      "ticker": "301200.SZ",
+      "name_cn": "大族数控",
+      "score": 98.96,
+      "entry_price": 338.96,
+      "max_entry_price": 345.74,
+      "stop_loss": 315.46,
+      "target_1": 383.83,
+      "holding_period": 5
+    },
+    {
+      "ticker": "688347.SH",
+      "name_cn": "华虹宏力",
+      "score": 98.92,
+      "entry_price": 280.0,
+      "max_entry_price": 285.6,
+      "stop_loss": 255.53,
+      "target_1": 326.72,
+      "holding_period": 5
+    }
+  ]
+}

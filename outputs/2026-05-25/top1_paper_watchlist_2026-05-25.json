@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-25",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "601857.SH",
+    "name_cn": "中国石油",
+    "score": 96.0,
+    "entry_price": 10.73,
+    "max_entry_price": 10.76,
+    "stop_loss": 10.42,
+    "target_1": 11.26,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "601857.SH",
+      "name_cn": "中国石油",
+      "score": 96.0,
+      "entry_price": 10.73,
+      "max_entry_price": 10.76,
+      "stop_loss": 10.42,
+      "target_1": 11.26,
+      "holding_period": 3
+    },
+    {
+      "ticker": "300750.SZ",
+      "name_cn": "宁德时代",
+      "score": 95.0,
+      "entry_price": 402.88,
+      "max_entry_price": 404.36,
+      "stop_loss": 388.86,
+      "target_1": 411.67,
+      "holding_period": 3
+    }
+  ]
+}

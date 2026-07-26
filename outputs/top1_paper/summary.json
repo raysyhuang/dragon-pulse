@@ -1,0 +1,23 @@
+{
+  "generated": "paper A/B — top-1 (challenger) vs top-2 (live) vs CSI300",
+  "evaluated_days": 35,
+  "sizing": "capital-constrained, 20%/position, max 5 concurrent (identical across tracks)",
+  "top1": {
+    "trades": 22,
+    "cum_return_pct": -1.2,
+    "win_pct": 33.0,
+    "max_dd_pct": 5.0
+  },
+  "top2_live": {
+    "trades": 20,
+    "cum_return_pct": -7.1,
+    "win_pct": 25.0,
+    "max_dd_pct": 7.1
+  },
+  "csi300_benchmark": {
+    "windows": 35,
+    "avg_window_ret_pct": -0.21,
+    "win_pct": 54.0
+  },
+  "note": "PAPER ONLY. Promote top-1 to live only after it beats top-2 AND CSI300 net of costs."
+}

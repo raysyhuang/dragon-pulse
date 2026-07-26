@@ -1,0 +1,40 @@
+{
+  "date": "2026-05-13",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bull",
+  "top1": {
+    "ticker": "600188.SH",
+    "name_cn": "兖矿能源",
+    "score": 96.0,
+    "entry_price": 20.77,
+    "max_entry_price": 20.87,
+    "stop_loss": 19.8,
+    "target_1": 21.22,
+    "holding_period": 3
+  },
+  "top2": [
+    {
+      "ticker": "600188.SH",
+      "name_cn": "兖矿能源",
+      "score": 96.0,
+      "entry_price": 20.77,
+      "max_entry_price": 20.87,
+      "stop_loss": 19.8,
+      "target_1": 21.22,
+      "holding_period": 3
+    },
+    {
+      "ticker": "000729.SZ",
+      "name_cn": "燕京啤酒",
+      "score": 95.0,
+      "entry_price": 12.61,
+      "max_entry_price": 12.65,
+      "stop_loss": 12.23,
+      "target_1": 12.86,
+      "holding_period": 3
+    }
+  ]
+}
