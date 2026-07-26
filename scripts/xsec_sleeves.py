@@ -131,15 +131,16 @@ def main() -> int:
         base = base_b.sort_values("circ_mv", ascending=False).head(BASE_N).index
         p_now = px[d].reindex(base)
         mom = p_now / px[cols[max(0, j - MOM_WEEKS)]].reindex(base) - 1
+        rev = p_now / px[cols[max(0, j - 1)]].reindex(base) - 1   # 1-month return (short-term reversal)
         wret = px[cols[max(0, j - VOL_WEEKS):j + 1]].reindex(base).pct_change(axis=1)
         vol = wret.std(axis=1)
         b = base_b.reindex(base)
         value = _z(-b["pb"]) + _z(-b["pe_ttm"]) + _z(b["dv_ttm"])
-        f = pd.DataFrame({"mom": mom, "vol": vol, "value": value})
+        f = pd.DataFrame({"mom": mom, "rev": rev, "vol": vol, "value": value})
         f["multifactor"] = _z(f["mom"]) + _z(-f["vol"]) + _z(f["value"])
         return f.dropna(subset=["mom", "vol"])
 
-    SLEEVES = {"momentum": ("mom", False), "low_vol": ("vol", True),
+    SLEEVES = {"momentum": ("mom", False), "reversal": ("rev", True), "low_vol": ("vol", True),
                "value": ("value", False), "multifactor": ("multifactor", False)}
     TIMED = ["low_vol", "multifactor", "momentum"]  # factor basket + CSI300 bull-regime overlay
     ROUNDTRIP_BPS = 30.0                      # commission+stamp+slippage on turned-over fraction

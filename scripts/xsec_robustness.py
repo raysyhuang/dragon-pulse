@@ -51,11 +51,12 @@ def factor_series(i, base_n, vol_m, mom_m):
     base = b.sort_values("circ_mv", ascending=False).head(base_n).index
     p_now = PX[d].reindex(base)
     mom = p_now / PX[DATES[max(0, i - mom_m)]].reindex(base) - 1
+    rev = p_now / PX[DATES[max(0, i - 1)]].reindex(base) - 1   # 1-step return (short-term reversal)
     window = PX[[DATES[j] for j in range(max(0, i - vol_m), i + 1)]].reindex(base)
     vol = window.pct_change(axis=1).std(axis=1)
     bb = b.reindex(base)
     value = _z(-bb["pb"]) + _z(-bb["pe_ttm"]) + _z(bb["dv_ttm"])
-    f = pd.DataFrame({"vol": vol, "mom": mom, "value": value})
+    f = pd.DataFrame({"vol": vol, "mom": mom, "rev": rev, "value": value})
     f["multifactor"] = _z(f["mom"]) + _z(-f["vol"]) + _z(f["value"])
     return f.dropna(subset=["vol"])
 
