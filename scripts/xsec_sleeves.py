@@ -140,26 +140,51 @@ def main() -> int:
 
     SLEEVES = {"momentum": ("mom", False), "low_vol": ("vol", True),
                "value": ("value", False), "multifactor": ("multifactor", False)}
+    TIMED = ["low_vol", "multifactor", "momentum"]  # factor basket + CSI300 bull-regime overlay
     ROUNDTRIP_BPS = 30.0                      # commission+stamp+slippage on turned-over fraction
+
+    # CSI300 50/200 bull-regime gate for the timed overlay (no lookahead: decided at d)
+    csi_s50, csi_s200 = csi.rolling(50).mean(), csi.rolling(200).mean()
+
+    def is_bull(dstr):
+        t = pd.Timestamp(dstr)
+        sub = csi[csi.index <= t]
+        if len(sub) < 200:
+            return True
+        return sub.iloc[-1] > csi_s50[csi_s50.index <= t].iloc[-1] > csi_s200[csi_s200.index <= t].iloc[-1]
+
     equity = {s: [1.0] for s in SLEEVES}
     equity["CSI300"] = [1.0]
+    for b in TIMED:
+        equity[f"{b}_timed"] = [1.0]
     dates_out = [reb[0]]
     prior = {s: set() for s in SLEEVES}
+    prior_t = {f"{b}_timed": set() for b in TIMED}
     turnover = {s: [] for s in SLEEVES}
+    side = ROUNDTRIP_BPS / 2 / 10000.0
 
     for k in range(len(reb) - 1):
         d, dn = reb[k], reb[k + 1]
         f = factors(d)
         n = max(5, int(len(f) * HOLD_FRAC))
         fwd = (px[dn].reindex(f.index) / px[d].reindex(f.index) - 1)
+        bull = is_bull(d)
+        held_sets = {}
         for s, (col, asc) in SLEEVES.items():
             held = set(f[col].sort_values(ascending=asc).head(n).index)
+            held_sets[s] = held
             turn = 1.0 - (len(held & prior[s]) / len(held)) if held else 0.0
             turnover[s].append(turn)
-            cost = turn * ROUNDTRIP_BPS / 10000.0
             r = fwd.reindex(list(held)).dropna().mean()
-            equity[s].append(equity[s][-1] * (1 + (0.0 if pd.isna(r) else r) - cost))
+            equity[s].append(equity[s][-1] * (1 + (0.0 if pd.isna(r) else r) - turn * ROUNDTRIP_BPS / 10000.0))
             prior[s] = held
+        for b in TIMED:                        # timed overlay: basket if bull else cash
+            ts = f"{b}_timed"
+            target = held_sets[b] if bull else set()
+            cost = (len(prior_t[ts] - target) + len(target - prior_t[ts])) / n * side
+            r = fwd.reindex(list(target)).dropna().mean() if target else 0.0
+            equity[ts].append(equity[ts][-1] * (1 + (0.0 if pd.isna(r) else r) - cost))
+            prior_t[ts] = target
         c0 = csi[csi.index <= pd.Timestamp(d)].iloc[-1]
         c1 = csi[csi.index <= pd.Timestamp(dn)].iloc[-1]
         equity["CSI300"].append(equity["CSI300"][-1] * (c1 / c0))
@@ -169,7 +194,7 @@ def main() -> int:
     out.to_csv(CACHE / "xsec_equity.csv")
     print(f"\nCross-sectional sleeves — {dates_out[0]}..{dates_out[-1]} ({len(reb)} rebalances)\n")
     rows = []
-    for s in list(SLEEVES) + ["CSI300"]:
+    for s in equity:
         e = np.array(equity[s]); rr = np.diff(e) / e[:-1]
         dd = (1 - e / np.maximum.accumulate(e)).max()
         yrs = len(rr) / 12.0
