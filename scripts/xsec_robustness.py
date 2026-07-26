@@ -45,10 +45,10 @@ def _z(s):
     return (s - s.mean()) / s.std()
 
 
-def factor_series(i, base_n, vol_m, mom_m):
+def factor_series(i, base_n, vol_m, mom_m, base_lo=0):
     d = DATES[i]
     b = BASICS[d].dropna(subset=["circ_mv"])
-    base = b.sort_values("circ_mv", ascending=False).head(base_n).index
+    base = b.sort_values("circ_mv", ascending=False).iloc[base_lo:base_n].index  # base_lo>0 = mid-cap
     p_now = PX[d].reindex(base)
     mom = p_now / PX[DATES[max(0, i - mom_m)]].reindex(base) - 1
     rev = p_now / PX[DATES[max(0, i - 1)]].reindex(base) - 1   # 1-step return (short-term reversal)
@@ -61,13 +61,13 @@ def factor_series(i, base_n, vol_m, mom_m):
     return f.dropna(subset=["vol"])
 
 
-def run(factor, asc, base_n=300, hold_frac=0.10, rebal=1, cost_bps=30, vol_m=6, mom_m=6):
+def run(factor, asc, base_n=300, hold_frac=0.10, rebal=1, cost_bps=30, vol_m=6, mom_m=6, base_lo=0):
     start = max(vol_m, mom_m)
     idx = list(range(start, len(DATES) - 1, rebal))
     eq, prior, curve = 1.0, set(), []
     for k in range(len(idx) - 1):
         i, j = idx[k], idx[k + 1]
-        f = factor_series(i, base_n, vol_m, mom_m)
+        f = factor_series(i, base_n, vol_m, mom_m, base_lo)
         if f.empty:
             continue
         n = max(5, int(len(f) * hold_frac))
