@@ -1,0 +1,52 @@
+[
+  {
+    "sleeve":"ChiNext timed 50\/200",
+    "CAGR%":11.4,
+    "Sharpe":0.71,
+    "maxDD%":41.6,
+    "total%":233.1,
+    "1Y_CAGR%":35.0,
+    "1Y_Sharpe":1.21,
+    "1Y_maxDD%":16.6
+  },
+  {
+    "sleeve":"ChiNext buy&hold",
+    "CAGR%":8.0,
+    "Sharpe":0.4,
+    "maxDD%":69.7,
+    "total%":136.5,
+    "1Y_CAGR%":59.0,
+    "1Y_Sharpe":1.56,
+    "1Y_maxDD%":21.6
+  },
+  {
+    "sleeve":"Index rotation (dual-mom)",
+    "CAGR%":5.4,
+    "Sharpe":0.34,
+    "maxDD%":54.7,
+    "total%":78.8,
+    "1Y_CAGR%":24.8,
+    "1Y_Sharpe":0.85,
+    "1Y_maxDD%":26.0
+  },
+  {
+    "sleeve":"CSI300 buy&hold",
+    "CAGR%":2.5,
+    "Sharpe":0.22,
+    "maxDD%":46.7,
+    "total%":31.6,
+    "1Y_CAGR%":15.9,
+    "1Y_Sharpe":0.93,
+    "1Y_maxDD%":10.5
+  },
+  {
+    "sleeve":"CSI300 timed 50\/200",
+    "CAGR%":0.9,
+    "Sharpe":0.14,
+    "maxDD%":29.0,
+    "total%":10.6,
+    "1Y_CAGR%":4.7,
+    "1Y_Sharpe":0.41,
+    "1Y_maxDD%":11.6
+  }
+]
