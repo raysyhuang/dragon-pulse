@@ -31,13 +31,13 @@
   },
   {
     "sleeve":"xsec:ivol",
-    "CAGR%":2.6,
-    "Sharpe":0.28,
-    "maxDD%":14.8,
-    "total%":18.0,
-    "1Y_CAGR%":-3.8,
-    "1Y_Sharpe":-0.51,
-    "1Y_maxDD%":8.2
+    "CAGR%":6.4,
+    "Sharpe":0.4,
+    "maxDD%":35.3,
+    "total%":106.4,
+    "1Y_CAGR%":0.5,
+    "1Y_Sharpe":0.1,
+    "1Y_maxDD%":8.0
   },
   {
     "sleeve":"CSI300 buy&hold",
