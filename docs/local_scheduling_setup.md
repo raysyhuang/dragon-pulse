@@ -8,8 +8,14 @@ TCC** and need a one-time Full Disk Access grant to work.
 | `com.dragonpulse.morning-alert` | `scripts/morning_alert_local.sh` | Mon–Fri 09:28 Shanghai | Local fallback for the morning Telegram alert (primary is GitHub Actions `cn-morning.yml`) |
 | `com.dragonpulse.paper-lab-refresh` | `scripts/paper_lab_refresh.sh` | Sun 20:00 Shanghai | Forward-refresh the paper lab (ChiNext-timing + IVOL vs benchmarks) |
 
-Both must run locally — **Tushare rejects GitHub/CI runner IPs**, so this work cannot
-move to Actions.
+Both run locally by design: the morning-alert agent exists precisely as a *fallback for
+when Actions is unavailable*, and the paper-lab refresh is long-running with its data
+cache on this machine.
+
+> **Correction (2026-07-27):** an earlier version of this doc claimed "Tushare rejects
+> GitHub/CI runner IPs". That was **wrong** — it came from a mis-diagnosis after the
+> repo's `TUSHARE_TOKEN` secret was accidentally deleted. Tushare works fine from GitHub
+> runners (verified: northbound probe returned `status: ok`, 20 rows, from Actions).
 
 ## The problem
 

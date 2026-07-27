@@ -22,7 +22,8 @@ Features per pick:
 Usage:
     TUSHARE_TOKEN=... python scripts/cyq_build.py <detail.csv> <out_features.csv>
 
-Runs LOCAL only — Tushare rejects GitHub/CI runner IPs.
+Run locally (long-running). NOTE: Tushare also works from CI — the earlier
+"CI IPs are rejected" claim was a mis-diagnosis (deleted TUSHARE_TOKEN secret).
 """
 from __future__ import annotations
 

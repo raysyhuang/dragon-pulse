@@ -59,7 +59,8 @@ plausible "alphas" died to it before any reached capital — the real win.
 
 `scripts/paper_lab.py` (focused watchlist) tracks ChiNext-timing (survivor) + IVOL
 (defensive-tie tracker) vs CSI300/ChiNext buy-and-hold. Forward-refresh via
-`scripts/paper_lab_refresh.sh` (local; Tushare rejects CI IPs). Stock-picking
+`scripts/paper_lab_refresh.sh` (run locally — long-running, cache lives there;
+Tushare itself works from CI too). Stock-picking
 top-1/day paper track runs separately in `outputs/top1_paper/`.
 
 ## If reopening

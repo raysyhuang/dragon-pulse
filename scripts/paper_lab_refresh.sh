@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Forward-refresh the paper lab so the surviving sleeves accumulate live evidence.
 #
-# LOCAL ONLY: Tushare rejects GitHub/CI runner IPs, so this can't run in Actions.
+# Run locally: these jobs are long-running and the data cache lives here.
+# (NOTE: Tushare DOES work from GitHub runners — the earlier "CI IPs are rejected"
+# claim was a mis-diagnosis caused by an accidentally deleted TUSHARE_TOKEN secret.)
 # Run it locally on a schedule (the index sleeves update every run; the quarterly
 # factor sleeve auto-extends — it only pulls a new quarter-end when one has passed).
 #

@@ -15,7 +15,8 @@ so paper_lab.py includes them on the leaderboard.
 
 Usage:
     TUSHARE_TOKEN=... python scripts/xsec_sleeves.py --months 12   # seed PIT history + forward
-Runs LOCAL (Tushare rejects CI runner IPs).
+Run locally (long-running; the per-date cache lives here). NOTE: Tushare also works
+from CI — the earlier "CI IPs are rejected" claim was a mis-diagnosis.
 """
 from __future__ import annotations
 

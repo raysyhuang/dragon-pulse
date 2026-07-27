@@ -14,7 +14,8 @@ Costs charged on every switch. Leaderboard reports full-cycle + trailing-1Y.
 Usage:
     TUSHARE_TOKEN=... python scripts/paper_lab.py            # backfill + score
     TUSHARE_TOKEN=... python scripts/paper_lab.py --alert    # + telegram leaderboard
-Runs LOCAL (Tushare rejects CI runner IPs) unless index data is cached.
+Run locally (long-running; the cache lives here). NOTE: Tushare also works from CI —
+the earlier "CI IPs are rejected" claim was a mis-diagnosis (deleted TUSHARE_TOKEN secret).
 """
 from __future__ import annotations
 

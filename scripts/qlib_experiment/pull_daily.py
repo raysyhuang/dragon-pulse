@@ -7,7 +7,8 @@ if ML fails walk-forward even with that tailwind, the negative is strong. A PIT 
 the follow-up if the biased version shows promise).
 
 Usage: TUSHARE_TOKEN=... python scripts/qlib_experiment/pull_daily.py [N] [start]
-LOCAL only (Tushare rejects CI IPs).
+Run locally (long-running). NOTE: Tushare also works from CI — the earlier
+"CI IPs are rejected" claim was a mis-diagnosis.
 """
 from __future__ import annotations
 import json, os, sys, time, urllib.request
