@@ -95,6 +95,17 @@ def _section_line() -> str:
     return "\u2500" * 28
 
 
+def run_source_tag() -> str:
+    """Where this alert was produced: the GitHub Actions pipeline or a local run.
+
+    Mirrors MAS's MAS_GH convention. Local scans are a real fallback path (e.g. when
+    a data provider is down in CI), so the two must be distinguishable in Telegram.
+    """
+    if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("GITHUB_RUN_ID"):
+        return "DP_GH"
+    return "DP_LOCAL"
+
+
 def _starts_with_title_block(message: str, title: str) -> bool:
     """Detect a leading title even when it is wrapped in simple HTML tags."""
     first_line = (message or "").lstrip().split("\n", 1)[0].strip()
@@ -498,6 +509,8 @@ class AlertManager:
 
         # Avoid repeating the same header when the formatted body already includes it.
         text = message if _starts_with_title_block(message, title) else f"{title}\n\n{message}"
+        # Tag the origin pipeline (applied after the dedup check so it can't defeat it).
+        text = f"<b>[{run_source_tag()}]</b>\n{text}"
 
         logger.info(
             "Telegram config: token_present=%s chat_id=%s run_id=%s attempt=%s",
