@@ -1,0 +1,15 @@
+{
+  "date": "2026-07-27",
+  "generated_utc": "2026-07-27T00:11:43.410229",
+  "sleeve": "northbound_active_riskband_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "meta": {
+    "asof_date": "2026-07-27",
+    "source_trade_date": null,
+    "source_status": "missing TUSHARE_TOKEN",
+    "paper_only": true,
+    "rule": "northbound active rank<=5, stop-risk 4-7%, conservative T+1 no-chase, 5D bracket replay tracker"
+  },
+  "picks": []
+}
