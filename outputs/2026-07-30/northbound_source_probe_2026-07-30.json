@@ -1,0 +1,35 @@
+{
+  "date": "2026-07-30",
+  "generated_utc": "2026-07-30T00:09:59.874905",
+  "probe_time_shanghai": "2026-07-30T08:09:59.874932+08:00",
+  "hsgt_top10_status": "ok",
+  "hsgt_top10_latest_trade_date": "2026-07-29",
+  "hsgt_top10_rows": 20,
+  "hsgt_top10_rank_le_5_rows": 10,
+  "hsgt_top10_columns": [
+    "trade_date",
+    "ts_code",
+    "name",
+    "close",
+    "change",
+    "rank",
+    "market_type",
+    "amount",
+    "net_amount",
+    "buy",
+    "sell",
+    "_call_label"
+  ],
+  "hsgt_top10_net_amount_non_null": 0,
+  "holding_delta_status": "eastmoney_holding_delta_parser_error: TypeError: 'NoneType' object is not subscriptable",
+  "holding_delta_rows": 0,
+  "holding_delta_sample": {},
+  "data_quality": "active_rank_only",
+  "flow_confirmed": false,
+  "data_gaps": [
+    "latest hsgt_top10 trade_date 2026-07-29 is older than asof 2026-07-30",
+    "hsgt_top10 net_amount/buy/sell are not populated; active-rank turnover only",
+    "holding-delta replacement unavailable: eastmoney_holding_delta_parser_error: TypeError: 'NoneType' object is not subscriptable"
+  ],
+  "label": "北向活跃榜/成交活跃纸面跟踪"
+}
