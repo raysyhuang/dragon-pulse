@@ -1,0 +1,4 @@
+Title: 北向纸面袖珍盘 — 2026-08-04
+Run ID: 30864975745
+Attempt: 1
+Job: northbound-paper-preopen
