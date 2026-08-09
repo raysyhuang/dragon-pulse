@@ -45,6 +45,12 @@ The current input freezer is explicitly `pit_grade: false`: it freezes a current
 
 Therefore, **no new historical C2 result is admissible** until a PIT-grade universe/data-bundle design and a production-like replay harness exist. A date-separated factor curve from the current harness is a lead only, not a promotion test.
 
+### PIT evidence and provenance gate
+
+Task 1's `validate_pit_bundle` is an integrity validator, not an oracle for historical membership: it accepts only a supplied bundle with a nonempty `bundle_id`, flat file `hashes`, matching `composite_sha256`, `pit_grade: true`, hash-valid copied sources, and schedule rows tied to those sources. It can prove those supplied artifacts are self-consistent; it cannot prove a vendor snapshot was genuinely captured on its named date or contains every historically eligible issuer.
+
+Task 2 is the required provenance gate before a schedule may be offered to that validator. It accepts no provider calls and requires a supplied `daily_basic_YYYYMMDD.csv` for every requested date, preserves each raw file under `sources/`, rejects fabricated/malformed listing information and invalid caps, applies `list_date <= as_of < delist_date` (where a delisting date exists), and deterministically ranks eligible names by circulating market value (`circ_mv`) then ticker. Its manifest records the source label, provenance limitation, builder Git commit, flat hashes, and composite hash. Passing this gate is necessary evidence preservation, not proof of authentic historical membership; provider acquisition/capture provenance remains an upstream gate.
+
 ## Tushare source audit — 2026-08-07 close
 
 Artifact: `outputs/source_data_audit_2026-08-07.json`.

@@ -14,7 +14,7 @@
 
 ### Task 1: Add a strict PIT manifest validator
 
-**Objective:** Make it impossible for a research run to call a current-universe snapshot “PIT.”
+**Objective:** Validate supplied evidence so a research run cannot call an unhashed or internally inconsistent snapshot bundle “PIT.” This validator cannot prove that supplied historical membership is authentic or complete.
 
 **Files:**
 - Create: `src/core/pit_bundle.py`
@@ -24,7 +24,7 @@
 **Step 1: Write failing tests**
 
 Create fixtures containing:
-- `manifest.json` with `pit_grade: true`, `as_of_dates`, file hashes, source/snapshot metadata and `universe_schedule.csv`.
+- `manifest.json` with `bundle_id`, `pit_grade: true`, `as_of_dates`, flat `hashes`, `composite_sha256`, source/snapshot metadata and `universe_schedule.csv`.
 - schedule rows with `as_of_date`, `ticker`, `listed_on_or_before`, `delisted_after`, `source_file`, `source_sha256`.
 
 Test: valid bundle loads; false pit grade is rejected; un-hashed raw source is rejected; a schedule date outside manifest dates is rejected; duplicate `(as_of_date,ticker)` is rejected; missing source hash is rejected.
@@ -48,7 +48,7 @@ Run focused tests, then `.venv/bin/python -m pytest tests/test_pit_bundle.py tes
 
 ### Task 2: Build deterministic PIT schedule artifacts from supplied historical snapshots
 
-**Objective:** Build a hash-stamped universe schedule only from dated source snapshots, not a current market-cap universe.
+**Objective:** Act as the provenance gate: build a hash-stamped universe schedule only from dated supplied source snapshots, not a current market-cap universe. The builder validates snapshot shape, membership dates and selection before creating the immutable bundle; it still does not establish an upstream provider's historical authenticity.
 
 **Files:**
 - Create: `scripts/build_pit_universe_schedule.py`
@@ -67,7 +67,7 @@ Run focused pytest and observe expected failure.
 
 **Step 2: Minimal implementation**
 
-CLI inputs: `--sources-dir`, `--output`, `--as-of-dates`, `--universe-n`, `--source-label`. Each source is an immutable historical snapshot named `daily_basic_YYYYMMDD.csv`; it must have `ts_code,circ_mv`. Emit `universe_schedule.csv`, copied immutable `sources/` files and `manifest.json`. Do not fetch from providers in this task.
+CLI inputs: `--sources-dir`, `--output`, `--as-of-dates`, `--universe-n`, `--source-label`. Each source is an immutable historical snapshot named exactly `daily_basic_YYYYMMDD.csv`; it must include `ts_code,circ_mv,list_date,delist_date`. Require nonblank real listing dates, permit blank delisting dates only for still-listed names, select only `list_date <= as_of < delist_date` (when present), and rank `circ_mv` descending / ticker ascending. Emit a new output atomically: copied immutable `sources/` files, the exact Task 1 schedule schema, and a validator-compatible `bundle_id` / flat `hashes` / `composite_sha256` manifest with provenance/source label and builder Git commit. Do not fetch from providers in this task.
 
 **Step 3: Verify**
 

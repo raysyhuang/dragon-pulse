@@ -539,3 +539,35 @@ def test_validate_pit_bundle_returns_immutable_manifest(tmp_path):
         manifest["bundle_id"] = "mutated"
     with pytest.raises(TypeError):
         hashes["universe_schedule.csv"] = "0" * 64
+
+
+def test_validate_pit_bundle_accepts_listing_equal_to_as_of_and_rejects_delisting_equal_to_as_of(tmp_path):
+    bundle = _make_bundle(tmp_path)
+    source_hash = _sha256(bundle / "sources/universe-2025-01-02.csv")
+    _replace_schedule(
+        bundle,
+        [f"2025-01-02,000001.SZ,2025-01-02,,sources/universe-2025-01-02.csv,{source_hash}"],
+    )
+
+    assert validate_pit_bundle(bundle).schedule[0]["listed_on_or_before"] == "2025-01-02"
+
+    _replace_schedule(
+        bundle,
+        [f"2025-01-02,000001.SZ,2025-01-02,2025-01-02,sources/universe-2025-01-02.csv,{source_hash}"],
+    )
+    with pytest.raises(PitBundleValidationError, match="already delisted"):
+        validate_pit_bundle(bundle)
+
+
+def test_validate_pit_bundle_rejects_uppercase_sha256_digest(tmp_path):
+    bundle = _make_bundle(tmp_path)
+    _rewrite_manifest(
+        bundle,
+        lambda manifest: manifest["hashes"].update(
+            {"sources/universe-2025-01-02.csv": _sha256(bundle / "sources/universe-2025-01-02.csv").upper()}
+        ),
+    )
+    _rewrite_manifest(bundle, lambda manifest: manifest.update(composite_sha256=_composite(manifest["hashes"])))
+
+    with pytest.raises(PitBundleValidationError, match="invalid SHA-256 manifest hash"):
+        validate_pit_bundle(bundle)
