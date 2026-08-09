@@ -51,6 +51,21 @@ def assert_valid_control() -> None:
     assert replay_cross_section(request(filled_ticker())).outcomes[0].status is ReplayStatus.FILLED
 
 
+def test_open_equal_to_cap_is_filled_using_exit_close_not_entry_bar_close() -> None:
+    assert_valid_control()
+
+    result = replay_cross_section(request(
+        filled_ticker(next_session=bar(ENTRY_DATE, open=105.0, close=999.0), exit_session=bar(EXIT_DATE, open=106.0, close=110.0)),
+        cap=105.0,
+    ))
+
+    outcome = result.outcomes[0]
+    assert outcome.status is ReplayStatus.FILLED
+    assert outcome.entry_price == 105.0
+    assert outcome.exit_price == 110.0
+    assert outcome.gross_return == pytest.approx(110.0 / 105.0 - 1)
+
+
 def test_open_above_cap_is_chase_no_fill_without_allocation() -> None:
     assert_valid_control()
 

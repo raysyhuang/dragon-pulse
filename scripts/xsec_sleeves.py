@@ -8,13 +8,13 @@ monthly rebalance, benchmarked vs CSI300. Four sleeves:
   value       top decile by z(-PB)+z(-PE)+z(dividend yield)
   multifactor top decile by z(momentum)+z(-vol)+z(value)
 
-Point-in-time & no survivorship: uses per-date cross-sections (one `daily` /
-`daily_basic` call returns all stocks trading that day, as-of). Weekly-sampled
-price matrix keeps the pull light. Writes per-sleeve equity to outputs/paper_lab/
-so paper_lab.py includes them on the leaderboard.
+Point-in-time & no survivorship claims are **not** made for this legacy acquisition
+view.  Canonical replay requires caller-frozen selections and bars via
+``--frozen-selections``; it emits labelled evidence outside paper-lab outputs.
 
 Usage:
-    TUSHARE_TOKEN=... python scripts/xsec_sleeves.py --months 12   # seed PIT history + forward
+    python scripts/xsec_sleeves.py --frozen-selections selections.json --output-dir /tmp/xsec-replay
+    TUSHARE_TOKEN=... python scripts/xsec_sleeves.py --months 12 --legacy-output-dir /tmp/xsec-legacy
 Run locally (long-running; the per-date cache lives here). NOTE: Tushare also works
 from CI — the earlier "CI IPs are rejected" claim was a mis-diagnosis.
 """
@@ -23,14 +23,20 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 import time
 import urllib.request
 from pathlib import Path
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 import numpy as np
 import pandas as pd
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+from src.core.xsec_runner import ArtifactDurabilityUncertainError, run_xsec_replay
+
 CACHE = PROJECT_ROOT / "outputs" / "paper_lab"
 BASE_N = 300          # tradable base universe by circ mkt cap
 HOLD_FRAC = 0.10      # top decile
@@ -50,11 +56,11 @@ def _token() -> str:
     raise SystemExit("TUSHARE_TOKEN not set")
 
 
-TOKEN = _token()
-
-
 def _call(api, params):
-    body = json.dumps({"api_name": api, "token": TOKEN, "params": params, "fields": ""}).encode()
+    # Acquire credentials only on the legacy live acquisition path.  Importing this
+    # runner remains safe for pure frozen-input replay tests and tooling.
+    token = _token()
+    body = json.dumps({"api_name": api, "token": token, "params": params, "fields": ""}).encode()
     req = urllib.request.Request("http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
     for _ in range(3):
         try:
@@ -77,10 +83,45 @@ def _z(s):
     return (s - s.mean()) / s.std()
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--months", type=int, default=12)
-    args = ap.parse_args()
+    ap.add_argument("--frozen-selections", type=Path,
+                    help="JSON list (or {rebalances: [...]}) of frozen xsec selections and execution bars; provider-free canonical replay")
+    ap.add_argument("--output-dir", type=Path,
+                    help="required caller-owned directory for canonical replay JSONL; never defaults to paper_lab outputs")
+    ap.add_argument("--legacy-output-dir", type=Path,
+                    help="optional caller-owned destination for labelled legacy CSVs; never writes paper_lab leaderboards")
+    ap.add_argument("--pit-bundle", type=Path,
+                    help="validated PIT provenance bundle; invalid bundles fail before artifact creation")
+    ap.add_argument("--max-concurrent-slots", type=int, default=1,
+                    help="rank-first capacity: first N by factor ordering then ticker ASC")
+    ap.add_argument("--total-cost-bps", type=float, default=30.0,
+                    help="research-only total bps simplification, not a leg-specific A-share cost model")
+    args = ap.parse_args(argv)
+    if args.frozen_selections is not None:
+        if args.output_dir is None:
+            ap.error("--output-dir is required with --frozen-selections")
+        try:
+            payload = json.loads(args.frozen_selections.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"frozen selections are unreadable JSON: {exc}") from exc
+        rebalances = payload.get("rebalances") if isinstance(payload, dict) else payload
+        try:
+            artifact = run_xsec_replay(
+                rebalances, output_dir=args.output_dir, max_concurrent_slots=args.max_concurrent_slots,
+                total_cost_bps=args.total_cost_bps, pit_bundle=args.pit_bundle,
+            )
+        except ArtifactDurabilityUncertainError as exc:
+            print(exc, file=sys.stderr)
+            return 1
+        except (ValueError, OSError) as exc:
+            raise SystemExit(f"canonical xsec replay failed closed: {exc}") from exc
+        print(f"canonical xsec replay artifact: {artifact}")
+        return 0
+    if args.pit_bundle is not None or args.output_dir is not None:
+        ap.error("--pit-bundle/--output-dir require --frozen-selections")
+    print("LEGACY_NON_PIT_RESEARCH_ONLY: legacy xsec equity/leaderboard output is non-binding and not promotable.", flush=True)
 
     end = pd.Timestamp.now(tz="Asia/Shanghai").strftime("%Y%m%d")
     start = (pd.Timestamp.now(tz="Asia/Shanghai") - pd.Timedelta(days=30 * args.months + 220)).strftime("%Y%m%d")
@@ -204,7 +245,9 @@ def main() -> int:
         dates_out.append(dn)
 
     out = pd.DataFrame(equity, index=pd.to_datetime(dates_out))
-    out.to_csv(CACHE / "xsec_equity.csv")
+    if args.legacy_output_dir is not None:
+        args.legacy_output_dir.mkdir(parents=True, exist_ok=True)
+        out.to_csv(args.legacy_output_dir / "xsec_equity_legacy_non_pit.csv")
     print(f"\nCross-sectional sleeves — {dates_out[0]}..{dates_out[-1]} ({len(reb)} rebalances)\n")
     ppy = 12 / REBAL_MONTHS
     rows = []
@@ -219,7 +262,8 @@ def main() -> int:
                      "avg_turnover%": round(np.mean(turnover[s]) * 100, 0) if s in turnover else 0})
     board = pd.DataFrame(rows).sort_values("total%", ascending=False)
     print(board.to_string(index=False))
-    board.to_csv(CACHE / "xsec_leaderboard.csv", index=False)
+    if args.legacy_output_dir is not None:
+        board.to_csv(args.legacy_output_dir / "xsec_leaderboard_legacy_non_pit.csv", index=False)
     return 0
 
 

@@ -73,7 +73,7 @@ changing this answer.
 ## Reproduction
 
 - `scripts/paper_lab.py` — multi-sleeve leaderboard (`--all` shows archived/failed sleeves)
-- `scripts/xsec_sleeves.py` — cross-sectional factor sleeves (PIT, cost-aware)
+- `scripts/xsec_sleeves.py` — legacy cross-sectional factor sleeves. Its historical `xsec_equity.csv` / `xsec_leaderboard.csv` outputs are **non-PIT, non-execution, research-only legacy views and are not promotable**. Canonical frozen-selection replay uses `--frozen-selections --output-dir` and emits separately labelled JSONL evidence.
 - `scripts/xsec_robustness.py` — factor robustness sweeps (basket/universe/cost/window)
 - `scripts/regime_timing_study.py` — index trend-timing robustness
 - `scripts/chinext_timing_strategy.py` — the packaged survivor (vol-targeted)
