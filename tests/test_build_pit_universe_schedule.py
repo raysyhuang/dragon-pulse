@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import importlib.util
 import json
 import subprocess
 import sys
@@ -16,6 +17,11 @@ from src.core.pit_bundle import validate_pit_bundle
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "build_pit_universe_schedule.py"
 FIELDS = ["ts_code", "circ_mv", "list_date", "delist_date"]
+
+_SPEC = importlib.util.spec_from_file_location("build_pit_universe_schedule", SCRIPT)
+assert _SPEC is not None and _SPEC.loader is not None
+builder = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(builder)
 
 
 def _write_snapshot(directory: Path, as_of: str, rows: list[dict[str, str]], *, name: str | None = None, fields=FIELDS) -> Path:
@@ -111,6 +117,58 @@ def test_builds_multi_date_validator_accepted_provenance_bundle(tmp_path):
         rows = [row for row in loaded.schedule if row["as_of_date"] == as_of]
         assert {row["source_file"] for row in rows} == {f"sources/{copied.name}"}
         assert {row["source_sha256"] for row in rows} == {_sha256(copied)}
+
+
+@pytest.mark.parametrize(("porcelain", "expected_dirty"), [(" M scripts/build_pit_universe_schedule.py\n", True), ("", False)])
+def test_manifest_honestly_records_injected_builder_tree_status(tmp_path, monkeypatch, porcelain, expected_dirty):
+    def fake_check_output(command, *, text, stderr):
+        if command[-2:] == ["rev-parse", "HEAD"]:
+            return "f" * 40 + "\n"
+        assert command[-2:] == ["status", "--porcelain"]
+        return porcelain
+
+    monkeypatch.setattr(builder.subprocess, "check_output", fake_check_output)
+
+    manifest = builder.build_bundle(
+        _valid_sources(tmp_path),
+        tmp_path / "bundle",
+        builder._parse_as_of_dates("2025-01-02,2025-01-03"),
+        2,
+        "fixture_daily_basic",
+    )
+
+    assert manifest["builder_git_commit"] == "f" * 40
+    assert manifest["builder_tree_dirty"] is expected_dirty
+
+
+def test_tied_circ_mv_membership_is_ticker_ordered_regardless_of_snapshot_row_order(tmp_path):
+    rows = [
+        {"ts_code": "000002.SZ", "circ_mv": "100", "list_date": "2020-01-01", "delist_date": ""},
+        {"ts_code": "000001.SZ", "circ_mv": "100", "list_date": "2020-01-01", "delist_date": ""},
+    ]
+    first_sources = tmp_path / "first-input"
+    second_sources = tmp_path / "second-input"
+    _write_snapshot(first_sources, "2025-01-02", rows)
+    _write_snapshot(second_sources, "2025-01-02", list(reversed(rows)))
+
+    first = builder.build_bundle(
+        first_sources,
+        tmp_path / "first-bundle",
+        builder._parse_as_of_dates("2025-01-02"),
+        1,
+        "fixture_daily_basic",
+    )
+    second = builder.build_bundle(
+        second_sources,
+        tmp_path / "second-bundle",
+        builder._parse_as_of_dates("2025-01-02"),
+        1,
+        "fixture_daily_basic",
+    )
+
+    assert [row["ticker"] for row in csv.DictReader((tmp_path / "first-bundle" / "universe_schedule.csv").open(encoding="utf-8"))] == ["000001.SZ"]
+    assert [row["ticker"] for row in csv.DictReader((tmp_path / "second-bundle" / "universe_schedule.csv").open(encoding="utf-8"))] == ["000001.SZ"]
+    assert first["universe_n"] == second["universe_n"] == 1
 
 
 @pytest.mark.parametrize("malformed", ["BAD!", "000001.sz", "1.SZ"])

@@ -80,6 +80,17 @@ def _git_commit(repo_root: Path) -> str:
         raise BuildError("unable to determine builder git commit") from exc
 
 
+def _git_tree_dirty(repo_root: Path) -> bool:
+    try:
+        return bool(
+            subprocess.check_output(
+                ["git", "-C", str(repo_root), "status", "--porcelain"], text=True, stderr=subprocess.DEVNULL
+            )
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise BuildError("unable to determine builder git tree status") from exc
+
+
 def _read_eligible_snapshot(source: Path, as_of_text: str, as_of: date) -> list[tuple[str, float, str, str]]:
     if not source.is_file() or source.is_symlink():
         raise BuildError(f"missing required snapshot: {source}")
@@ -174,7 +185,9 @@ def build_bundle(sources_dir: Path, output: Path, as_of_dates: list[tuple[str, d
                 )
         hashes["universe_schedule.csv"] = _sha256(schedule_path)
         as_of_texts = [value for value, _ in as_of_dates]
-        commit = _git_commit(Path(__file__).resolve().parents[1])
+        repo_root = Path(__file__).resolve().parents[1]
+        commit = _git_commit(repo_root)
+        tree_dirty = _git_tree_dirty(repo_root)
         manifest: dict[str, object] = {
             "bundle_id": f"pit-universe-{as_of_texts[0]}-to-{as_of_texts[-1]}-n{universe_n}",
             "pit_grade": True,
@@ -187,6 +200,7 @@ def build_bundle(sources_dir: Path, output: Path, as_of_dates: list[tuple[str, d
                 "historical_membership_authenticity": "not established by this builder",
             },
             "builder_git_commit": commit,
+            "builder_tree_dirty": tree_dirty,
             "hashes": hashes,
             "composite_sha256": _composite(hashes),
         }
