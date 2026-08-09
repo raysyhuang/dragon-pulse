@@ -31,6 +31,16 @@ def _write_snapshot(directory: Path, as_of: str, rows: list[dict[str, str]], *, 
         writer = csv.DictWriter(handle, fieldnames=fields, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(rows)
+    day = as_of.replace("-", "")
+    (directory / f"daily_basic_{day}.capture.json").write_text(
+        json.dumps({
+            "schema_version": 1, "provider": "tushare", "endpoint": "daily_basic",
+            "requested_trade_date": day, "snapshot_file": path.name,
+            "snapshot_sha256": _sha256(path), "captured_at": "2025-01-03T16:00:00Z",
+            "provenance_grade": "TRUSTED_HISTORICAL_ASSUMPTION",
+            "caveat": "historical_tushare_trusted_assumption",
+        }), encoding="utf-8"
+    )
     return path
 
 
@@ -105,6 +115,8 @@ def test_builds_multi_date_validator_accepted_provenance_bundle(tmp_path):
     assert manifest["provenance"]["source_label"] == "fixture_daily_basic"
     assert isinstance(manifest["builder_git_commit"], str) and manifest["builder_git_commit"]
     assert set(manifest["hashes"]) == {
+        "attestations/daily_basic_20250102.capture.json",
+        "attestations/daily_basic_20250103.capture.json",
         "sources/daily_basic_20250102.csv",
         "sources/daily_basic_20250103.csv",
         "universe_schedule.csv",
@@ -117,6 +129,19 @@ def test_builds_multi_date_validator_accepted_provenance_bundle(tmp_path):
         rows = [row for row in loaded.schedule if row["as_of_date"] == as_of]
         assert {row["source_file"] for row in rows} == {f"sources/{copied.name}"}
         assert {row["source_sha256"] for row in rows} == {_sha256(copied)}
+
+
+def test_main_accepts_relative_sources_dir_and_builds_valid_bundle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    _valid_sources(tmp_path)
+    output = tmp_path / "bundle"
+    monkeypatch.chdir(tmp_path)
+
+    assert builder.main([
+        "--sources-dir", "input", "--output", str(output),
+        "--as-of-dates", "2025-01-02,2025-01-03", "--universe-n", "2",
+        "--source-label", "fixture_daily_basic",
+    ]) == 0
+    assert validate_pit_bundle(output).pit_grade is True
 
 
 @pytest.mark.parametrize(("porcelain", "expected_dirty"), [(" M scripts/build_pit_universe_schedule.py\n", True), ("", False)])
@@ -275,3 +300,41 @@ def test_refuses_existing_output_atomically(tmp_path):
     assert "already exists" in completed.stderr
     assert sentinel.read_text(encoding="utf-8") == "preserve"
     assert not (output / "manifest.json").exists()
+
+
+def test_observed_and_trusted_inputs_copy_hash_bound_evidence_and_keep_trusted_caveat(tmp_path):
+    sources = _valid_sources(tmp_path)
+    raw = sources / "raw" / "daily_basic_20250102.response.json"
+    raw.parent.mkdir()
+    raw.write_text('{"observed": true}\n', encoding="utf-8")
+    observed_receipt = sources / "daily_basic_20250102.capture.json"
+    payload = json.loads(observed_receipt.read_text(encoding="utf-8"))
+    payload.pop("caveat")
+    payload.update({
+        "provenance_grade": "OBSERVED_CAPTURE",
+        "raw_response_file": "raw/daily_basic_20250102.response.json",
+        "raw_response_sha256": _sha256(raw),
+    })
+    observed_receipt.write_text(json.dumps(payload), encoding="utf-8")
+    output = tmp_path / "bundle"
+
+    assert _run(sources, output).returncode == 0
+    manifest = json.loads((output / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["capture_provenance_grade"] == "TRUSTED_HISTORICAL_ASSUMPTION"
+    assert manifest["capture_provenance_caveat"] == "trusted history is not independently capture-proven"
+    assert (output / "raw" / raw.name).read_bytes() == raw.read_bytes()
+    assert manifest["hashes"]["raw/daily_basic_20250102.response.json"] == _sha256(output / "raw" / raw.name)
+    assert manifest["hashes"]["attestations/daily_basic_20250102.capture.json"] == _sha256(output / "attestations" / observed_receipt.name)
+    validate_pit_bundle(output)
+    (output / "raw" / raw.name).write_text("tampered", encoding="utf-8")
+    with pytest.raises(Exception, match="hash mismatch"):
+        validate_pit_bundle(output)
+
+
+def test_validator_rejects_unlisted_ancillary_payload(tmp_path):
+    output = tmp_path / "bundle"
+    assert _run(_valid_sources(tmp_path), output).returncode == 0
+    (output / "attestations" / "stray.capture.json").write_text("{}", encoding="utf-8")
+
+    with pytest.raises(Exception, match="unhashed ancillary payload"):
+        validate_pit_bundle(output)

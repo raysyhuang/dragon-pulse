@@ -14,6 +14,8 @@ from pathlib import Path, PurePosixPath
 from types import MappingProxyType
 from typing import cast
 
+from src.core.capture_provenance import CaptureProvenanceError, validate_capture_attestations
+
 
 _SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -103,6 +105,11 @@ def _failures_text(failures: list[str]) -> str:
     return "PIT bundle validation failed:\n- " + "\n- ".join(failures)
 
 
+def _is_flat_ancillary_path(relpath: str, directory: str, suffix: str | None = None) -> bool:
+    parts = PurePosixPath(relpath).parts
+    return len(parts) == 2 and parts[0] == directory and (suffix is None or parts[1].endswith(suffix))
+
+
 # A manifest nesting limit safely remains far below Python's recursion limit.
 _MAX_FREEZE_DEPTH = 100
 
@@ -165,14 +172,26 @@ def validate_pit_bundle(bundle_dir: str | Path) -> PitBundle:
 
     if "universe_schedule.csv" not in hashes:
         failures.append("manifest is missing hash for universe_schedule.csv")
-    source_hashes = {relpath: digest for relpath, digest in hashes.items() if relpath.startswith("sources/")}
+    source_hashes = {relpath: digest for relpath, digest in hashes.items() if isinstance(relpath, str) and relpath.startswith("sources/")}
+    attestation_hashes = {relpath: digest for relpath, digest in hashes.items() if isinstance(relpath, str) and relpath.startswith("attestations/")}
+    raw_hashes = {relpath: digest for relpath, digest in hashes.items() if isinstance(relpath, str) and relpath.startswith("raw/")}
     if not source_hashes:
         failures.append("manifest must hash at least one raw source under sources/")
     for relpath in source_hashes:
-        if PurePosixPath(relpath).name == "manifest.json":
-            failures.append(f"manifest hash path must not be named manifest.json: {relpath}")
-    if any(not relpath.startswith("sources/") and relpath != "universe_schedule.csv" for relpath in hashes):
-        failures.append("manifest.hashes may contain only universe_schedule.csv and sources/ files")
+        if not _is_flat_ancillary_path(relpath, "sources") or PurePosixPath(relpath).name == "manifest.json":
+            failures.append(f"manifest source path must be flat and not named manifest.json: {relpath}")
+    for relpath in attestation_hashes:
+        if not _is_flat_ancillary_path(relpath, "attestations", ".capture.json") or PurePosixPath(relpath).name == "manifest.json":
+            failures.append(f"manifest attestation path must be flat capture receipt and not named manifest.json: {relpath}")
+    for relpath in raw_hashes:
+        if not _is_flat_ancillary_path(relpath, "raw") or PurePosixPath(relpath).name == "manifest.json":
+            failures.append(f"manifest raw path must be flat and not named manifest.json: {relpath}")
+    if any(
+        relpath != "universe_schedule.csv"
+        and not (isinstance(relpath, str) and (relpath.startswith("sources/") or relpath.startswith("attestations/") or relpath.startswith("raw/")))
+        for relpath in hashes
+    ):
+        failures.append("manifest.hashes may contain only universe_schedule.csv and flat sources/, attestations/, or raw/ files")
 
     actual_files = {
         item.relative_to(path).as_posix()
@@ -185,6 +204,8 @@ def validate_pit_bundle(bundle_dir: str | Path) -> PitBundle:
     for relpath in sorted(actual_files - set(hashes)):
         if relpath.startswith("sources/"):
             failures.append(f"unhashed raw source: {relpath}")
+        elif relpath.startswith("attestations/") or relpath.startswith("raw/"):
+            failures.append(f"unhashed ancillary payload: {relpath}")
         else:
             failures.append(f"unlisted PIT bundle file: {relpath}")
     for relpath, expected in sorted(hashes.items()):
@@ -269,6 +290,33 @@ def validate_pit_bundle(bundle_dir: str | Path) -> PitBundle:
         failures.append("schedule dates do not exactly match manifest.as_of_dates (missing schedule dates or undeclared dates)")
     for relpath in sorted(set(source_hashes) - referenced_source_hashes):
         failures.append(f"unreferenced manifest source hash: {relpath}")
+
+    if attestation_hashes:
+        try:
+            attestations = validate_capture_attestations(
+                path / "sources",
+                [path / relpath for relpath in sorted(source_hashes)],
+                receipts_dir=path / "attestations",
+                raw_root=path,
+                output_relative=True,
+            )
+        except CaptureProvenanceError as exc:
+            failures.append(str(exc))
+        else:
+            if {f"attestations/{item.receipt_path.name}" for item in attestations} != set(attestation_hashes):
+                failures.append("manifest attestations must contain exactly one receipt per source")
+            expected_raw = {item.raw_response_file for item in attestations if item.raw_response_file is not None}
+            if expected_raw != set(raw_hashes):
+                failures.append("manifest raw files must exactly match observed receipt references")
+            all_observed = all(item.provenance_grade == "OBSERVED_CAPTURE" for item in attestations)
+            expected_grade = "OBSERVED_CAPTURE" if all_observed else "TRUSTED_HISTORICAL_ASSUMPTION"
+            if manifest.get("capture_provenance_grade") != expected_grade:
+                failures.append("manifest.capture_provenance_grade does not match receipt grades")
+            expected_caveat = None if all_observed else "trusted history is not independently capture-proven"
+            if manifest.get("capture_provenance_caveat") != expected_caveat:
+                failures.append("manifest.capture_provenance_caveat does not match supplied evidence")
+    elif raw_hashes:
+        failures.append("raw payloads require capture attestations")
 
     if failures:
         raise PitBundleValidationError(_failures_text(failures))

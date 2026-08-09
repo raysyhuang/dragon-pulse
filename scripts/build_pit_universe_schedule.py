@@ -22,6 +22,9 @@ import tempfile
 from datetime import date
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from src.core.capture_provenance import CaptureAttestation, CaptureProvenanceError, validate_capture_attestations
+
 REQUIRED_COLUMNS = ("ts_code", "circ_mv", "list_date", "delist_date")
 TICKER_PATTERN = re.compile(r"[0-9]{6}\.(?:SH|SZ|BJ)")
 SCHEDULE_COLUMNS = (
@@ -141,14 +144,19 @@ def build_bundle(sources_dir: Path, output: Path, as_of_dates: list[tuple[str, d
         raise BuildError(f"sources directory is missing or unsafe: {sources_dir}")
 
     selected: list[tuple[str, str, str, str, Path]] = []
-    snapshots: list[tuple[str, Path]] = []
-    for as_of_text, as_of in as_of_dates:
-        filename = f"daily_basic_{as_of.strftime('%Y%m%d')}.csv"
-        source = sources_dir / filename
+    snapshots = [(as_of_text, sources_dir / f"daily_basic_{as_of.strftime('%Y%m%d')}.csv") for as_of_text, as_of in as_of_dates]
+    for _, source in snapshots:
+        if not source.is_file() or source.is_symlink():
+            raise BuildError(f"missing required snapshot: {source}")
+    try:
+        attestations = validate_capture_attestations(sources_dir, [source for _, source in snapshots])
+    except CaptureProvenanceError as exc:
+        raise BuildError(str(exc)) from exc
+    attestation_by_source = {attestation.snapshot_path: attestation for attestation in attestations}
+    for (as_of_text, as_of), (_, source) in zip(as_of_dates, snapshots):
         eligible = _read_eligible_snapshot(source, as_of_text, as_of)
         if len(eligible) < universe_n:
             raise BuildError(f"{source}: fewer eligible candidates ({len(eligible)}) than universe_n ({universe_n})")
-        snapshots.append((as_of_text, source))
         selected.extend((as_of_text, ticker, listed, delisted, source) for ticker, _, listed, delisted in eligible[:universe_n])
 
     output_parent = output.parent
@@ -157,6 +165,10 @@ def build_bundle(sources_dir: Path, output: Path, as_of_dates: list[tuple[str, d
     try:
         copied_sources = temporary / "sources"
         copied_sources.mkdir()
+        copied_attestations = temporary / "attestations"
+        copied_attestations.mkdir()
+        copied_raw = temporary / "raw"
+        copied_raw.mkdir()
         hashes: dict[str, str] = {}
         source_rels: dict[Path, tuple[str, str]] = {}
         for _, source in snapshots:
@@ -166,6 +178,17 @@ def build_bundle(sources_dir: Path, output: Path, as_of_dates: list[tuple[str, d
             digest = _sha256(destination)
             hashes[relpath] = digest
             source_rels[source] = (relpath, digest)
+            attestation: CaptureAttestation = attestation_by_source[source]
+            receipt_payload = json.loads(attestation.receipt_path.read_text(encoding="utf-8"))
+            receipt_payload["snapshot_file"] = relpath
+            receipt_destination = copied_attestations / attestation.receipt_path.name
+            receipt_destination.write_text(json.dumps(receipt_payload, sort_keys=True) + "\n", encoding="utf-8")
+            hashes[f"attestations/{receipt_destination.name}"] = _sha256(receipt_destination)
+            if attestation.raw_response_file is not None:
+                raw_source = sources_dir / attestation.raw_response_file
+                raw_destination = copied_raw / Path(attestation.raw_response_file).name
+                shutil.copyfile(raw_source, raw_destination)
+                hashes[f"raw/{raw_destination.name}"] = _sha256(raw_destination)
 
         schedule_path = temporary / "universe_schedule.csv"
         with schedule_path.open("w", newline="", encoding="utf-8") as handle:
@@ -199,6 +222,16 @@ def build_bundle(sources_dir: Path, output: Path, as_of_dates: list[tuple[str, d
                 "snapshot_contract": "supplied daily_basic_YYYYMMDD.csv; no provider calls",
                 "historical_membership_authenticity": "not established by this builder",
             },
+            "capture_provenance_grade": (
+                "OBSERVED_CAPTURE"
+                if all(item.provenance_grade == "OBSERVED_CAPTURE" for item in attestations)
+                else "TRUSTED_HISTORICAL_ASSUMPTION"
+            ),
+            "capture_provenance_caveat": (
+                None
+                if all(item.provenance_grade == "OBSERVED_CAPTURE" for item in attestations)
+                else "trusted history is not independently capture-proven"
+            ),
             "builder_git_commit": commit,
             "builder_tree_dirty": tree_dirty,
             "hashes": hashes,

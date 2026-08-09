@@ -47,6 +47,14 @@ def write_snapshot(sources: Path, yyyymmdd: str, rows, header: str = HEADER) -> 
     path = sources / f"daily_basic_{yyyymmdd}.csv"
     body = header + "\n" + "".join(",".join(r) + "\n" for r in rows)
     path.write_text(body)
+    (sources / f"daily_basic_{yyyymmdd}.capture.json").write_text(json.dumps({
+        "schema_version": 1, "provider": "tushare", "endpoint": "daily_basic",
+        "requested_trade_date": yyyymmdd, "snapshot_file": path.name,
+        "snapshot_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        "captured_at": "2026-01-06T16:00:00Z",
+        "provenance_grade": "TRUSTED_HISTORICAL_ASSUMPTION",
+        "caveat": "historical_tushare_trusted_assumption",
+    }))
     return path
 
 

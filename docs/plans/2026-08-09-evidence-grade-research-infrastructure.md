@@ -79,6 +79,21 @@ Run unit tests. Build a tiny local fixture bundle and validate it with `validate
 
 ---
 
+### Task 2.5: Capture-provenance attestation gate
+
+**Objective:** Tasks 1–2 prove bundle self-consistency and source membership only. Before Task 3, require one immutable Tushare `daily_basic` capture receipt per supplied snapshot, without provider calls or third-party notarization.
+
+**Files:**
+- Create: `src/core/capture_provenance.py`
+- Create: `tests/test_capture_provenance.py`
+- Modify: `src/core/pit_bundle.py`, `scripts/build_pit_universe_schedule.py`
+
+**Contract:** A receipt named `daily_basic_YYYYMMDD.capture.json` binds schema version 1, literal provider/endpoint, filename date, snapshot filename and SHA-256, ISO UTC capture time, and a grade. `OBSERVED_CAPTURE` additionally binds a hash-valid flat `raw/` payload. Existing historical snapshots may enter only as `TRUSTED_HISTORICAL_ASSUMPTION` with literal caveat `historical_tushare_trusted_assumption`; they are permanently caveated and must never be called `PIT_CAPTURE_VERIFIED`. The builder copies/hash-binds `sources/`, `attestations/`, and observed `raw/` payloads, and emits `OBSERVED_CAPTURE` only when every receipt is observed; any mixed set is `TRUSTED_HISTORICAL_ASSUMPTION` with the permanent statement that trusted history is not independently capture-proven.
+
+**Verification:** Test trusted and observed positive controls; stale/tampered hashes, date/provider/endpoint/grade/caveat/path and symlink attacks; and output ancillary tampering/unlisted payload rejection. Do not change selector, cron, or cross-sectional replay.
+
+---
+
 ### Task 3: Create a pure executable cross-sectional replay accounting core
 
 **Objective:** Eliminate same-close fills and silent missing-name drops from the research engine.
