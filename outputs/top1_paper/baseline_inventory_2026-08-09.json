@@ -1,0 +1,923 @@
+{
+  "as_of": "2026-08-09",
+  "capture_provenance_caveat": "Artifact capture provenance is not retroactively established; this inventory is legacy, non-PIT, non-execution, and non-promotable.",
+  "evidence_grade": "LEGACY_NON_PIT_BASELINE_INVENTORY",
+  "generated": "2026-08-09",
+  "generator": {
+    "git": {
+      "advisory_only": true,
+      "commit": "bd7055f781059068e07dda3487cc054630eaf686",
+      "dirty": true
+    },
+    "source_path": "scripts/freeze_top1_baseline.py",
+    "source_sha256": "30ad09c09f450046c30c448c94ea428325045c0099ff9259a4f3980ff2d64593"
+  },
+  "inputs": {
+    "artifact_evidence": [
+      {
+        "path": "2026-05-04/top1_paper_watchlist_2026-05-04.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "00230617d87b01124eb045fc6b1fb3b15ef45cb5b1b0dcf4f6c83c555e857a40"
+      },
+      {
+        "path": "2026-05-05/top1_paper_watchlist_2026-05-05.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "880d07a2b68897ad393b1deb3caa20f97445711407ca4082ea72ef83c06bfa2a"
+      },
+      {
+        "path": "2026-05-06/top1_paper_watchlist_2026-05-06.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "e665b9187e2cc72b18b0631cd52bb14cb95dad02fe3308899e7060c1ae3b497a"
+      },
+      {
+        "path": "2026-05-07/top1_paper_watchlist_2026-05-07.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "b4707a0793f838735da69590a7ff273f98fe9cc54b5924752951bf917af3f81d"
+      },
+      {
+        "path": "2026-05-11/top1_paper_watchlist_2026-05-11.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "7afd15b41fc3e376fe3e887c9ddf7ffa36886a1f559c0158a37bb4b3eea08d81"
+      },
+      {
+        "path": "2026-05-12/top1_paper_watchlist_2026-05-12.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "538ec33c73752e6f9880817266b4df701ab2292fe2462198a45c848920c5da51"
+      },
+      {
+        "path": "2026-05-13/top1_paper_watchlist_2026-05-13.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "fb13278572606baedbeb31ae5213a953ee96c4a387cadd1f9c5ef3828ccbf748"
+      },
+      {
+        "path": "2026-05-14/top1_paper_watchlist_2026-05-14.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "5ab233f3e0240f3a268d7b882c1d06873f98949f89d81e60f657a5f9063601e5"
+      },
+      {
+        "path": "2026-05-15/top1_paper_watchlist_2026-05-15.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "b2c213b277b52f7088f5de5990162dceac5721dbd04379b61fc7e8549aa10f56"
+      },
+      {
+        "path": "2026-05-18/top1_paper_watchlist_2026-05-18.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "8ea75a72b606b2efaf75c8453d6c79bb075d90bfeff9d63223efd1396065a21e"
+      },
+      {
+        "path": "2026-05-19/top1_paper_watchlist_2026-05-19.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "895a78880ac12c30d07a1dbf82e2bb7b813ad165f0b1ac1d84d1a4741dad7ea5"
+      },
+      {
+        "path": "2026-05-20/top1_paper_watchlist_2026-05-20.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "98135c36f276e0ee6d5604a0d4b4c768d3642ed70bae81b7d840ed9e390a3c0d"
+      },
+      {
+        "path": "2026-05-21/top1_paper_watchlist_2026-05-21.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "058af4159d456dd16aabd2ca1dc5cf024439560fb4ef6cfd8e76a3ba07dee367"
+      },
+      {
+        "path": "2026-05-22/top1_paper_watchlist_2026-05-22.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "49c033b66e0602a2ad7ec2309e9b40266086a8f7bea73b62227b3cffacc96c49"
+      },
+      {
+        "path": "2026-05-25/top1_paper_watchlist_2026-05-25.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "15bf6c460764e5c037c1641c660ddbac4dc36e7c42720b4470b7d1dcce646655"
+      },
+      {
+        "path": "2026-05-26/top1_paper_watchlist_2026-05-26.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "dc0968bb66ebfb7830e5316e5e8b25936da703b05e7fd161a43f7b7b4ee56b75"
+      },
+      {
+        "path": "2026-05-27/top1_paper_watchlist_2026-05-27.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "5915fa0c5e3799a7962ae73bbe112e87d068012ae4e470d0b07601f2b5d40dd6"
+      },
+      {
+        "path": "2026-05-28/top1_paper_watchlist_2026-05-28.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "a01730182e7f3632178606de9dc0cc32d7e4b43d02570c25714694c6f94ca41b"
+      },
+      {
+        "path": "2026-05-29/top1_paper_watchlist_2026-05-29.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "5bb490bb42cb2a4865badbcba44f7570fd17d48326dc0400e2d280d21a32f29d"
+      },
+      {
+        "path": "2026-06-01/top1_paper_watchlist_2026-06-01.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "43f4483693b01e112743033c2e17aa25783cfe2e30f5a949833332d1dfa35900"
+      },
+      {
+        "path": "2026-06-03/top1_paper_watchlist_2026-06-03.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "d5c874a4d5214884f8adbc732a9d0b267148536c90ae227ffd6d8a3cda8d20ce"
+      },
+      {
+        "path": "2026-06-04/top1_paper_watchlist_2026-06-04.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "6b9330152f9caf41049f882e4647d0fb91bbb95b1303e108ac3dbf2613193bfe"
+      },
+      {
+        "path": "2026-06-05/top1_paper_watchlist_2026-06-05.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "cb6cfe44a6f5c83c80c5ae7e6ad14017a431ae90579eec0b453adb9f3057171d"
+      },
+      {
+        "path": "2026-06-16/top1_paper_watchlist_2026-06-16.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "0a7f8e2ce48c073de55d928b4a3f449186aaa278bcea1c1c7b30f904fc257a16"
+      },
+      {
+        "path": "2026-06-17/top1_paper_watchlist_2026-06-17.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "3e3bab9af9f38314e7444cfeb254e0d5ec8e60e101f69e933e81e6af3cda626d"
+      },
+      {
+        "path": "2026-06-18/top1_paper_watchlist_2026-06-18.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "0ce24d280732c12f2c89918d1b632350b2e3421cec23d9a53414fe10f49e3eeb"
+      },
+      {
+        "path": "2026-06-19/top1_paper_watchlist_2026-06-19.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "48ddb7ebd23d6d99395b67df16c3cb3417304f9e7bfe8ec17efa2435ed0af100"
+      },
+      {
+        "path": "2026-06-22/top1_paper_watchlist_2026-06-22.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "5c890015a149c57fd835c166a2186bbc4ddb24fbe679e3f84a153d74f4f734c8"
+      },
+      {
+        "path": "2026-06-23/top1_paper_watchlist_2026-06-23.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "0e19da69df35d74f1208a09b6b9dd388ed1762a34215aefc0af2781c61dccaa8"
+      },
+      {
+        "path": "2026-06-24/top1_paper_watchlist_2026-06-24.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "61218bf70a303f429963ef0ba5cb3ced7d709c987e7fd689a725da83c3378b2c"
+      },
+      {
+        "path": "2026-06-25/top1_paper_watchlist_2026-06-25.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "64edf578f4f7727140be92db5aff8332cb62abf9663cbc1c17c0e21cd091411c"
+      },
+      {
+        "path": "2026-06-26/top1_paper_watchlist_2026-06-26.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "34776496d5e5ce9347673e291717b7c0565c79a19235e5602b4a45899719ae05"
+      },
+      {
+        "path": "2026-06-30/top1_paper_watchlist_2026-06-30.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "6bf6d840bfa53b45ffc005448d3a9a591662e890ffaa6dd35bbb78ae8edb7053"
+      },
+      {
+        "path": "2026-07-01/top1_paper_watchlist_2026-07-01.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "024a5247e467645dec8b3bb5c77d4fafcb978544c8360c7085a9272479c5294d"
+      },
+      {
+        "path": "2026-07-02/top1_paper_watchlist_2026-07-02.json",
+        "root": "/home/agent/dragon-pulse/outputs",
+        "sha256": "924b469cf2b157f648448c23a315fd76bbc11b22153b83bf27a0032cf710e183"
+      }
+    ],
+    "artifact_roots": [
+      "/home/agent/dragon-pulse/outputs"
+    ],
+    "ledger": {
+      "path": "/home/agent/dragon-pulse/outputs/top1_paper/ledger.jsonl",
+      "sha256": "31f27b8ae26d85fa860d4f009f83056c36794b183048bc30f57e8a7cae5c044d"
+    }
+  },
+  "manifest_sha256": "9dc8babd16bb91b38dc3ff2a6fef39d2793a56cddacd438da3ea10feaa4859d1",
+  "promotion_status": "NON_EXECUTION_NON_PROMOTABLE",
+  "rows": [
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-04/top1_paper_watchlist_2026-05-04.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "00230617d87b01124eb045fc6b1fb3b15ef45cb5b1b0dcf4f6c83c555e857a40",
+      "identity": "2026-05-04",
+      "ledger_record_sha256": "f78c5e203920685f57e34a77ce4b4f27a1ff639a510baf992507ec20145ccf75",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-04",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-05/top1_paper_watchlist_2026-05-05.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "880d07a2b68897ad393b1deb3caa20f97445711407ca4082ea72ef83c06bfa2a",
+      "identity": "2026-05-05",
+      "ledger_record_sha256": "179b5bb9b319a06ede015032041b524c509b3315542d38b91e9381e570d5bc5a",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-05",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-06/top1_paper_watchlist_2026-05-06.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "e665b9187e2cc72b18b0631cd52bb14cb95dad02fe3308899e7060c1ae3b497a",
+      "identity": "2026-05-06",
+      "ledger_record_sha256": "16827330889030912c3c90221e014ad65ff5d7edc1878e128efca7bda55b12ce",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-06",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-07/top1_paper_watchlist_2026-05-07.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "b4707a0793f838735da69590a7ff273f98fe9cc54b5924752951bf917af3f81d",
+      "identity": "2026-05-07",
+      "ledger_record_sha256": "2017e117eb1478301809eb537c887dc9d9f5271f3436c04616ba64e09677c091",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-07",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-11/top1_paper_watchlist_2026-05-11.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "7afd15b41fc3e376fe3e887c9ddf7ffa36886a1f559c0158a37bb4b3eea08d81",
+      "identity": "2026-05-11",
+      "ledger_record_sha256": "2bee6d800f5e41631f5af1f8461165dabce482c8c36817b771ab3506a51dae07",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-11",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-12/top1_paper_watchlist_2026-05-12.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "538ec33c73752e6f9880817266b4df701ab2292fe2462198a45c848920c5da51",
+      "identity": "2026-05-12",
+      "ledger_record_sha256": "1a4a098465ca6fc344df8a3a23aba07753f683a1dcc4857e543d4c49f8b8e4c8",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-12",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-13/top1_paper_watchlist_2026-05-13.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "fb13278572606baedbeb31ae5213a953ee96c4a387cadd1f9c5ef3828ccbf748",
+      "identity": "2026-05-13",
+      "ledger_record_sha256": "1f922adce5a9ae7780c3710ebebb9c3a278ddf8931c9ab084fa6f25cb42037d7",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-13",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-14/top1_paper_watchlist_2026-05-14.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "5ab233f3e0240f3a268d7b882c1d06873f98949f89d81e60f657a5f9063601e5",
+      "identity": "2026-05-14",
+      "ledger_record_sha256": "63ce58c5411a099adae3e745c190b56d6b74f2dec6489d4b9ac32c14f2a0bfd7",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-14",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-15/top1_paper_watchlist_2026-05-15.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "b2c213b277b52f7088f5de5990162dceac5721dbd04379b61fc7e8549aa10f56",
+      "identity": "2026-05-15",
+      "ledger_record_sha256": "0a792ebc055b687f93d9ad266aa374c4812171becf96a658e3fe8e1a3fab9db8",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-15",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-18/top1_paper_watchlist_2026-05-18.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "8ea75a72b606b2efaf75c8453d6c79bb075d90bfeff9d63223efd1396065a21e",
+      "identity": "2026-05-18",
+      "ledger_record_sha256": "2598d458d3dad434337d20099183513582f014257cca03334da2f4f12012cef2",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-18",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-19/top1_paper_watchlist_2026-05-19.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "895a78880ac12c30d07a1dbf82e2bb7b813ad165f0b1ac1d84d1a4741dad7ea5",
+      "identity": "2026-05-19",
+      "ledger_record_sha256": "08fa291e44ce779e60e208be5bff488a3adb07867218d20634b8a5b1eb4e4d87",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-19",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-20/top1_paper_watchlist_2026-05-20.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "98135c36f276e0ee6d5604a0d4b4c768d3642ed70bae81b7d840ed9e390a3c0d",
+      "identity": "2026-05-20",
+      "ledger_record_sha256": "2f805344e7b991ed50c05b85740bc7f8b21472fba4cf79325e5e34a87965230c",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-20",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-21/top1_paper_watchlist_2026-05-21.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "058af4159d456dd16aabd2ca1dc5cf024439560fb4ef6cfd8e76a3ba07dee367",
+      "identity": "2026-05-21",
+      "ledger_record_sha256": "fcad82a364e16b1e232fd094f7d14b676a80ebafd29ccc119766e6ce2c120e12",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "choppy",
+      "resolvable": true,
+      "scan_date": "2026-05-21",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-22/top1_paper_watchlist_2026-05-22.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "49c033b66e0602a2ad7ec2309e9b40266086a8f7bea73b62227b3cffacc96c49",
+      "identity": "2026-05-22",
+      "ledger_record_sha256": "896d533331036297cbd1aa3886759240c0f8265e42824d39b98c654a9aa8bea3",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "choppy",
+      "resolvable": true,
+      "scan_date": "2026-05-22",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-25/top1_paper_watchlist_2026-05-25.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "15bf6c460764e5c037c1641c660ddbac4dc36e7c42720b4470b7d1dcce646655",
+      "identity": "2026-05-25",
+      "ledger_record_sha256": "ac94e324cde9e110f6a83ebbd8fb04f68428fc8f824d68dc91e9acb67b0ae1a9",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-25",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-26/top1_paper_watchlist_2026-05-26.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "dc0968bb66ebfb7830e5316e5e8b25936da703b05e7fd161a43f7b7b4ee56b75",
+      "identity": "2026-05-26",
+      "ledger_record_sha256": "1411c29acd9b0f011b4911b2ad1d114f6bc187aaf1f49e27f2f995311a347676",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-26",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-27/top1_paper_watchlist_2026-05-27.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "5915fa0c5e3799a7962ae73bbe112e87d068012ae4e470d0b07601f2b5d40dd6",
+      "identity": "2026-05-27",
+      "ledger_record_sha256": "c1e641f7afb5acc5487e0c7682cea3f94781d1f6caa0acd381e1f323836a1416",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-27",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-28/top1_paper_watchlist_2026-05-28.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "a01730182e7f3632178606de9dc0cc32d7e4b43d02570c25714694c6f94ca41b",
+      "identity": "2026-05-28",
+      "ledger_record_sha256": "2db8a88e24ef7dda089a310db8c279a2e451b604f312af329c63c9efc8583939",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-28",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-05-29/top1_paper_watchlist_2026-05-29.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "5bb490bb42cb2a4865badbcba44f7570fd17d48326dc0400e2d280d21a32f29d",
+      "identity": "2026-05-29",
+      "ledger_record_sha256": "82a4b0654bd6c0108ace52389d5588e7b5c15d807d86082610dcf26a334de1f4",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-05-29",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-01/top1_paper_watchlist_2026-06-01.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "43f4483693b01e112743033c2e17aa25783cfe2e30f5a949833332d1dfa35900",
+      "identity": "2026-06-01",
+      "ledger_record_sha256": "2e6b6dc3786ee713410b54c655dbd6496eafc4087d2dd227d17ff7ceaf53c92e",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-01",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-03/top1_paper_watchlist_2026-06-03.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "d5c874a4d5214884f8adbc732a9d0b267148536c90ae227ffd6d8a3cda8d20ce",
+      "identity": "2026-06-03",
+      "ledger_record_sha256": "3f59572175af6f693fa79e169203d0abe7b38c076a9e0b81a900210ddfe49d7d",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-03",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-04/top1_paper_watchlist_2026-06-04.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "6b9330152f9caf41049f882e4647d0fb91bbb95b1303e108ac3dbf2613193bfe",
+      "identity": "2026-06-04",
+      "ledger_record_sha256": "7f4275d39a5c89ad3bbe9286a17152463c31562878e9702917b985ac390e9089",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-04",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-05/top1_paper_watchlist_2026-06-05.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "cb6cfe44a6f5c83c80c5ae7e6ad14017a431ae90579eec0b453adb9f3057171d",
+      "identity": "2026-06-05",
+      "ledger_record_sha256": "6e62e1683ae660149f7ecbd2436cb290cffb05486ad450dfd39d9725c2ec5587",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-05",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-16/top1_paper_watchlist_2026-06-16.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "0a7f8e2ce48c073de55d928b4a3f449186aaa278bcea1c1c7b30f904fc257a16",
+      "identity": "2026-06-16",
+      "ledger_record_sha256": "59aa17375961b9c28bfbe78337b036d3a18205ca2538f20b3a2dbe1a53a5ebe0",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-16",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-17/top1_paper_watchlist_2026-06-17.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "3e3bab9af9f38314e7444cfeb254e0d5ec8e60e101f69e933e81e6af3cda626d",
+      "identity": "2026-06-17",
+      "ledger_record_sha256": "e71dc189303d6969e1bedd6e454331f3128c3241af3dcd33f18e1255e624d1e1",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-17",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-18/top1_paper_watchlist_2026-06-18.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "0ce24d280732c12f2c89918d1b632350b2e3421cec23d9a53414fe10f49e3eeb",
+      "identity": "2026-06-18",
+      "ledger_record_sha256": "268c80fe2528e278c9bbb027bfcc2cc814cbf6e1d5c79fb009aeb323230d3f76",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-18",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-19/top1_paper_watchlist_2026-06-19.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "48ddb7ebd23d6d99395b67df16c3cb3417304f9e7bfe8ec17efa2435ed0af100",
+      "identity": "2026-06-19",
+      "ledger_record_sha256": "a92bf05ec93f8600c7df4be0c7cd98998d52fe63d07d20b79d22ff6e940bb219",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-19",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-22/top1_paper_watchlist_2026-06-22.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "5c890015a149c57fd835c166a2186bbc4ddb24fbe679e3f84a153d74f4f734c8",
+      "identity": "2026-06-22",
+      "ledger_record_sha256": "088b09447d576d0c3b6e577d9bb3664a1dc0c32785c7ba220c07cba884a404e4",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-22",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-23/top1_paper_watchlist_2026-06-23.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "0e19da69df35d74f1208a09b6b9dd388ed1762a34215aefc0af2781c61dccaa8",
+      "identity": "2026-06-23",
+      "ledger_record_sha256": "a454ee111bef8d17b0b73ac796aeade2dfa1449f5afa208e5e246633c18b52cb",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-23",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-24/top1_paper_watchlist_2026-06-24.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "61218bf70a303f429963ef0ba5cb3ced7d709c987e7fd689a725da83c3378b2c",
+      "identity": "2026-06-24",
+      "ledger_record_sha256": "a7652aca70f9cabafebeb67897cd16019185db387d44fa3fb5686c7f3591ad22",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-24",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-25/top1_paper_watchlist_2026-06-25.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "64edf578f4f7727140be92db5aff8332cb62abf9663cbc1c17c0e21cd091411c",
+      "identity": "2026-06-25",
+      "ledger_record_sha256": "e69c72775d9fb1daf6d07d9ef504355e8d876dfd39a4333b39838fa580d063b1",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-25",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 0,
+        "no_fill": 1,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-26/top1_paper_watchlist_2026-06-26.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "34776496d5e5ce9347673e291717b7c0565c79a19235e5602b4a45899719ae05",
+      "identity": "2026-06-26",
+      "ledger_record_sha256": "510ab9f85a84ad04bafded76789fb192d3540c4f95c62db138a8e238489e09b3",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-26",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-06-30/top1_paper_watchlist_2026-06-30.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "6bf6d840bfa53b45ffc005448d3a9a591662e890ffaa6dd35bbb78ae8edb7053",
+      "identity": "2026-06-30",
+      "ledger_record_sha256": "c1175e153c9f305927c198fc36b26c8699232fcb53afd1b7fd23789d0c98689b",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-06-30",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-07-01/top1_paper_watchlist_2026-07-01.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "024a5247e467645dec8b3bb5c77d4fafcb978544c8360c7085a9272479c5294d",
+      "identity": "2026-07-01",
+      "ledger_record_sha256": "3dc953459a0de7cbfcb740ff0ab6e2ce36dc03adcf635f776f25b81b015a55b8",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-07-01",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    },
+    {
+      "accounting": {
+        "censored": 0,
+        "filled": 1,
+        "no_fill": 0,
+        "selected": 1,
+        "unknown": 0
+      },
+      "artifact_path": "2026-07-02/top1_paper_watchlist_2026-07-02.json",
+      "artifact_root": "/home/agent/dragon-pulse/outputs",
+      "artifact_sha256": "924b469cf2b157f648448c23a315fd76bbc11b22153b83bf27a0032cf710e183",
+      "identity": "2026-07-02",
+      "ledger_record_sha256": "77f2ab3c1580ed4cd7964f35bd25e5f93448d679ecbec50c255160f3d3a68ea8",
+      "reason": "saved native top1_paper_watchlist artifact",
+      "regime": "bull",
+      "resolvable": true,
+      "scan_date": "2026-07-02",
+      "source_tier": "NATIVE_SAVED_TOP1_PAPER",
+      "status": "RESOLVED_NATIVE_ARTIFACT"
+    }
+  ],
+  "schema_version": 1,
+  "summary": {
+    "accounting": {
+      "censored": 0,
+      "filled": 24,
+      "no_fill": 11,
+      "selected": 35,
+      "unknown": 0
+    },
+    "artifact_status_counts": {
+      "RESOLVED_NATIVE_ARTIFACT": 35
+    },
+    "ledger_rows": 35,
+    "regime_counts": {
+      "bull": 33,
+      "choppy": 2
+    }
+  }
+}
