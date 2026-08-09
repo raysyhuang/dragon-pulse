@@ -130,6 +130,33 @@ def test_missing_data_is_emitted_and_all_censored_mean_is_null(tmp_path) -> None
     assert row["summary"]["filled_mean_net_return"] is None
 
 
+def test_canonical_filled_means_use_filled_denominator_and_null_all_censored_records(tmp_path) -> None:
+    mixed_artifact = xsec_runner.run_xsec_replay(
+        [_rebalance(
+            _selection("000001.SZ", 3.0, entry=_bar("2025-01-03", 100, 100), exit=_bar("2025-01-06", 100, 110)),
+            _selection("000002.SZ", 2.0, entry=_bar("2025-01-03", 100, 100), exit=_bar("2025-01-06", 100, 80)),
+            _selection("000003.SZ", 1.0, entry=None),
+        )], output_dir=tmp_path / "mixed", max_concurrent_slots=3, total_cost_bps=20.0,
+    )
+    mixed_summary = _records(mixed_artifact)[0]["summary"]
+    assert isinstance(mixed_summary, dict)
+    assert mixed_summary["selected"] == 3
+    assert mixed_summary["filled"] == 2
+    assert mixed_summary["filled_mean_gross_return"] == pytest.approx(-0.05)
+    assert mixed_summary["filled_mean_net_return"] == pytest.approx(-0.052)
+
+    censored_artifact = xsec_runner.run_xsec_replay(
+        [_rebalance(_selection("000001.SZ", 2.0, entry=None), _selection("000002.SZ", 1.0, exit=None))],
+        output_dir=tmp_path / "all-censored", max_concurrent_slots=2, total_cost_bps=20.0,
+    )
+    censored_summary = _records(censored_artifact)[0]["summary"]
+    assert isinstance(censored_summary, dict)
+    assert censored_summary["selected"] == 2
+    assert censored_summary["filled"] == 0
+    assert censored_summary["filled_mean_gross_return"] is None
+    assert censored_summary["filled_mean_net_return"] is None
+
+
 def test_invalid_pit_bundle_fails_before_creating_artifact(tmp_path) -> None:
     output = tmp_path / "out"
     with pytest.raises(PitBundleValidationError):
@@ -192,6 +219,38 @@ def test_valid_tiny_pit_bundle_emits_labelled_artifact_with_provenance(tmp_path)
     selection_hash = row["frozen_selection_content_sha256"]
     assert isinstance(selection_hash, str)
     assert re.fullmatch(r"[0-9a-f]{64}", selection_hash)
+
+
+def test_canonical_labels_ignore_caller_injections_for_non_pit_and_valid_pit_bundle(tmp_path) -> None:
+    injected = {
+        "pit_grade": "CALLER_INJECTED_PIT_GRADE",
+        "evidence_label": "CALLER_INJECTED_EVIDENCE_LABEL",
+        "input_mode": "CALLER_INJECTED_INPUT_MODE",
+        "selection_execution_provenance": "CALLER_INJECTED_EXECUTION_PROVENANCE",
+    }
+    non_pit = _rebalance(_selection("000001.SZ", 1.0))
+    non_pit.update(injected)
+    pit = _rebalance(_selection("000001.SZ", 1.0))
+    pit.update(injected)
+
+    non_pit_record = _records(xsec_runner.run_xsec_replay(
+        [non_pit], output_dir=tmp_path / "non-pit", max_concurrent_slots=1, total_cost_bps=20.0,
+    ))[0]
+    pit_record = _records(xsec_runner.run_xsec_replay(
+        [pit], output_dir=tmp_path / "pit", max_concurrent_slots=1, total_cost_bps=20.0,
+        pit_bundle=_valid_pit_bundle(tmp_path),
+    ))[0]
+
+    for record, expected in (
+        (non_pit_record, ("PIT_GRADE_FALSE", "FROZEN_SELECTIONS_NON_PIT")),
+        (pit_record, ("PIT_UNIVERSE_MEMBERSHIP_ONLY", "FROZEN_SELECTIONS_PIT_UNIVERSE_MEMBERSHIP_VALIDATED")),
+    ):
+        assert record["pit_grade"] == expected[0]
+        assert record["input_mode"] == expected[1]
+        assert record["evidence_label"] == "RESEARCH_ONLY_NON_BINDING"
+        assert record["selection_execution_provenance"] == "CALLER_ASSERTED_UNVERIFIED"
+        for field, supplied in injected.items():
+            assert record[field] != supplied
 
 
 @pytest.mark.parametrize("compact_date", ["20250102", "2025-1-2", "2025/01/02"])
