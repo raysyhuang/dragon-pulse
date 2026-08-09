@@ -46,7 +46,7 @@ python main.py movers       # Daily movers only
 ## Configuration
 
 All settings in `config/default.yaml`. Key options:
-- `universe.mode`: now supports `"CHINA_A"` (AkShare primary, Tushare backup) in addition to `"SP500"`, `"SP500+NASDAQ100"`, `"SP500+NASDAQ100+R2000"`
+- `universe.mode`: now supports `"CHINA_A"` (Tushare primary, AkShare fallback) in addition to `"SP500"`, `"SP500+NASDAQ100"`, `"SP500+NASDAQ100+R2000"`
 - `market.region` + `market.timezone`: defaults to China (`Asia/Shanghai`) in this fork
 - `data.china`: primary/backup provider and Tushare token env (`TUSHARE_TOKEN`)
 - `movers.enabled`: true/false to enable daily movers

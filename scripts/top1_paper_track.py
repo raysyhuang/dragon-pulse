@@ -147,8 +147,16 @@ def evaluate(date: str) -> int:
     tickers = sorted({p["ticker"] for r in pending for p in r["top2"]})
     start = (pd.Timestamp(min(r["scan_date"] for r in pending)) - pd.Timedelta(days=5)).strftime("%Y-%m-%d")
     end = date
-    data, _ = download_daily_range(tickers=tickers + [CSI300], start=start, end=end,
-                                   provider_config={"backup": "tushare", "tushare_token_env": "TUSHARE_TOKEN"})
+    data, _ = download_daily_range(
+        tickers=tickers + [CSI300],
+        start=start,
+        end=end,
+        provider_config={
+            "primary": "tushare",
+            "backup": "akshare",
+            "tushare_token_env": "TUSHARE_TOKEN",
+        },
+    )
     csi = data.get(CSI300, pd.DataFrame())
 
     for r in pending:

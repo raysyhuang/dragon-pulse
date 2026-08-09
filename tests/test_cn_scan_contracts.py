@@ -28,6 +28,10 @@ def test_market_cap_universe_requires_tushare_ranking(monkeypatch):
         )
 
 
+def test_default_cn_provider_sequence_prefers_tushare():
+    assert list(cn_data._provider_sequence(None)) == ["tushare", "akshare"]
+
+
 def test_sort_signal_candidates_breaks_ties_by_adv_then_market_cap():
     candidates = [
         ("sniper", SimpleNamespace(ticker="AAA", score=80.0)),
@@ -97,7 +101,11 @@ def test_download_daily_range_disables_tushare_backup_after_repeated_timeouts(
         tickers=tickers,
         start="2025-01-01",
         end="2025-01-31",
-        provider_config={"backup_timeout_trip_count": 2},
+        provider_config={
+            "primary": "akshare",
+            "backup": "tushare",
+            "backup_timeout_trip_count": 2,
+        },
     )
 
     assert calls["akshare"] == len(tickers)
@@ -135,7 +143,11 @@ def test_download_daily_range_times_out_stuck_primary_and_uses_backup(
         tickers=["000001.SZ"],
         start="2025-01-01",
         end="2025-01-31",
-        provider_config={"provider_timeout_seconds": 0.05},
+        provider_config={
+            "primary": "akshare",
+            "backup": "tushare",
+            "provider_timeout_seconds": 0.05,
+        },
     )
 
     assert calls["akshare"] == 1

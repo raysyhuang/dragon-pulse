@@ -1,8 +1,8 @@
 """
 China A-share Data Download Helpers
 
-Primary: AkShare
-Backup:  Tushare (if AkShare fails or returns empty)
+Primary: Tushare
+Backup:  AkShare (if Tushare fails or returns empty)
 
 Returns the same shape as yfinance helpers:
 - A dict of {ticker: DataFrame[Open, High, Low, Close, Volume]}
@@ -547,8 +547,8 @@ def _validate_df(df: pd.DataFrame) -> bool:
 
 def _provider_sequence(provider_config: Optional[dict]) -> Iterable[str]:
     cfg = provider_config or {}
-    primary = cfg.get("primary", "akshare")
-    backup = cfg.get("backup", "tushare")
+    primary = cfg.get("primary", "tushare")
+    backup = cfg.get("backup", "akshare")
     seq = [primary]
     if backup and backup != primary:
         seq.append(backup)
@@ -609,7 +609,7 @@ def download_daily_range(
     provider_config: Optional[dict] = None,
 ) -> tuple[dict, dict]:
     """
-    Date-range download for A-shares with AkShare primary and Tushare backup.
+    Date-range download for A-shares with Tushare primary and AkShare backup.
     """
     assert_provider_access_allowed("download_daily_range")
     if interval != "1d":

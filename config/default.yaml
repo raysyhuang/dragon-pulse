@@ -10,8 +10,10 @@ market:
 data:
   provider: "AUTO"
   china:
-    primary: "akshare"
-    backup: "tushare"
+    # Authenticated, canonical source for CN scanner and research artifacts.
+    # AkShare is an explicitly degraded fallback only.
+    primary: "tushare"
+    backup: "akshare"
     adjust: "qfq"
     tushare_token_env: "TUSHARE_TOKEN"
   us:

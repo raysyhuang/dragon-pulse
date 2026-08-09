@@ -101,6 +101,8 @@ jobs:
       - name: Top-1/day paper track (A/B vs live top-2 + CSI300)
         if: steps.check.outputs.skip != 'true'
         continue-on-error: true
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
         run: |
           TRADE_DATE="${{ steps.date.outputs.trade_date }}"
           # Non-invasive: post-processes the watchlist above; does NOT touch live ranking.

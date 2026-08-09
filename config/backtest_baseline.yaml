@@ -13,8 +13,8 @@ market:
 data:
   provider: "AUTO"
   china:
-    primary: "akshare"
-    backup: "tushare"
+    primary: "tushare"
+    backup: "akshare"
     adjust: "qfq"
     tushare_token_env: "TUSHARE_TOKEN"
   us:
