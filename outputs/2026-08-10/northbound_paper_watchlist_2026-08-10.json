@@ -1,0 +1,62 @@
+{
+  "date": "2026-08-10",
+  "generated_utc": "2026-08-09T23:45:59.204488",
+  "sleeve": "northbound_active_riskband_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "meta": {
+    "asof_date": "2026-08-10",
+    "source_trade_date": "2026-08-07",
+    "source_status": "ok",
+    "paper_only": true,
+    "rule": "northbound active rank<=5, stop-risk 4-7%, conservative T+1 no-chase, 5D bracket replay tracker",
+    "holding_delta_status": "eastmoney_holding_delta_parser_error: TypeError: 'NoneType' object is not subscriptable",
+    "holding_delta_rows": 0,
+    "regime_at_signal": "bear",
+    "breadth_at_signal": 0.6372,
+    "regime_market_date": "2026-08-07",
+    "regime_stamp_source": "saved_regime_artifact",
+    "regime_stamp_status": "ok",
+    "data_quality": "active_rank_only",
+    "flow_confirmed": false,
+    "data_gaps": [
+      "latest hsgt_top10 trade_date 2026-08-07 is older than asof 2026-08-10",
+      "hsgt_top10 net_amount/buy/sell are not populated; active-rank turnover only",
+      "holding-delta replacement unavailable: eastmoney_holding_delta_parser_error: TypeError: 'NoneType' object is not subscriptable"
+    ],
+    "label": "北向活跃榜/成交活跃纸面跟踪",
+    "source_rows": 10,
+    "riskband_picks": 1
+  },
+  "picks": [
+    {
+      "ticker": "603259.SH",
+      "name_cn": "药明康德",
+      "engine": "northbound_active_riskband_paper",
+      "paper_only": true,
+      "status": "PAPER_TRACK_ONLY",
+      "rank": 4,
+      "signal_date": "2026-08-10",
+      "source_trade_date": "2026-08-07",
+      "entry_price": 154.82,
+      "max_entry_price": 157.92,
+      "stop_loss": 147.13,
+      "target_1": 169.5,
+      "target_2": 179.98,
+      "holding_period": 5,
+      "score": 94.72,
+      "stop_risk_pct": 4.97,
+      "net_amount": null,
+      "amount": 2709871435.0,
+      "holding_delta_vol": null,
+      "holding_delta_ratio": null,
+      "holding_delta_source": null,
+      "regime_at_signal": "bear",
+      "breadth_at_signal": 0.6372,
+      "northbound_flow_confirmed": false,
+      "promotion_eligible": false,
+      "promotion_blocker": "Paper-only active-rank lead until net_amount or holding-delta works and PIT/publish-lag gates pass",
+      "reason_summary": "北向活跃榜rank=4, stop风险=5.0%"
+    }
+  ]
+}
