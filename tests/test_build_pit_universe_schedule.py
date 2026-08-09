@@ -144,6 +144,20 @@ def test_main_accepts_relative_sources_dir_and_builds_valid_bundle(tmp_path: Pat
     assert validate_pit_bundle(output).pit_grade is True
 
 
+def test_builds_sources_reached_through_symlinked_ancestor(tmp_path: Path):
+    physical_parent = tmp_path / "physical-parent"
+    physical_parent.mkdir()
+    lexical_parent = tmp_path / "lexical-parent"
+    lexical_parent.symlink_to(physical_parent, target_is_directory=True)
+    sources = _valid_sources(lexical_parent)
+    output = tmp_path / "bundle"
+
+    completed = _run(sources, output)
+
+    assert completed.returncode == 0, completed.stderr
+    assert validate_pit_bundle(output).pit_grade is True
+
+
 @pytest.mark.parametrize(("porcelain", "expected_dirty"), [(" M scripts/build_pit_universe_schedule.py\n", True), ("", False)])
 def test_manifest_honestly_records_injected_builder_tree_status(tmp_path, monkeypatch, porcelain, expected_dirty):
     def fake_check_output(command, *, text, stderr):

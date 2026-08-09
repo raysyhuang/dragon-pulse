@@ -54,6 +54,50 @@ def test_valid_trusted_receipt_is_accepted_before_builder_exists(tmp_path: Path)
     assert attestations[0].caveat == "historical_tushare_trusted_assumption"
 
 
+def test_accepts_absolute_and_relative_snapshots_through_symlinked_ancestor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    physical_parent = tmp_path / "physical-parent"
+    physical_parent.mkdir()
+    lexical_parent = tmp_path / "lexical-parent"
+    lexical_parent.symlink_to(physical_parent, target_is_directory=True)
+    sources = lexical_parent / "input"
+    snapshot = _snapshot(sources)
+    _receipt(snapshot)
+
+    assert validate_capture_attestations(sources, [snapshot])[0].snapshot_path == snapshot
+
+    monkeypatch.chdir(sources)
+    assert validate_capture_attestations(Path("."), [Path(snapshot.name)])[0].snapshot_path == Path(snapshot.name)
+
+
+def test_rejects_symlinked_snapshot_child_below_sources_root(tmp_path: Path):
+    sources = tmp_path / "input"
+    external = tmp_path / "external"
+    snapshot = _snapshot(external)
+    receipt = _receipt(snapshot)
+    sources.mkdir()
+    receipt.rename(sources / receipt.name)
+    (sources / "nested").symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(CaptureProvenanceError, match="symlinked snapshot"):
+        validate_capture_attestations(sources, [sources / "nested" / snapshot.name])
+
+
+def test_rejects_schema_version_other_than_one(tmp_path: Path):
+    snapshot = _snapshot(tmp_path / "input")
+    _receipt(snapshot, schema_version=2)
+
+    with pytest.raises(CaptureProvenanceError, match="schema_version"):
+        validate_capture_attestations(snapshot.parent, [snapshot])
+
+
+def test_rejects_naive_captured_at_timestamp(tmp_path: Path):
+    snapshot = _snapshot(tmp_path / "input")
+    _receipt(snapshot, captured_at="2025-01-02T16:00:00")
+
+    with pytest.raises(CaptureProvenanceError, match="captured_at"):
+        validate_capture_attestations(snapshot.parent, [snapshot])
+
+
 def test_rejects_capture_before_requested_trade_date(tmp_path: Path):
     snapshot = _snapshot(tmp_path / "input")
     _receipt(snapshot, captured_at="2025-01-01T23:59:59Z")

@@ -74,6 +74,32 @@ def _safe_file(path: Path, root: Path, what: str) -> None:
         _reject(f"missing {what}: {path}")
 
 
+def _safe_source_snapshot(
+    supplied: Path, lexical_root: Path, physical_root: Path,
+) -> Path:
+    """Map a lexical source path to its physical counterpart without trusting symlinks below it."""
+    lexical_supplied = Path(os.path.abspath(supplied))
+    try:
+        child = lexical_supplied.relative_to(lexical_root)
+    except ValueError:
+        if supplied.is_absolute():
+            _reject(f"snapshot is outside allowed root: {supplied}")
+        child = supplied
+    if child.is_absolute() or "." in child.parts or ".." in child.parts:
+        _reject(f"snapshot is outside allowed root: {supplied}")
+
+    lexical_snapshot = lexical_root / child
+    current = lexical_snapshot
+    while current != lexical_root:
+        if current.is_symlink():
+            _reject(f"symlinked snapshot is forbidden: {lexical_snapshot}")
+        current = current.parent
+
+    snapshot = physical_root / child
+    _safe_file(snapshot, physical_root, "snapshot")
+    return snapshot
+
+
 def _load_receipt(path: Path) -> dict[str, object]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -112,19 +138,9 @@ def validate_capture_attestations(
     source_lexical_root = Path(os.path.abspath(source_dir))
 
     records: list[CaptureAttestation] = []
-    for snapshot in snapshots:
-        supplied_snapshot = Path(snapshot)
-        snapshot = supplied_snapshot
-        if snapshot.is_absolute():
-            snapshot = Path(os.path.abspath(snapshot))
-        else:
-            lexical_snapshot = Path(os.path.abspath(snapshot))
-            try:
-                relative_snapshot = lexical_snapshot.relative_to(source_lexical_root)
-            except ValueError:
-                relative_snapshot = snapshot
-            snapshot = Path(os.path.abspath(source_root / relative_snapshot))
-        _safe_file(snapshot, source_root, "snapshot")
+    for supplied_snapshot in snapshots:
+        supplied_snapshot = Path(supplied_snapshot)
+        snapshot = _safe_source_snapshot(supplied_snapshot, source_lexical_root, source_root)
         match = _SNAPSHOT_RE.fullmatch(snapshot.name)
         if match is None:
             _reject(f"snapshot filename must be daily_basic_YYYYMMDD.csv: {snapshot.name}")
