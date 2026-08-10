@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Paper sleeve for the one confirmed edge: ChiNext 50/200 trend timing.
 
-Records, daily and append-only, exactly the rule validated in
+Records, daily and append-only, exactly the rule studied in
 docs/research/2026-08-10-edge-test-trend-timing.md. It places no orders, sends no
 alerts, and touches no selector, cron, or production artifact.
 
@@ -27,14 +27,25 @@ import os
 import pathlib
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+import hashlib
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import requests
 
+
+class ProviderError(RuntimeError):
+    """The provider failed. Distinct from a market holiday or from stale data."""
+
+
+_CAPTURE: dict[str, str] = {}
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 LEDGER = ROOT / "outputs" / "paper_lab" / "chinext_timing_paper_ledger.jsonl"
 INCEPTION_FILE = ROOT / "outputs" / "paper_lab" / "chinext_timing_paper_inception.txt"
+CAPTURE_FILE = ROOT / "outputs" / "paper_lab" / "chinext_timing_last_capture.json"
 TS_CODE = "399006.SZ"
 FAST, SLOW = 50, 200
 SIDE_BPS = 5.0
@@ -60,16 +71,24 @@ def fetch_index() -> pd.DataFrame:
     token = os.getenv("TUSHARE_TOKEN")
     if not token:
         raise SystemExit("TUSHARE_TOKEN not set")
-    frames = []
-    for start, end in (("20100101", "20180101"), ("20180101", "20260101"), ("20260101", "20991231")):
-        resp = requests.post("http://api.tushare.pro", timeout=60, json={
-            "api_name": "index_daily", "token": token,
-            "params": {"ts_code": TS_CODE, "start_date": start, "end_date": end},
-            "fields": "trade_date,close"}).json()
+    today = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y%m%d")
+    frames, digests = [], []
+    # Windows are CLOSED at today's Shanghai date: an open-ended or future end date
+    # would make the query non-reproducible and could admit unsettled rows.
+    for start, end in (("20100101", "20180101"), ("20180101", "20260101"), ("20260101", today)):
+        body = {"api_name": "index_daily", "token": token,
+                "params": {"ts_code": TS_CODE, "start_date": start, "end_date": end},
+                "fields": "trade_date,close"}
+        raw = requests.post("https://api.tushare.pro", timeout=60, json=body).content
+        digests.append(hashlib.sha256(raw).hexdigest())
+        resp = json.loads(raw)
         if resp.get("code") != 0:
-            raise SystemExit(f"tushare error: {resp.get('msg')}")
+            raise ProviderError(f"tushare error for {start}..{end}: {resp.get('msg')}")
         data = resp["data"]
         frames.append(pd.DataFrame(data["items"], columns=data["fields"]))
+    _CAPTURE["response_sha256"] = hashlib.sha256("".join(digests).encode()).hexdigest()
+    _CAPTURE["captured_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    _CAPTURE["query_end_date"] = today
     df = pd.concat(frames, ignore_index=True)
     df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d")
     df["close"] = df["close"].astype(float)
@@ -124,10 +143,55 @@ def build_rows(df: pd.DataFrame, inception: str | None = None) -> list[dict]:
     return rows
 
 
-def existing_dates() -> set[str]:
+def existing_rows() -> dict[str, dict]:
     if not LEDGER.exists():
-        return set()
-    return {json.loads(l)["trade_date"] for l in LEDGER.read_text().splitlines() if l.strip()}
+        return {}
+    out: dict[str, dict] = {}
+    for line in LEDGER.read_text().splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        day = row["trade_date"]
+        if day in out and out[day] != row:
+            raise SystemExit(f"ledger already contains conflicting rows for {day}; "
+                             f"refusing to append to a corrupt ledger")
+        out[day] = row
+    return out
+
+
+_IMMUTABLE = ("close", "sma_fast", "sma_slow", "signal_today",
+              "position_held_today", "position_next_session", "net_return")
+
+
+def conflicts(existing: dict, fresh: dict) -> list[str]:
+    """Fields that changed for a date already recorded. A restated close is a real
+    event and must surface, not be silently discarded by a date-only dedupe."""
+    return [k for k in _IMMUTABLE if k in existing and existing[k] != fresh[k]]
+
+
+def latest_expected_session(token: str) -> str | None:
+    """Most recent CLOSED trading session in Shanghai, from the exchange calendar.
+
+    Without this, a market holiday, a provider outage and silently stale data all look
+    identical: zero new rows. They are different events and must be reported differently.
+    """
+    now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    today = now.strftime("%Y%m%d")
+    body = {"api_name": "trade_cal", "token": token,
+            "params": {"exchange": "SSE",
+                       "start_date": (now.replace(day=1) - timedelta(days=40)).strftime("%Y%m%d"),
+                       "end_date": today},
+            "fields": "cal_date,is_open"}
+    resp = requests.post("https://api.tushare.pro", timeout=60, json=body).json()
+    if resp.get("code") != 0:
+        raise ProviderError(f"trade_cal failed: {resp.get('msg')}")
+    opens = sorted(r[0] for r in resp["data"]["items"] if int(r[1]) == 1)
+    if not opens:
+        return None
+    # A session only counts as closed once the 15:00 Shanghai close has passed.
+    if opens[-1] == today and now.hour < 15:
+        opens = opens[:-1]
+    return opens[-1] if opens else None
 
 
 def main() -> int:
@@ -135,12 +199,26 @@ def main() -> int:
     ap.add_argument("--status", action="store_true", help="print state without writing")
     args = ap.parse_args()
 
-    have_before = existing_dates()
+    _load_env()
+    token = os.getenv("TUSHARE_TOKEN")
+    if not token:
+        raise SystemExit("TUSHARE_TOKEN not set")
+
+    try:
+        expected = latest_expected_session(token)
+        frame = fetch_index()
+    except (ProviderError, requests.RequestException) as exc:
+        print(f"status              PROVIDER_ERROR\n  {exc}")
+        return 2
+
+    have_before = existing_rows()
     inception = INCEPTION_FILE.read_text().strip() if INCEPTION_FILE.exists() else None
-    rows = build_rows(fetch_index(), inception=inception)
+    rows = build_rows(frame, inception=inception)
     if not rows:
-        raise SystemExit("no rows produced")
+        print("status              PROVIDER_ERROR\n  no rows produced")
+        return 2
     latest = rows[-1]
+    provider_latest = latest["trade_date"].replace("-", "")
 
     print(f"ChiNext 50/200 trend-timing paper sleeve — {EVIDENCE_LABEL} / {EXECUTION_STATUS}")
     print(f"  latest session      {latest['trade_date']}   close {latest['close']:.2f}")
@@ -148,24 +226,63 @@ def main() -> int:
     print(f"  signal today        {'BULL (in)' if latest['signal_today'] else 'no signal (cash)'}")
     print(f"  position NEXT sess. {'HOLD ChiNext ETF' if latest['position_next_session'] else 'CASH'}")
     trailing = rows[-243:] if len(rows) >= 243 else rows
-    expo = sum(r["position_held_today"] for r in trailing) / len(trailing)
-    print(f"  trailing 1y exposure {expo:.0%}   paper equity since {rows[0]['trade_date']}: {latest['paper_equity']:.3f}x")
+    print(f"  trailing 1y exposure {sum(r['position_held_today'] for r in trailing)/len(trailing):.0%}"
+          f"   paper equity since {rows[0]['trade_date']}: {latest['paper_equity']:.3f}x")
+    print(f"  capture             {_CAPTURE.get('captured_at')} "
+          f"sha256={_CAPTURE.get('response_sha256', '')[:16]} "
+          f"query_end={_CAPTURE.get('query_end_date')}")
+
+    # freshness: holiday, stale provider, or current — three distinct outcomes
+    if expected is None:
+        state = "UNKNOWN_CALENDAR"
+    elif provider_latest >= expected:
+        state = "CURRENT"
+    else:
+        state = "STALE_PROVIDER_DATA"
+    print(f"  expected session    {expected}   provider latest {provider_latest}   -> {state}")
+
+    conflicting = {}
+    for r in rows:
+        prior = have_before.get(r["trade_date"])
+        if prior:
+            bad = conflicts(prior, r)
+            if bad:
+                conflicting[r["trade_date"]] = bad
+    if conflicting:
+        for day, fields in sorted(conflicting.items())[:5]:
+            print(f"  CONFLICT {day}: {', '.join(fields)} differ from the recorded row")
+        print("::error::provider values changed for sessions already recorded; "
+              "refusing to append. Inspect and reconcile before rerunning.")
+        return 3
 
     if args.status:
-        return 0
+        return 0 if state != "STALE_PROVIDER_DATA" else 1
 
-    have = have_before
-    new = [r for r in rows if r["trade_date"] not in have]
+    new = [r for r in rows if r["trade_date"] not in have_before]
     LEDGER.parent.mkdir(parents=True, exist_ok=True)
     if inception is None:
-        INCEPTION_FILE.parent.mkdir(parents=True, exist_ok=True)
         INCEPTION_FILE.write_text(latest["trade_date"] + "\n")
-        print(f"  inception set to {latest['trade_date']} — later rows count as FORWARD_PAPER")
+        print(f"  inception set to {latest['trade_date']} — later rows are FORWARD_PAPER")
     with LEDGER.open("a", encoding="utf-8") as fh:
         for r in new:
             fh.write(json.dumps(r, sort_keys=True) + "\n")
-    print(f"  ledger {LEDGER.relative_to(ROOT)}: +{len(new)} rows (total {len(have) + len(new)})")
-    print(f"  generated {datetime.now(timezone.utc):%Y-%m-%dT%H:%M:%SZ}")
+    CAPTURE_FILE.write_text(json.dumps(
+        {**_CAPTURE, "ts_code": TS_CODE, "latest_session": latest["trade_date"],
+         "expected_session": expected, "freshness": state,
+         "rows_appended": len(new), "ledger_rows": len(have_before) + len(new),
+         "evidence_label": EVIDENCE_LABEL, "execution_status": EXECUTION_STATUS},
+        indent=2, sort_keys=True) + "\n")
+
+    forward = sum(1 for r in rows if r["record_origin"] == "FORWARD_PAPER")
+    print(f"  ledger {LEDGER.relative_to(ROOT)}: +{len(new)} rows "
+          f"(total {len(have_before) + len(new)}; forward-paper {forward})")
+
+    if state == "STALE_PROVIDER_DATA":
+        print(f"::error::provider data is stale: expected a session at {expected}, "
+              f"provider's latest is {provider_latest}. This is NOT a market holiday.")
+        return 1
+    if not new:
+        print("  no new session (market closed or already recorded) — not an error")
     return 0
 
 

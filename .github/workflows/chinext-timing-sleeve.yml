@@ -1,6 +1,6 @@
 name: ChiNext Timing Paper Sleeve
 
-# Records the ChiNext 50/200 trend-timing rule validated in
+# Records the ChiNext 50/200 trend-timing rule studied in
 # docs/research/2026-08-10-edge-test-trend-timing.md.
 #
 # PAPER ONLY. It places no orders, sends no alerts, and touches no selector, scan,
@@ -64,6 +64,9 @@ jobs:
           fi
           echo "Token present."
 
+      - name: Sleeve safety tests
+        run: python -m pip install --quiet pytest && python -m pytest tests/test_chinext_timing_sleeve.py -q
+
       - name: Record the signal
         id: sleeve
         env:
@@ -72,7 +75,18 @@ jobs:
           set -o pipefail
           ARGS=""
           if [ "${{ inputs.status_only }}" = "true" ]; then ARGS="--status"; fi
+          set +e
           python scripts/chinext_timing_paper_sleeve.py ${ARGS} 2>&1 | tee sleeve.log
+          RC=${PIPESTATUS[0]}
+          set -e
+          echo "rc=${RC}" >> "$GITHUB_OUTPUT"
+          # 0 recorded or nothing new · 1 stale provider data · 2 provider error · 3 ledger conflict
+          case "${RC}" in
+            0) : ;;
+            1) echo "::error::Provider data is stale — distinct from a market holiday." ;;
+            2) echo "::error::Provider call failed — no signal recorded." ;;
+            3) echo "::error::Provider restated a session already recorded — ledger not appended." ;;
+          esac
           {
             echo "### ChiNext 50/200 timing sleeve"
             echo ""
@@ -82,12 +96,13 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Commit new ledger rows
-        if: ${{ inputs.status_only != true }}
+        if: ${{ inputs.status_only != true && steps.sleeve.outputs.rc == '0' }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add outputs/paper_lab/chinext_timing_paper_ledger.jsonl \
-                  outputs/paper_lab/chinext_timing_paper_inception.txt
+                  outputs/paper_lab/chinext_timing_paper_inception.txt \
+                  outputs/paper_lab/chinext_timing_last_capture.json
           if git diff --cached --quiet; then
             echo "No new sessions to record (already up to date, or a non-trading day)."
             exit 0
@@ -105,13 +120,15 @@ jobs:
           git commit -m "auto: chinext timing paper sleeve ${SESSION}
 
           PAPER ONLY. No orders, no alerts, no production artifact touched."
-          # A concurrent auto-commit on this branch is normal; rebase rather than fail.
-          for attempt in 1 2 3; do
-            git pull --rebase --quiet origin "${GITHUB_REF_NAME}" && git push && exit 0
-            echo "push attempt ${attempt} failed, retrying"
-            sleep 5
-          done
-          echo "::error::Could not push the ledger update after 3 attempts."
+          # Use the repository's tested helper rather than a bespoke retry: it pushes the
+          # committed HEAD and rebases on conflict, avoiding the known bug where a failed
+          # push followed by a --cached check concludes there is nothing to push.
+          bash scripts/gha_push_with_rebase.sh "${GITHUB_REF_NAME}" 3
+
+      - name: Fail the run if the sleeve reported a problem
+        if: ${{ steps.sleeve.outputs.rc != '0' }}
+        run: |
+          echo "sleeve exited ${{ steps.sleeve.outputs.rc }} — see the annotation above."
           exit 1
 
       - name: Upload log
