@@ -1,0 +1,124 @@
+name: ChiNext Timing Paper Sleeve
+
+# Records the ChiNext 50/200 trend-timing rule validated in
+# docs/research/2026-08-10-edge-test-trend-timing.md.
+#
+# PAPER ONLY. It places no orders, sends no alerts, and touches no selector, scan,
+# watchlist or production artifact. It appends to its own ledger and nothing else.
+#
+# Timing: ChiNext closes 15:00 Shanghai (07:00 UTC). The signal is computed from a
+# COMPLETED session's close and governs the NEXT session, so the run only needs the
+# closing bar to be published. 08:00 UTC = 16:00 Shanghai leaves an hour; the 11:00 UTC
+# backup covers a late or failed provider.
+#
+# Reruns are safe: the ledger is append-only and idempotent by trade_date, so a backup
+# run on a day already recorded adds zero rows. Non-trading days add zero rows too,
+# because the latest completed session has not changed.
+
+on:
+  schedule:
+    # Primary: 16:00 Shanghai = 08:00 UTC (weekdays)
+    - cron: "0 8 * * 1-5"
+    # Backup: 19:00 Shanghai = 11:00 UTC (weekdays)
+    - cron: "0 11 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      status_only:
+        description: "Print the signal without writing to the ledger"
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  PYTHONUNBUFFERED: "1"
+  TZ: "Asia/Shanghai"
+
+concurrency:
+  group: chinext-timing-sleeve
+  cancel-in-progress: false
+
+jobs:
+  record:
+    name: Record ChiNext timing signal
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: python -m pip install --quiet "pandas>=1.5.0,<3.0" requests
+
+      - name: Fail fast if the provider token is absent
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          if [ -z "${TUSHARE_TOKEN}" ]; then
+            echo "::error::TUSHARE_TOKEN is not set. Refusing to run rather than record a gap silently."
+            exit 1
+          fi
+          echo "Token present."
+
+      - name: Record the signal
+        id: sleeve
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+        run: |
+          set -o pipefail
+          ARGS=""
+          if [ "${{ inputs.status_only }}" = "true" ]; then ARGS="--status"; fi
+          python scripts/chinext_timing_paper_sleeve.py ${ARGS} 2>&1 | tee sleeve.log
+          {
+            echo "### ChiNext 50/200 timing sleeve"
+            echo ""
+            echo '```'
+            cat sleeve.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Commit new ledger rows
+        if: ${{ inputs.status_only != true }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add outputs/paper_lab/chinext_timing_paper_ledger.jsonl \
+                  outputs/paper_lab/chinext_timing_paper_inception.txt
+          if git diff --cached --quiet; then
+            echo "No new sessions to record (already up to date, or a non-trading day)."
+            exit 0
+          fi
+          SESSION=$(python - <<'PY'
+          import json, pathlib
+          rows = [json.loads(l) for l in
+                  pathlib.Path("outputs/paper_lab/chinext_timing_paper_ledger.jsonl")
+                  .read_text().splitlines() if l.strip()]
+          last = rows[-1]
+          print(f"{last['trade_date']} "
+                f"{'HOLD' if last['position_next_session'] else 'CASH'}")
+          PY
+          )
+          git commit -m "auto: chinext timing paper sleeve ${SESSION}
+
+          PAPER ONLY. No orders, no alerts, no production artifact touched."
+          # A concurrent auto-commit on this branch is normal; rebase rather than fail.
+          for attempt in 1 2 3; do
+            git pull --rebase --quiet origin "${GITHUB_REF_NAME}" && git push && exit 0
+            echo "push attempt ${attempt} failed, retrying"
+            sleep 5
+          done
+          echo "::error::Could not push the ledger update after 3 attempts."
+          exit 1
+
+      - name: Upload log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chinext-timing-sleeve-log
+          path: sleeve.log
+          retention-days: 30
+          if-no-files-found: ignore
