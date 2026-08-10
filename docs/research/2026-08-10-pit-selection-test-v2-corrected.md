@@ -24,16 +24,16 @@ The bundle: `pit-universe-2021-01-29-to-2026-06-30-n1000`, composite
 
 ## Results — 65 rebalances, PIT-bound, frozen
 
-| Sleeve | mo | CAGR | beta | annual alpha | **t** | **p** | H1 | H2 |
-|---|---|---|---|---|---|---|---|---|---|
-| turnover_low | 65 | +0.24% | 0.52 | +3.55% | **0.70** | −2.75% | +2.74% | +6.12% | **−5.16%** |
-| size_small | 65 | −3.97% | 0.98 | +2.23% | 0.62 | −0.18% | +0.46% | −4.54% | −3.43% |
-| value_pb | 65 | −5.17% | 0.63 | −1.05% | −0.17 | −2.52% | +1.86% | −2.89% | −7.33% |
-| momentum_12_1 | 53 | −5.38% | 1.00 | +6.24% | 0.51 | +0.67% | +0.44% | −19.96% | +11.17% |
-| dividend | 65 | −5.41% | 0.62 | −1.27% | −0.21 | −2.50% | +1.81% | −1.74% | −8.84% |
-| **control_spread** | 65 | −5.87% | 1.00 | — | — | — | — | −8.61% | −3.14% |
-| value_pe | 65 | −6.36% | 0.44 | −3.42% | −0.58 | −3.45% | +2.29% | −10.81% | −1.83% |
-| reversal_1m | 64 | −12.81% | 1.22 | −3.98% | −0.78 | +0.15% | −0.81% | −19.09% | −6.04% |
+| Sleeve | mo | filled | cens | CAGR | beta | annual alpha | t | p | H1 | H2 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| turnover_low | 65 | 3245 | 5 | +0.24% | 0.52 | +3.55% | 0.68 | 0.50 | +6.12% | -5.16% |
+| size_small | 65 | 3244 | 6 | -3.97% | 0.98 | +2.23% | 0.61 | 0.54 | -4.54% | -3.43% |
+| value_pb | 65 | 3244 | 6 | -5.17% | 0.63 | -1.05% | -0.17 | 0.86 | -2.89% | -7.33% |
+| momentum_12_1 | 53 | 2648 | 2 | -5.38% | 1.00 | +6.24% | 0.50 | 0.62 | -19.96% | +11.17% |
+| dividend | 65 | 3249 | 1 | -5.41% | 0.62 | -1.27% | -0.21 | 0.84 | -1.74% | -8.84% |
+| **control_spread** | 65 | 3246 | 4 | -5.87% | 1.00 | +0.00% | — | — | -8.61% | -3.14% |
+| value_pe | 65 | 3249 | 1 | -6.36% | 0.44 | -3.42% | -0.57 | 0.57 | -10.81% | -1.83% |
+| reversal_1m | 64 | 3199 | 1 | -12.81% | 1.22 | -3.98% | -0.77 | 0.44 | -19.09% | -6.04% |
 
 **No factor is statistically significant. The best t-statistic is 0.70.** Under the
 corrected method the apparent effect is *weaker* than in v1 (best t was 0.90), consistent
@@ -63,7 +63,7 @@ not by showing it is negative.
 
 ## What this does and does not support
 
-**Supports:** across these seven sorts, on a bundle-validated survivorship-free universe
+**Supports:** across these seven sorts, on a bundle-validated survivorship-controlled universe
 over 65 monthly rebalances, no factor produced significant alpha; every sleeve that beat
 the control carried beta between 0.44 and 0.63 while every sleeve near beta 1.0 lost; and
 the one non-negative sleeve is a defensive tilt whose advantage reverses out of sample and
@@ -87,7 +87,7 @@ python scripts/pit_selection_test.py <work_dir>
 Expects a validated bundle at `<work_dir>/pit_bundle_66` and cached panels at
 `<work_dir>/seltest_cache`. Refuses to overwrite an existing `analysis.json`.
 
-Analysis hash: `2a4d419f2b6ff9b1aaa700ddddb8e7b8e7fb7ec4884896c92c0b3837f5db2c2a`
+Analysis hash: `9be050f8ca025500515c6c69b5db8ea7569e8de45ba1ac47ebf2c293c8cf8ee7`
 
 ---
 
@@ -104,17 +104,9 @@ A second audit rejected `dfe240a`. All six findings were valid and are addressed
 | Reported t is not an OLS intercept t-statistic | **Fixed.** Proper OLS with `s² = SSR/(n−2)` and `SE(α) = s·√(1/n + x̄²/Sxx)`; specification, SE, df and two-sided p are persisted. The prior figure omitted both the df correction and the leverage term. |
 | Documentation overclaims | **Fixed.** "survivorship-free" → "survivorship-controlled"; the half-split is labelled post-hoc, explicitly not out-of-sample; the stale "frictionless is conservative" header is replaced with the correction; the v1 banner no longer claims the note is "unaltered" while carrying a prepended banner. |
 
-**Corrected statistics** (OLS, df = 63):
+**Corrected statistics** (OLS, df = 63) — table above is generated from `analysis.json`, not hand-written, so it cannot drift from the artifact again.
 
-| Sleeve | beta | annual alpha | t | **p** |
-|---|---|---|---|---|
-| turnover_low | 0.52 | +3.55% | 0.68 | **0.50** |
-| size_small | 0.98 | +2.23% | 0.61 | 0.54 |
-| momentum_12_1 | 1.00 | +6.24% | 0.50 | 0.62 |
-| value_pe | 0.44 | −3.42% | −0.57 | 0.57 |
-| reversal_1m | 1.22 | −3.98% | −0.77 | 0.44 |
-
-No p-value is below 0.44.
+No p-value in the study is below 0.44.
 
 **Known remaining limitation, stated rather than omitted:** the raw cached provider panels
 (~38 MB of daily OHLCV and `daily_basic` parquet) are **not** committed. The bundle and
@@ -125,3 +117,27 @@ size/traceability trade-off and it is an auditor's call whether it is acceptable
 
 **Status is unchanged by these fixes:** exploratory. No factor is significant, the best
 p-value is 0.50, and this does not close the selection question.
+
+---
+
+## Addendum — third audit round
+
+A third audit returned MODIFY on three blockers. All were confirmed independently and all are repaired.
+
+**Provenance was stale.** Canonical rows recorded `runner_git_commit=dfe240a` with a dirty tree, and nothing bound the study script or the raw panels. The script is now committed *before* the run, so the regenerated artifacts record `runner_git_commit=e31aa7f` with `runner_tree_dirty=false`. An `input_binding` block now carries the study script's own SHA-256 and the SHA-256 of every raw panel consumed, so inputs are cryptographically bound even though the bytes are not committed.
+
+**The document misreported its own evidence.** It cited an obsolete analysis hash, and the results table was worse than misaligned: a header edit added a `p` column without updating the rows, so it displayed the superseded t of 0.70 and printed an up-month excess of −2.75% under a column headed `p`. Both tables are now **generated from `analysis.json`** rather than written by hand, which removes the class of error rather than the instance.
+
+**One overclaim survived.** A line-wrapped "survivorship-free" escaped the previous pass and is corrected.
+
+### Scope, stated as the audit requires
+
+**Accountable outcomes, non-replayable selection inputs.** Canonical rows carry every executed entry and exit price, so all accounting is auditable from this repository alone. Selection construction is *not* reproducible here, because the raw provider panels are hash-bound but not committed. The runner's `CALLER_ASSERTED_UNVERIFIED` label is correct and remains limiting. No factor conclusion and no selection closure follows from this study.
+
+### Execution sensitivity (generated)
+
+| Config | slots | turnover_low fills | control fills | cap-censored | turnover_low | control | excess |
+|---|---|---|---|---|---|---|---|
+| no_cap_50_slots | 50 | 3245 | 3246 | 0 | +0.24% | -5.87% | +6.11% |
+| cap_1.02x_20_slots | 20 | 598 | 629 | 1950 | +0.18% | +0.49% | -0.30% |
+| cap_1.00x_10_slots | 10 | 298 | 165 | 2600 | +3.46% | -5.61% | +9.07% |
