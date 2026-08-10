@@ -123,16 +123,13 @@ def test_A_missing_artifact_is_recorded_never_invented(tmp_path: Path):
     assert doc["summary"]["ledger_rows"] == 1
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "M1: a ledger row whose artifact FILE is missing while its directory still exists "
-    "hard-fails instead of recording MISSING_NATIVE_ARTIFACT. _open_relative_regular "
-    "returns None on FileNotFoundError, but _open_regular wraps the leaf's OSError into "
-    "BaselineInventoryError, which that handler no longer matches. Remove this marker "
-    "once the leaf ENOENT is passed through."))
 def test_A_partial_evidence_keeps_every_row(tmp_path: Path):
     """A resolvable row must not mask an unresolvable one, or coverage is overstated.
-    This is the realistic missing-evidence case: the file is gone, the date directory
-    remains - exactly what a partial-evidence inventory exists to record."""
+
+    This is the realistic missing-evidence case: the artifact FILE is gone while its
+    date directory remains - distinct from the whole directory being absent, which was
+    always handled. Was M1; the strict xfail marker was removed once repaired.
+    """
     rows = [ledger_row("2026-05-04"),
             ledger_row("2026-05-05", artifact="2026-05-05/top1_paper_watchlist_2026-05-05.json")]
     ledger, root = build_inputs(tmp_path, rows)
@@ -143,6 +140,23 @@ def test_A_partial_evidence_keeps_every_row(tmp_path: Path):
     statuses = sorted(r["status"] for r in doc["rows"])
     assert statuses == ["MISSING_NATIVE_ARTIFACT", "RESOLVED_NATIVE_ARTIFACT"]
     assert doc["summary"]["ledger_rows"] == 2
+
+
+def test_A_missing_file_and_missing_directory_agree(tmp_path: Path):
+    """The two shapes of absence must produce the same status. They diverged under M1,
+    so this pins them together rather than testing either alone."""
+    import shutil
+    outcomes = {}
+    for label, remove in (("file", lambda r: (r / "2026-05-04" / "top1_paper_watchlist_2026-05-04.json").unlink()),
+                          ("directory", lambda r: shutil.rmtree(r / "2026-05-04"))):
+        work = tmp_path / label
+        work.mkdir()
+        ledger, root = build_inputs(work, [ledger_row()])
+        remove(root)
+        proc = freeze(ledger, root, work / "o")
+        assert proc.returncode == 0, f"{label}: {proc.stderr}"
+        outcomes[label] = load(work / "o")["rows"][0]["status"]
+    assert outcomes["file"] == outcomes["directory"] == "MISSING_NATIVE_ARTIFACT", outcomes
 
 
 def test_A_inventory_row_count_equals_ledger_lines(tmp_path: Path):
@@ -192,17 +206,76 @@ def test_C_same_machine_runs_are_byte_identical(tmp_path: Path):
     assert load(a)["manifest_sha256"] == load(b)["manifest_sha256"]
 
 
-def test_C_manifest_hash_covers_the_document(tmp_path: Path):
-    """Editing any recorded field must invalidate the manifest hash."""
+def test_C_manifest_hash_is_portable_across_absolute_paths(tmp_path: Path):
+    """L1: identical evidence at a different absolute location must hash identically.
+
+    This is the whole point of a portable content identity - a third party on another
+    machine has to be able to confirm the artifact was not altered.
+    """
+    digests = []
+    for label in ("here", "elsewhere/deeper/still"):
+        work = tmp_path / label
+        work.mkdir(parents=True)
+        ledger, root = build_inputs(work, [ledger_row()])
+        proc = freeze(ledger, root, work / "o")
+        assert proc.returncode == 0, proc.stderr
+        digests.append(load(work / "o")["manifest_sha256"])
+    assert digests[0] == digests[1], (
+        "manifest hash still varies with absolute path; it cannot serve as portable "
+        "tamper evidence"
+    )
+
+
+def test_C_manifest_hash_still_binds_substantive_evidence(tmp_path: Path):
+    """The danger in excluding fields from a hash is excluding too much. Every change
+    below is substantive and MUST move the hash, or the exclusion has created a hole."""
+    def digest_for(rows, mutate=None):
+        work = tmp_path / f"case{len(list(tmp_path.iterdir()))}"
+        work.mkdir()
+        ledger, root = build_inputs(work, rows)
+        if mutate:
+            mutate(root)
+        proc = freeze(ledger, root, work / "o")
+        assert proc.returncode == 0, proc.stderr
+        return load(work / "o")["manifest_sha256"]
+
+    baseline = digest_for([ledger_row()])
+
+    # 1. artifact CONTENT changes (identity fields still agree with the ledger)
+    def touch_artifact(root):
+        target = root / "2026-05-04" / "top1_paper_watchlist_2026-05-04.json"
+        payload = json.loads(target.read_text())
+        payload["extra_field"] = "changed"
+        target.write_text(json.dumps(payload))
+    assert digest_for([ledger_row()], touch_artifact) != baseline, \
+        "artifact content is not covered by the manifest hash"
+
+    # 2. a different regime recorded in the ledger (and artifact)
+    assert digest_for([ledger_row(regime="choppy")]) != baseline, \
+        "ledger content is not covered by the manifest hash"
+
+    # 3. a row becoming unresolvable
+    assert digest_for([ledger_row()], lambda r: (r / "2026-05-04" /
+                      "top1_paper_watchlist_2026-05-04.json").unlink()) != baseline, \
+        "artifact resolvability is not covered by the manifest hash"
+
+    # 4. an additional ledger row
+    assert digest_for([ledger_row("2026-05-04"),
+                       ledger_row("2026-05-05", artifact="2026-05-05/w.json")]) != baseline, \
+        "row count is not covered by the manifest hash"
+
+
+def test_C_excluded_provenance_is_retained_and_declared(tmp_path: Path):
+    """Excluded metadata must still be PRESENT in the artifact and identifiable as
+    non-hash-covered. Silently dropping it would trade one opacity for another."""
     ledger, root = build_inputs(tmp_path)
     freeze(ledger, root, tmp_path / "o")
     doc = load(tmp_path / "o")
-    recorded = doc.pop("manifest_sha256")
-    import hashlib
-    recomputed = hashlib.sha256(
-        json.dumps(doc, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
-    ).hexdigest()
-    assert recomputed == recorded, "manifest hash does not cover the emitted document"
+    assert "generator" in doc, "advisory generator provenance was dropped entirely"
+    assert doc["generator"].get("git", {}).get("advisory_only") is True
+    blob = json.dumps(doc)
+    assert "artifact_root" in blob or "root" in blob, \
+        "absolute-root provenance was dropped rather than retained as advisory"
 
 
 def test_C_existing_output_is_not_overwritten(tmp_path: Path):
