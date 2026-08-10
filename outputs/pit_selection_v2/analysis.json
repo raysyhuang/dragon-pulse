@@ -225,7 +225,7 @@
       "total_return": -0.2994759336849342
     }
   },
-  "analysis_sha256": "9be050f8ca025500515c6c69b5db8ea7569e8de45ba1ac47ebf2c293c8cf8ee7",
+  "analysis_sha256": "60a245ebfb8dbc73284dd2aa855b6a299d3e788798276a42cda15af7fd99719f",
   "bundle_composite_sha256": "fd59dfa40eb183df620d15c4fb7e739456244cf4acfb187c318cd29d7f993f0d",
   "bundle_id": "pit-universe-2021-01-29-to-2026-06-30-n1000",
   "capture_provenance_grade": "TRUSTED_HISTORICAL_ASSUMPTION",
@@ -355,6 +355,13 @@
       "20260430": "596d873a8a09a4462f0c58b0a4e6c719e73bc5c2db242a91f24eb3269bb79bfb",
       "20260529": "9fe1d7a4e034506d68ae743a5105b880fbfda9311d9d625792f3b56f0cbb1286",
       "20260630": "a572cdf5a0fed86778e140463de1ef2fb4578030c091571dd5b538e9ec467d12"
+    },
+    "frozen_plan": {
+      "definition": "signal=last session of month M; entry=first session of M+1; exit=last session of M+1; capped at FROZEN_END",
+      "first_signal": "20210129",
+      "last_signal": "20260529",
+      "rebalances": 65,
+      "sha256": "b100bdd223a0a0d1664ee77f1cc26749425c3ec7ebad3d48b364791ed3c5e5ac"
     },
     "note": "panel bytes are HASH-BOUND here but NOT committed; an auditor holding the panels can verify they are the ones used, but cannot re-derive selection from this repository alone",
     "panels": {
@@ -492,7 +499,14 @@
     },
     "study_script": {
       "path": "scripts/pit_selection_test.py",
-      "sha256": "7d755d059c40f149f47857a30bf013c21a3bb799efa1a5e74616064ac48a9809"
+      "sha256": "bce1a1772c844a01c786bf977a55727d5f7695bbdbd5a7ccc07239e62d7feb27"
+    },
+    "trade_calendar": {
+      "path": "seltest_cache/trade_cal.parquet",
+      "producer": "scripts/pit_selection_test.py fetch step (cached)",
+      "schema": "cal_date,is_open",
+      "sha256": "23dca116e2d25935b77ef2b88ecc4fa74a87753cbdb38305029cc76116d919ed",
+      "source": "tushare trade_cal, exchange=SSE"
     }
   },
   "rebalances": 65,

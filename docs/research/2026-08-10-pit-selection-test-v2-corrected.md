@@ -24,7 +24,8 @@ The bundle: `pit-universe-2021-01-29-to-2026-06-30-n1000`, composite
 
 ## Results — 65 rebalances, PIT-bound, frozen
 
-| Sleeve | mo | filled | cens | CAGR | beta | annual alpha | t | p | H1 | H2 |
+<!-- BEGIN GENERATED: results -->
+| Sleeve | mo | filled | cens | CAGR | beta | annual alpha | t | p | H1 (post-hoc) | H2 (post-hoc) |
 |---|---|---|---|---|---|---|---|---|---|---|
 | turnover_low | 65 | 3245 | 5 | +0.24% | 0.52 | +3.55% | 0.68 | 0.50 | +6.12% | -5.16% |
 | size_small | 65 | 3244 | 6 | -3.97% | 0.98 | +2.23% | 0.61 | 0.54 | -4.54% | -3.43% |
@@ -34,10 +35,14 @@ The bundle: `pit-universe-2021-01-29-to-2026-06-30-n1000`, composite
 | **control_spread** | 65 | 3246 | 4 | -5.87% | 1.00 | +0.00% | — | — | -8.61% | -3.14% |
 | value_pe | 65 | 3249 | 1 | -6.36% | 0.44 | -3.42% | -0.57 | 0.57 | -10.81% | -1.83% |
 | reversal_1m | 64 | 3199 | 1 | -12.81% | 1.22 | -3.98% | -0.77 | 0.44 | -19.09% | -6.04% |
+<!-- END GENERATED: results -->
 
-**No factor is statistically significant. The best t-statistic is 0.70.** Under the
-corrected method the apparent effect is *weaker* than in v1 (best t was 0.90), consistent
-with v1 carrying mild optimistic bias.
+<!-- BEGIN GENERATED: verdict -->
+**No factor is statistically significant.** The largest intercept t-statistic in the study is **0.68375** (`turnover_low`, p = 0.49664, df = 63); the smallest two-sided p-value across all sleeves is **0.44446**. The half-sample columns are a POST-HOC split of a single sample and are not an out-of-sample holdout.
+<!-- END GENERATED: verdict -->
+
+Under the corrected method the apparent effect is *weaker* than in v1, consistent with v1
+carrying mild optimistic bias.
 
 `turnover_low` remains the only non-negative sleeve and remains a low-beta portfolio
 (0.52) that earns −2.75% in up months and +2.74% in down months. Its half-split is now
@@ -66,8 +71,8 @@ not by showing it is negative.
 **Supports:** across these seven sorts, on a bundle-validated survivorship-controlled universe
 over 65 monthly rebalances, no factor produced significant alpha; every sleeve that beat
 the control carried beta between 0.44 and 0.63 while every sleeve near beta 1.0 lost; and
-the one non-negative sleeve is a defensive tilt whose advantage reverses out of sample and
-is unidentified under execution constraints.
+the one non-negative sleeve is a defensive tilt whose advantage reverses in the POST-HOC
+second half and is unidentified under execution constraints.
 
 **Does not support**, and the v1 claim to the contrary is withdrawn: this does **not**
 close "standard A-share factor selection." Seven hand-chosen sorts at a single
@@ -87,7 +92,15 @@ python scripts/pit_selection_test.py <work_dir>
 Expects a validated bundle at `<work_dir>/pit_bundle_66` and cached panels at
 `<work_dir>/seltest_cache`. Refuses to overwrite an existing `analysis.json`.
 
-Analysis hash: `9be050f8ca025500515c6c69b5db8ea7569e8de45ba1ac47ebf2c293c8cf8ee7`
+<!-- BEGIN GENERATED: provenance -->
+- analysis self-hash `60a245ebfb8dbc73284dd2aa855b6a299d3e788798276a42cda15af7fd99719f`
+- bundle `pit-universe-2021-01-29-to-2026-06-30-n1000` composite `fd59dfa40eb183df620d15c4fb7e739456244cf4acfb187c318cd29d7f993f0d`
+- study script `bce1a1772c844a01c786bf977a55727d5f7695bbdbd5a7ccc07239e62d7feb27`
+- trade calendar `23dca116e2d25935b77ef2b88ecc4fa74a87753cbdb38305029cc76116d919ed` (tushare trade_cal, exchange=SSE, schema `cal_date,is_open`)
+- frozen plan `b100bdd223a0a0d1664ee77f1cc26749425c3ec7ebad3d48b364791ed3c5e5ac` — 65 rebalances, 20210129 .. 20260529
+- raw inputs hash-bound but **not committed**: 131 daily panels, 66 daily_basic panels
+- capture grade `TRUSTED_HISTORICAL_ASSUMPTION`; replayability: ACCOUNTABLE OUTCOMES, NON-REPLAYABLE SELECTION INPUTS.
+<!-- END GENERATED: provenance -->
 
 ---
 
@@ -136,8 +149,10 @@ A third audit returned MODIFY on three blockers. All were confirmed independentl
 
 ### Execution sensitivity (generated)
 
+<!-- BEGIN GENERATED: sensitivity -->
 | Config | slots | turnover_low fills | control fills | cap-censored | turnover_low | control | excess |
 |---|---|---|---|---|---|---|---|
 | no_cap_50_slots | 50 | 3245 | 3246 | 0 | +0.24% | -5.87% | +6.11% |
 | cap_1.02x_20_slots | 20 | 598 | 629 | 1950 | +0.18% | +0.49% | -0.30% |
 | cap_1.00x_10_slots | 10 | 298 | 165 | 2600 | +3.46% | -5.61% | +9.07% |
+<!-- END GENERATED: sensitivity -->
