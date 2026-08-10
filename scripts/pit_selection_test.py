@@ -41,6 +41,10 @@ sys.path.insert(0, str(ROOT))
 from src.core.pit_bundle import validate_pit_bundle          # noqa: E402
 from src.core.xsec_runner import run_xsec_replay             # noqa: E402
 
+class AnalysisDurabilityUncertainError(OSError):
+    """The analysis artifact was linked but its directory entry was not synced."""
+
+
 FROZEN_END = "20260630"      # explicit; never date.today()
 TOP_K = 50
 COST_BPS = 30.0
@@ -313,8 +317,19 @@ def main() -> int:
 
     def sha(fp):
         return hashlib.sha256(pathlib.Path(fp).read_bytes()).hexdigest()
+    plan_repr = json.dumps(plan, sort_keys=True, separators=(",", ":")).encode()
     input_binding = {
         "study_script": {"path": "scripts/pit_selection_test.py", "sha256": sha(__file__)},
+        "trade_calendar": {"path": "seltest_cache/trade_cal.parquet",
+                           "sha256": sha(cache / "trade_cal.parquet"),
+                           "source": "tushare trade_cal, exchange=SSE",
+                           "schema": "cal_date,is_open",
+                           "producer": "scripts/pit_selection_test.py fetch step (cached)"},
+        "frozen_plan": {"rebalances": len(plan),
+                        "first_signal": plan[0]["signal"], "last_signal": plan[-1]["signal"],
+                        "sha256": hashlib.sha256(plan_repr).hexdigest(),
+                        "definition": "signal=last session of month M; entry=first session "
+                                      "of M+1; exit=last session of M+1; capped at FROZEN_END"},
         "panels": {f"{d}": sha(cache / f"daily_{d}.parquet")
                    for d in sorted({p[k] for p in plan for k in ("signal", "entry", "exit")})
                    if (cache / f"daily_{d}.parquet").exists()},
@@ -366,15 +381,30 @@ def main() -> int:
     import os, tempfile
     out_root.mkdir(parents=True, exist_ok=True)
     ap = out_root / "analysis.json"
-    with tempfile.NamedTemporaryFile("wb", dir=out_root, prefix=".analysis.", delete=False) as fh:
-        tmp = pathlib.Path(fh.name)
-        fh.write(body)
-        fh.flush()
-        os.fsync(fh.fileno())
+    tmp = None
     try:
-        os.link(tmp, ap)          # fails if ap exists; no TOCTOU window
+        with tempfile.NamedTemporaryFile("wb", dir=out_root, prefix=".analysis.",
+                                         delete=False) as fh:
+            tmp = pathlib.Path(fh.name)
+            fh.write(body)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.link(tmp, ap)              # no-replace; fails if ap exists, no TOCTOU window
+        directory_fd = os.open(out_root, os.O_RDONLY)
+        try:
+            try:
+                os.fsync(directory_fd)
+            except OSError as exc:
+                # Same contract as the runner: the artifact IS linked and is deliberately
+                # NOT removed. Surfacing uncertainty beats pretending it does not exist.
+                raise AnalysisDurabilityUncertainError(
+                    f"analysis artifact linked but directory sync failed; inspect and "
+                    f"reconcile: {ap}") from exc
+        finally:
+            os.close(directory_fd)
     finally:
-        tmp.unlink(missing_ok=True)
+        if tmp is not None:
+            tmp.unlink(missing_ok=True)
 
     print("\n" + "=" * 116)
     print(f"RESULTS — PIT-bound, frozen to {FROZEN_END}, top {TOP_K}, {COST_BPS:.0f}bps")
