@@ -24,7 +24,7 @@ The bundle: `pit-universe-2021-01-29-to-2026-06-30-n1000`, composite
 
 ## Results — 65 rebalances, PIT-bound, frozen
 
-| Sleeve | mo | CAGR | beta | annual alpha | **t(alpha)** | up-mo excess | down-mo excess | H1 | H2 |
+| Sleeve | mo | CAGR | beta | annual alpha | **t** | **p** | H1 | H2 |
 |---|---|---|---|---|---|---|---|---|---|
 | turnover_low | 65 | +0.24% | 0.52 | +3.55% | **0.70** | −2.75% | +2.74% | +6.12% | **−5.16%** |
 | size_small | 65 | −3.97% | 0.98 | +2.23% | 0.62 | −0.18% | +0.46% | −4.54% | −3.43% |
@@ -88,3 +88,40 @@ Expects a validated bundle at `<work_dir>/pit_bundle_66` and cached panels at
 `<work_dir>/seltest_cache`. Refuses to overwrite an existing `analysis.json`.
 
 Analysis hash: `2a4d419f2b6ff9b1aaa700ddddb8e7b8e7fb7ec4884896c92c0b3837f5db2c2a`
+
+---
+
+## Addendum — second audit round (`dfe240a` → this commit)
+
+A second audit rejected `dfe240a`. All six findings were valid and are addressed here.
+
+| Finding | Resolution |
+|---|---|
+| Only the manifest committed; schedule, snapshots, receipts, canonical JSONL absent | **Fixed.** `outputs/pit_selection_v2/bundle/` now holds the full bundle — `universe_schedule.csv`, all 66 source snapshots, all 66 capture receipts, manifest. `outputs/pit_selection_v2/canonical/` holds the canonical JSONL for all 8 sleeves and all 6 sensitivity runs. 19 MB total. |
+| `analysis.json` not strict JSON (bare `NaN`) | **Fixed.** Serialised with `allow_nan=False`; undefined values are `null`. Verified to parse under a strict constant handler. |
+| Publishing is check-then-write, not atomic | **Fixed.** Writes to a temp file, `fsync`s, then `os.link` — no-replace with no TOCTOU window, matching the Task 4 pattern. |
+| Sensitivity table absent from the executable script | **Fixed.** The grid is computed inside `main()` and persisted to `execution_sensitivity`, with its own canonical JSONL per configuration. It was previously an ad-hoc shell session — the same error the first audit flagged, repeated. |
+| Reported t is not an OLS intercept t-statistic | **Fixed.** Proper OLS with `s² = SSR/(n−2)` and `SE(α) = s·√(1/n + x̄²/Sxx)`; specification, SE, df and two-sided p are persisted. The prior figure omitted both the df correction and the leverage term. |
+| Documentation overclaims | **Fixed.** "survivorship-free" → "survivorship-controlled"; the half-split is labelled post-hoc, explicitly not out-of-sample; the stale "frictionless is conservative" header is replaced with the correction; the v1 banner no longer claims the note is "unaltered" while carrying a prepended banner. |
+
+**Corrected statistics** (OLS, df = 63):
+
+| Sleeve | beta | annual alpha | t | **p** |
+|---|---|---|---|---|
+| turnover_low | 0.52 | +3.55% | 0.68 | **0.50** |
+| size_small | 0.98 | +2.23% | 0.61 | 0.54 |
+| momentum_12_1 | 1.00 | +6.24% | 0.50 | 0.62 |
+| value_pe | 0.44 | −3.42% | −0.57 | 0.57 |
+| reversal_1m | 1.22 | −3.98% | −0.77 | 0.44 |
+
+No p-value is below 0.44.
+
+**Known remaining limitation, stated rather than omitted:** the raw cached provider panels
+(~38 MB of daily OHLCV and `daily_basic` parquet) are **not** committed. The bundle and
+canonical JSONL make the universe construction validatable and every entry/exit price and
+outcome auditable, so all accounting can be checked without them. Re-deriving the
+*selection* step from raw vendor data requires re-fetching. That is a deliberate
+size/traceability trade-off and it is an auditor's call whether it is acceptable.
+
+**Status is unchanged by these fixes:** exploratory. No factor is significant, the best
+p-value is 0.50, and this does not close the selection question.

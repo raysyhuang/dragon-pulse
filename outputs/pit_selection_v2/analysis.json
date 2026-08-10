@@ -1,8 +1,6 @@
 {
   "analysis": {
     "control_spread": {
-      "annual_alpha": 0.0,
-      "beta_vs_control": 1.0,
       "cagr": -0.058739441978805984,
       "cagr_first_half": -0.08609097544909738,
       "cagr_second_half": -0.03143523104565471,
@@ -15,14 +13,22 @@
       "months_beating_control": 0,
       "n_dn": 38,
       "n_up": 27,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": 0.0,
+        "annual_alpha": 0.0,
+        "beta": 1.0,
+        "df": 63,
+        "p_two_sided": null,
+        "se_alpha": 0.0,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": null
+      },
       "selected": 3250,
-      "t_alpha": NaN,
       "total_return": -0.27956454349905224
     },
     "dividend": {
-      "annual_alpha": -0.012709453782749007,
-      "beta_vs_control": 0.6226804418460179,
       "cagr": -0.05410530739763586,
       "cagr_first_half": -0.017368639007547038,
       "cagr_second_half": -0.08841660408407925,
@@ -35,14 +41,22 @@
       "months_beating_control": 31,
       "n_dn": 38,
       "n_up": 27,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": -0.0010591211485624168,
+        "annual_alpha": -0.012709453782749002,
+        "beta": 0.6226804418460179,
+        "df": 63,
+        "p_two_sided": 0.8380801694506861,
+        "se_alpha": 0.0051614971672628756,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": -0.20519649904681922
+      },
       "selected": 3250,
-      "t_alpha": -0.20877717777931376,
       "total_return": -0.260141890272767
     },
     "momentum_12_1": {
-      "annual_alpha": 0.06244092959134481,
-      "beta_vs_control": 1.0013559077221952,
       "cagr": -0.05381357948403653,
       "cagr_first_half": -0.19963945925114268,
       "cagr_second_half": 0.11166899185137891,
@@ -55,14 +69,22 @@
       "months_beating_control": 24,
       "n_dn": 34,
       "n_up": 19,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": 0.005203410799278735,
+        "annual_alpha": 0.06244092959134481,
+        "beta": 1.0013559077221952,
+        "df": 51,
+        "p_two_sided": 0.6176090028901872,
+        "se_alpha": 0.010358889116457805,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": 0.5023135918128282
+      },
       "selected": 2650,
-      "t_alpha": 0.5141200085915609,
       "total_return": -0.21675588656351497
     },
     "reversal_1m": {
-      "annual_alpha": -0.03979921661620703,
-      "beta_vs_control": 1.2208230522542582,
       "cagr": -0.12807829215197497,
       "cagr_first_half": -0.19089990867653728,
       "cagr_second_half": -0.06037896575556778,
@@ -75,14 +97,22 @@
       "months_beating_control": 31,
       "n_dn": 38,
       "n_up": 26,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": -0.003316601384683919,
+        "annual_alpha": -0.03979921661620703,
+        "beta": 1.2208230522542582,
+        "df": 62,
+        "p_two_sided": 0.44445760084165353,
+        "se_alpha": 0.004309495399704575,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": -0.769603184844165
+      },
       "selected": 3200,
-      "t_alpha": -0.7837932429574712,
       "total_return": -0.518555073336779
     },
     "size_small": {
-      "annual_alpha": 0.02231599533845778,
-      "beta_vs_control": 0.9786974833563961,
       "cagr": -0.039743624220710316,
       "cagr_first_half": -0.045356032001092395,
       "cagr_second_half": -0.0342697802517028,
@@ -95,14 +125,22 @@
       "months_beating_control": 31,
       "n_dn": 38,
       "n_up": 27,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": 0.0018596662782048154,
+        "annual_alpha": 0.022315995338457784,
+        "beta": 0.9786974833563961,
+        "df": 63,
+        "p_two_sided": 0.5436079713632465,
+        "se_alpha": 0.0030452353855033344,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": 0.6106806347573814
+      },
       "selected": 3250,
-      "t_alpha": 0.6213370113104871,
       "total_return": -0.19721854713257037
     },
     "turnover_low": {
-      "annual_alpha": 0.035541438238566855,
-      "beta_vs_control": 0.5152902340320954,
       "cagr": 0.002365600027161463,
       "cagr_first_half": 0.061211822672591065,
       "cagr_second_half": -0.05157932339525606,
@@ -115,14 +153,22 @@
       "months_beating_control": 35,
       "n_dn": 38,
       "n_up": 27,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": 0.002961786519880571,
+        "annual_alpha": 0.035541438238566855,
+        "beta": 0.5152902340320954,
+        "df": 63,
+        "p_two_sided": 0.496640252069513,
+        "se_alpha": 0.004331679743828581,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": 0.6837501142830975
+      },
       "selected": 3250,
-      "t_alpha": 0.6956815531912998,
       "total_return": 0.012880786439184
     },
     "value_pb": {
-      "annual_alpha": -0.01048091263242591,
-      "beta_vs_control": 0.6303768442514497,
       "cagr": -0.05166824971415773,
       "cagr_first_half": -0.02886817282612053,
       "cagr_second_half": -0.07326608255499467,
@@ -135,14 +181,22 @@
       "months_beating_control": 34,
       "n_dn": 38,
       "n_up": 27,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": -0.0008734093860354925,
+        "annual_alpha": -0.01048091263242591,
+        "beta": 0.6303768442514497,
+        "df": 63,
+        "p_two_sided": 0.8645489158144076,
+        "se_alpha": 0.0050991689291442635,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": -0.17128465406265075
+      },
       "selected": 3250,
-      "t_alpha": -0.17427357112923708,
       "total_return": -0.24975764870489725
     },
     "value_pe": {
-      "annual_alpha": -0.034182786388974665,
-      "beta_vs_control": 0.4446678050949317,
       "cagr": -0.06359716739826382,
       "cagr_first_half": -0.10813009658622574,
       "cagr_second_half": -0.018291208983053364,
@@ -155,20 +209,92 @@
       "months_beating_control": 33,
       "n_dn": 38,
       "n_up": 27,
+      "no_fill": 0,
       "pit_grade": "PIT_UNIVERSE_MEMBERSHIP_ONLY",
+      "regression": {
+        "alpha_monthly": -0.002848565532414555,
+        "annual_alpha": -0.034182786388974665,
+        "beta": 0.4446678050949317,
+        "df": 63,
+        "p_two_sided": 0.572177668173887,
+        "se_alpha": 0.005016700252919285,
+        "specification": "y_t = alpha + beta * control_t + e_t, OLS, monthly net returns, no HAC correction",
+        "t_alpha": -0.5678165704153715
+      },
       "selected": 3250,
-      "t_alpha": -0.5777249690824479,
       "total_return": -0.2994759336849342
     }
   },
-  "analysis_sha256": "2a4d419f2b6ff9b1aaa700ddddb8e7b8e7fb7ec4884896c92c0b3837f5db2c2a",
+  "analysis_sha256": "c6b354a511b9a5c52caa3396097f15b03ec7c5319a540bfbc09fa344897293af",
   "bundle_composite_sha256": "fd59dfa40eb183df620d15c4fb7e739456244cf4acfb187c318cd29d7f993f0d",
   "bundle_id": "pit-universe-2021-01-29-to-2026-06-30-n1000",
   "capture_provenance_grade": "TRUSTED_HISTORICAL_ASSUMPTION",
   "cost_bps": 30.0,
+  "execution_sensitivity": [
+    {
+      "cap_multiple": null,
+      "config": "no_cap_50_slots",
+      "control_spread": {
+        "cagr": -0.058739441978805984,
+        "capacity_censored": 0,
+        "filled": 3246,
+        "no_fill": 0
+      },
+      "excess": 0.06110504200596745,
+      "slots": 50,
+      "turnover_low": {
+        "cagr": 0.002365600027161463,
+        "capacity_censored": 0,
+        "filled": 3245,
+        "no_fill": 0
+      }
+    },
+    {
+      "cap_multiple": 1.02,
+      "config": "cap_1.02x_20_slots",
+      "control_spread": {
+        "cagr": 0.004870540743709073,
+        "capacity_censored": 1950,
+        "filled": 629,
+        "no_fill": 669
+      },
+      "excess": -0.003021357250057477,
+      "slots": 20,
+      "turnover_low": {
+        "cagr": 0.001849183493651596,
+        "capacity_censored": 1950,
+        "filled": 598,
+        "no_fill": 700
+      }
+    },
+    {
+      "cap_multiple": 1.0,
+      "config": "cap_1.00x_10_slots",
+      "control_spread": {
+        "cagr": -0.0561205265239022,
+        "capacity_censored": 2600,
+        "filled": 165,
+        "no_fill": 485
+      },
+      "excess": 0.09071230713698464,
+      "slots": 10,
+      "turnover_low": {
+        "cagr": 0.034591780613082435,
+        "capacity_censored": 2600,
+        "filled": 298,
+        "no_fill": 351
+      }
+    }
+  ],
   "frozen_end": "20260630",
-  "interpretation": "Evidence about these seven sorts over this window. Not a closure of A-share factor selection: no sector neutralisation, no sealed holdout, no multiple-testing adjustment.",
   "rebalances": 65,
-  "schema_version": 1,
+  "schema_version": 2,
+  "scope": {
+    "conclusion": "exploratory evidence about these seven sorts over this window; does NOT close A-share factor selection",
+    "half_split": "POST-HOC split of one sample; NOT a sealed out-of-sample holdout",
+    "multiple_testing": "none applied across seven sleeves",
+    "neutralisation": "none: no sector, industry or size neutralisation",
+    "survivorship": "controlled via list/delist dates from a listing table fetched today; NOT survivorship-free in the absolute sense, since an issuer absent from the vendor's current records is invisible"
+  },
   "top_k": 50
 }
