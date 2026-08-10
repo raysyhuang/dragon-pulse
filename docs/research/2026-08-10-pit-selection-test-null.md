@@ -1,3 +1,8 @@
+> **SUPERSEDED (2026-08-10).** An external audit rejected this note's evidentiary
+> standing and its closure claim. The direction survived re-testing; the standing did
+> not. See `2026-08-10-pit-selection-test-v2-corrected.md`. Retained unaltered as the
+> record of what was claimed and on what basis.
+
 # PIT Cross-Sectional Selection Test, 2021–2026 — the Null, Confirmed
 
 **Status:** research / paper-only. Changes no selector, cron, execution rule, or order authority.

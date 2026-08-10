@@ -1,0 +1,90 @@
+# PIT Selection Test v2 — Corrected After External Audit (2026-08-10)
+
+**Supersedes** `2026-08-10-pit-selection-test-null.md`, whose conclusion was correctly
+rejected. That note's *direction* survived re-testing; its *evidentiary standing* did not,
+and its closure claim was withdrawn.
+
+**Status:** research / paper-only. Changes no selector, cron, execution rule, or order authority.
+
+## What the audit found, and what was done
+
+| Blocker | Status |
+|---|---|
+| Not PIT — runner called without a validated bundle, output `PIT_GRADE_FALSE` | **Fixed.** Universe is now read *from* a validated bundle and the bundle is passed to the runner. Artifacts read `PIT_UNIVERSE_MEMBERSHIP_ONLY`. |
+| No immutable evidence artifact | **Fixed.** Hashed `analysis.json`, non-overwriting publication, nothing deleted. |
+| Headline statistics not computed or persisted by the script | **Fixed.** Beta, alpha, t, up/down attribution and half-splits are computed in-script and hashed. |
+| Execution realism disabled | **Bounded, not fixed** — see the sensitivity below, which changed the conclusion about this blocker. |
+| Sample not frozen (`date.today()`) | **Fixed.** `FROZEN_END = 20260630`, explicit. |
+| Conclusion overreaches | **Accepted and withdrawn.** See "What this does not close". |
+
+The bundle: `pit-universe-2021-01-29-to-2026-06-30-n1000`, composite
+`fd59dfa40eb183df620d15c4fb7e739456244cf4acfb187c318cd29d7f993f0d`, 66 dates,
+66,000 schedule rows, **604 carrying a real delisting date**, capture grade
+`TRUSTED_HISTORICAL_ASSUMPTION`.
+
+## Results — 65 rebalances, PIT-bound, frozen
+
+| Sleeve | mo | CAGR | beta | annual alpha | **t(alpha)** | up-mo excess | down-mo excess | H1 | H2 |
+|---|---|---|---|---|---|---|---|---|---|
+| turnover_low | 65 | +0.24% | 0.52 | +3.55% | **0.70** | −2.75% | +2.74% | +6.12% | **−5.16%** |
+| size_small | 65 | −3.97% | 0.98 | +2.23% | 0.62 | −0.18% | +0.46% | −4.54% | −3.43% |
+| value_pb | 65 | −5.17% | 0.63 | −1.05% | −0.17 | −2.52% | +1.86% | −2.89% | −7.33% |
+| momentum_12_1 | 53 | −5.38% | 1.00 | +6.24% | 0.51 | +0.67% | +0.44% | −19.96% | +11.17% |
+| dividend | 65 | −5.41% | 0.62 | −1.27% | −0.21 | −2.50% | +1.81% | −1.74% | −8.84% |
+| **control_spread** | 65 | −5.87% | 1.00 | — | — | — | — | −8.61% | −3.14% |
+| value_pe | 65 | −6.36% | 0.44 | −3.42% | −0.58 | −3.45% | +2.29% | −10.81% | −1.83% |
+| reversal_1m | 64 | −12.81% | 1.22 | −3.98% | −0.78 | +0.15% | −0.81% | −19.09% | −6.04% |
+
+**No factor is statistically significant. The best t-statistic is 0.70.** Under the
+corrected method the apparent effect is *weaker* than in v1 (best t was 0.90), consistent
+with v1 carrying mild optimistic bias.
+
+`turnover_low` remains the only non-negative sleeve and remains a low-beta portfolio
+(0.52) that earns −2.75% in up months and +2.74% in down months. Its half-split is now
+**positive then negative** (+6.12% → −5.16%).
+
+## Execution sensitivity — and a correction
+
+The frictionless case was defended in v1 as "conservative for a null," on the reasoning
+that constraints only reduce factor returns. **That reasoning was wrong and the data
+refutes it.**
+
+| Config | turnover_low | control | excess | fills |
+|---|---|---|---|---|
+| no cap, 50 slots | +0.24% | −5.87% | +6.11% | 3245 |
+| 1.02× cap, 20 slots | +0.18% | +0.49% | −0.30% | 598 |
+| 1.00× cap, 10 slots | +3.46% | −5.61% | +9.07% | 298 |
+
+Constraints do not move the estimate monotonically. They collapse the filled sample by
+80–90% and the excess **flips sign** across configurations. Under realistic execution the
+effect is not identified at all. This supports the null more strongly than the incorrect
+monotonicity argument did, but it does so by showing the quantity is unmeasurable here,
+not by showing it is negative.
+
+## What this does and does not support
+
+**Supports:** across these seven sorts, on a bundle-validated survivorship-free universe
+over 65 monthly rebalances, no factor produced significant alpha; every sleeve that beat
+the control carried beta between 0.44 and 0.63 while every sleeve near beta 1.0 lost; and
+the one non-negative sleeve is a defensive tilt whose advantage reverses out of sample and
+is unidentified under execution constraints.
+
+**Does not support**, and the v1 claim to the contrary is withdrawn: this does **not**
+close "standard A-share factor selection." Seven hand-chosen sorts at a single
+parameterisation — monthly, top-50, no sector or industry neutralisation, no sealed
+holdout, no multiple-testing adjustment, one 5.4-year window that was predominantly
+bearish — cannot settle that question. It is a strong exploratory result consistent with a
+large body of prior evidence in this repository, and it should be described that way.
+
+It also does not test `alpha_rs_pullback`, and it says nothing about the timing sleeve,
+which stands or falls on its own evidence.
+
+## Reproduce
+
+```
+python scripts/pit_selection_test.py <work_dir>
+```
+Expects a validated bundle at `<work_dir>/pit_bundle_66` and cached panels at
+`<work_dir>/seltest_cache`. Refuses to overwrite an existing `analysis.json`.
+
+Analysis hash: `2a4d419f2b6ff9b1aaa700ddddb8e7b8e7fb7ec4884896c92c0b3837f5db2c2a`
