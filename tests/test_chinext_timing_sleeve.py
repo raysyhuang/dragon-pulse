@@ -324,3 +324,87 @@ def test_main_checks_the_marker_before_any_provider_call(monkeypatch):
     with pytest.raises(SystemExit, match="SENTINEL"):
         sleeve.main()
     assert called["marker"] and not called["network"]
+
+
+# --------------------------------------------------------------------------------------
+# Adversarial provider shapes and exact-schema reconciliation
+#
+# An audit accepted a fake calendar whose fields were named x/y, which returned a
+# plausible date and wrote 51 rows; a list-shaped response escaped as AttributeError;
+# and rows carrying unknown extra fields passed the "exact" schema check.
+# --------------------------------------------------------------------------------------
+
+
+class _Resp:
+    def __init__(self, payload):
+        self.payload = payload
+        self.content = json.dumps(payload).encode() if not isinstance(payload, bytes) else payload
+
+    def json(self):
+        return self.payload
+
+
+ADVERSARIAL = {
+    "top_level_list": ["not", "a", "dict"],
+    "top_level_string": "nope",
+    "wrong_field_names": {"code": 0, "data": {"items": [["20260810", 1]], "fields": ["x", "y"]}},
+    "missing_one_field": {"code": 0, "data": {"items": [["20260810"]], "fields": ["cal_date"]}},
+    "fields_not_a_list": {"code": 0, "data": {"items": [], "fields": "cal_date,is_open"}},
+    "row_wrong_width": {"code": 0, "data": {"items": [["20260810"]], "fields": ["cal_date", "is_open"]}},
+    "row_not_a_list": {"code": 0, "data": {"items": ["20260810"], "fields": ["cal_date", "is_open"]}},
+    "data_not_object": {"code": 0, "data": [["20260810", 1]]},
+    "error_code": {"code": 40001, "msg": "bad token"},
+}
+
+
+@pytest.mark.parametrize("name", sorted(ADVERSARIAL))
+def test_adversarial_calendar_shapes_raise_typed_provider_error(monkeypatch, name):
+    monkeypatch.setattr(sleeve.requests, "post", lambda *a, **k: _Resp(ADVERSARIAL[name]))
+    with pytest.raises(sleeve.ProviderError):
+        sleeve.latest_expected_session("token")
+
+
+@pytest.mark.parametrize("name", sorted(ADVERSARIAL))
+def test_adversarial_index_shapes_raise_typed_provider_error(monkeypatch, name):
+    monkeypatch.setenv("TUSHARE_TOKEN", "x")
+    monkeypatch.setattr(sleeve.requests, "post", lambda *a, **k: _Resp(ADVERSARIAL[name]))
+    with pytest.raises(sleeve.ProviderError):
+        sleeve.fetch_index()
+
+
+def test_calendar_is_read_by_field_name_not_position(monkeypatch):
+    """Reordered fields must still be read correctly, not misinterpreted."""
+    payload = {"code": 0, "data": {"fields": ["is_open", "cal_date"],
+                                   "items": [[1, "20200103"], [0, "20200104"]]}}
+    monkeypatch.setattr(sleeve.requests, "post", lambda *a, **k: _Resp(payload))
+    assert sleeve.latest_expected_session("token") == "20200103"
+
+
+def test_calendar_with_non_date_sessions_is_refused(monkeypatch):
+    payload = {"code": 0, "data": {"fields": ["cal_date", "is_open"],
+                                   "items": [["not-a-date", 1]]}}
+    monkeypatch.setattr(sleeve.requests, "post", lambda *a, **k: _Resp(payload))
+    with pytest.raises(sleeve.ProviderError, match="YYYYMMDD"):
+        sleeve.latest_expected_session("token")
+
+
+def test_extra_field_in_a_ledger_row_is_refused(tmp_path, monkeypatch):
+    """An unexpected field is semantic drift reconciliation would silently ignore."""
+    led = tmp_path / "l.jsonl"
+    row = _full_row()
+    row["UNKNOWN_FIELD"] = "drift"
+    led.write_text(json.dumps(row) + "\n")
+    monkeypatch.setattr(sleeve, "LEDGER", led)
+    with pytest.raises(SystemExit, match="unexpected"):
+        sleeve.existing_rows()
+
+
+def test_workflow_commits_the_state_marker():
+    """The marker is useless if it is not persisted: a fresh checkout would never see it
+    and the recovery check would silently no-op forever."""
+    wf = (ROOT / ".github" / "workflows" / "chinext-timing-sleeve.yml").read_text()
+    assert "chinext_timing_state.json" in wf
+    for artifact in ("chinext_timing_paper_ledger.jsonl",
+                     "chinext_timing_paper_inception.txt",
+                     "chinext_timing_last_capture.json"):
+        assert artifact in wf
