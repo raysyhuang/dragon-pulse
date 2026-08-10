@@ -1,0 +1,13 @@
+{
+  "captured_at": "2026-08-10T12:15:16Z",
+  "evidence_label": "RESEARCH_ONLY_NON_BINDING",
+  "execution_status": "PAPER_ONLY_NO_ORDERS",
+  "expected_session": "20260810",
+  "freshness": "CURRENT",
+  "latest_session": "2026-08-10",
+  "ledger_rows": 3734,
+  "query_end_date": "20260810",
+  "response_sha256": "c86f04569dbe6902b944503e1429bb606047c6e26085b8400fc7301e81362373",
+  "rows_appended": 0,
+  "ts_code": "399006.SZ"
+}

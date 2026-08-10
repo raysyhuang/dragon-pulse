@@ -1,0 +1,206 @@
+{
+  "analysis_sha256": "38d831a6d7e871893f203471f87d389b5f586cc8d8f2bf1c53e89533b8107d47",
+  "cash_annual": 0.018,
+  "convention": "signal from close[t] governs t+1; an entry day earns open->close, not the full close-to-close move",
+  "cost_sensitivity": [
+    {
+      "cagr": 0.11984266029617974,
+      "maxdd": -0.36984416526231556,
+      "ret": 4.687933899937659,
+      "sharpe": 0.7472943047058628,
+      "side_bps": 0
+    },
+    {
+      "cagr": 0.1154758568348273,
+      "maxdd": -0.37861430477649616,
+      "ret": 4.356665634891113,
+      "sharpe": 0.7244174516814362,
+      "side_bps": 5
+    },
+    {
+      "cagr": 0.11112390946232797,
+      "maxdd": -0.38726668751037696,
+      "ret": 4.044539149187677,
+      "sharpe": 0.7014983196502498,
+      "side_bps": 10
+    },
+    {
+      "cagr": 0.10246441051088029,
+      "maxdd": -0.40422425694645103,
+      "ret": 3.473384656682133,
+      "sharpe": 0.6555511194788002,
+      "side_bps": 20
+    },
+    {
+      "cagr": 0.07683799412399672,
+      "maxdd": -0.4524253788127661,
+      "ret": 2.117210871234533,
+      "sharpe": 0.5171623076675044,
+      "side_bps": 50
+    }
+  ],
+  "dividend_break_even": {
+    "CSI300": {
+      "assumed_yield": 0.025,
+      "cagr_break_even_yield": 0.014
+    },
+    "CSI500": {
+      "assumed_yield": 0.015,
+      "cagr_break_even_yield": 0.0
+    },
+    "ChiNext": {
+      "assumed_yield": 0.005,
+      "cagr_break_even_yield": 0.0385
+    }
+  },
+  "dividend_yield": {
+    "CSI300": 0.025,
+    "CSI500": 0.015,
+    "ChiNext": 0.005
+  },
+  "fill": "next_open",
+  "headline": {
+    "buy_hold": {
+      "cagr": 0.09072787635884216,
+      "maxdd": -0.6922227566121533,
+      "ret": 2.7953304857612506,
+      "sharpe": 0.4382598270669228
+    },
+    "exposure": 0.3212754555198285,
+    "timed": {
+      "cagr": 0.1154758568348273,
+      "maxdd": -0.37861430477649616,
+      "ret": 4.356665634891113,
+      "sharpe": 0.7244174516814362
+    },
+    "trades_per_year": 7.813504823151125
+  },
+  "inputs": {
+    "captured_at": "2026-08-10T00:00:00Z",
+    "caveat": "historical_tushare_trusted_assumption",
+    "endpoint": "index_daily",
+    "provenance_grade": "TRUSTED_HISTORICAL_ASSUMPTION",
+    "provider": "tushare",
+    "series": {
+      "CSI300": {
+        "first": "20090105",
+        "last": "20260810",
+        "rows": 4275,
+        "sha256": "436d70ea656612c1c81cd8b81884a53ff8ebd340ddb36dcc9810eea870792b25",
+        "ts_code": "000300.SH"
+      },
+      "CSI500": {
+        "first": "20090105",
+        "last": "20260810",
+        "rows": 4275,
+        "sha256": "faf2b3dd39b16d3e8779fded8090fea9a8d738ef946b26f6c77fb9cc4cae5038",
+        "ts_code": "000905.SH"
+      },
+      "ChiNext": {
+        "first": "20100531",
+        "last": "20260810",
+        "rows": 3933,
+        "sha256": "c2d6333a33cbbbf3912a015abf77e71572fad0b0008a73217d3f2be2be01acfd",
+        "ts_code": "399006.SZ"
+      }
+    }
+  },
+  "k1_window": {
+    "beats_return": 36,
+    "beats_sharpe": 44,
+    "cuts_drawdown": 44,
+    "median_d_sharpe": 0.21369897101824617,
+    "starts": 44,
+    "worst_d_sharpe": 0.04224733346351539
+  },
+  "k2_grid": {
+    "beats_sharpe": 25,
+    "best": {
+      "d_maxdd": 0.4481130077450767,
+      "d_sharpe": 0.45564506874393973,
+      "fast": 30,
+      "sharpe": 0.9166325970536982,
+      "slow": 300
+    },
+    "cells": 29,
+    "cuts_drawdown": 29,
+    "percentile_50_200": 0.7931034482758621
+  },
+  "k3_indices": {
+    "CSI300": {
+      "buy_hold": {
+        "cagr": 0.04546725012040742,
+        "maxdd": -0.4581318020591516,
+        "ret": 1.1074037596218966,
+        "sharpe": 0.31594480626200805
+      },
+      "timed": {
+        "cagr": 0.037459437928197614,
+        "maxdd": -0.25243833628199197,
+        "ret": 0.8525196640132522,
+        "sharpe": 0.3900359945404201
+      }
+    },
+    "CSI500": {
+      "buy_hold": {
+        "cagr": 0.05890569103867649,
+        "maxdd": -0.6339505013177911,
+        "ret": 1.6106165106360981,
+        "sharpe": 0.3556110824821085
+      },
+      "timed": {
+        "cagr": 0.0469247798543686,
+        "maxdd": -0.47703530133251715,
+        "ret": 1.1572059837669788,
+        "sharpe": 0.4116828254219925
+      }
+    },
+    "ChiNext": {
+      "buy_hold": {
+        "cagr": 0.09072787635884216,
+        "maxdd": -0.6922227566121533,
+        "ret": 2.7953304857612506,
+        "sharpe": 0.4382598270669228
+      },
+      "timed": {
+        "cagr": 0.1154758568348273,
+        "maxdd": -0.37861430477649616,
+        "ret": 4.356665634891113,
+        "sharpe": 0.7244174516814362
+      }
+    }
+  },
+  "pre_cache_window": {
+    "buy_hold": {
+      "cagr": 0.1130434591197258,
+      "maxdd": -0.4135683906209483,
+      "ret": 0.3429254087556839,
+      "sharpe": 0.5149214922492467
+    },
+    "note": "a window the original cached study could not see; it is out-of-cache, NOT a preregistered holdout",
+    "timed": {
+      "cagr": 0.1324916370950644,
+      "maxdd": -0.18093151603487867,
+      "ret": 0.4085200540721359,
+      "sharpe": 0.8197195970054422
+    },
+    "window": "2010-05..2014-01"
+  },
+  "side_bps": 5.0,
+  "split_post_hoc": {
+    "first": {
+      "cagr": 0.12817766985093737,
+      "maxdd": -0.319804750561282,
+      "ret": 1.4024421470931108,
+      "sharpe": 0.8019829176349296
+    },
+    "note": "POST-HOC split, not a sealed holdout",
+    "second": {
+      "cagr": 0.10414263107172461,
+      "maxdd": -0.17922868563244865,
+      "ret": 1.229840344509455,
+      "sharpe": 0.656987121801168
+    },
+    "split_at": "2018-07-03"
+  }
+}
