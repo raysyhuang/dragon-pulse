@@ -129,7 +129,7 @@ def _open_absolute_directory(path: Path, *, create: bool = False,
     return _AnchoredDirectory(fd=fd, display=absolute)
 
 
-def _open_regular(parent_fd: int, leaf: str, display: Path) -> _AnchoredFile:
+def _open_regular(parent_fd: int, leaf: str, display: Path, *, missing_ok: bool = False) -> _AnchoredFile | None:
     fd: int | None = None
     try:
         fd = os.open(leaf, _FILE_FLAGS, dir_fd=parent_fd)
@@ -140,6 +140,8 @@ def _open_regular(parent_fd: int, leaf: str, display: Path) -> _AnchoredFile:
                 os.close(fd)
             except OSError:
                 pass
+        if missing_ok and isinstance(exc, FileNotFoundError):
+            return None
         raise BaselineInventoryError(f"cannot open regular non-symlink file: {display}") from exc
     if not stat.S_ISREG(value.st_mode):
         os.close(fd)
@@ -152,7 +154,9 @@ def _open_absolute_regular(path: Path) -> _AnchoredFile:
     parent = _open_absolute_directory(absolute.parent)
     assert parent is not None
     try:
-        return _open_regular(parent.fd, absolute.name, absolute)
+        anchored = _open_regular(parent.fd, absolute.name, absolute)
+        assert anchored is not None
+        return anchored
     except Exception:
         parent.close()
         raise
@@ -165,7 +169,7 @@ def _open_relative_regular(root: _AnchoredDirectory, relative: Path) -> _Anchore
             next_fd = os.open(part, _DIRECTORY_FLAGS, dir_fd=parent_fd)
             os.close(parent_fd)
             parent_fd = next_fd
-        return _open_regular(parent_fd, relative.name, root.display / relative)
+        return _open_regular(parent_fd, relative.name, root.display / relative, missing_ok=True)
     except FileNotFoundError:
         os.close(parent_fd)
         return None
@@ -386,6 +390,25 @@ def _git_advisory(project_root: Path) -> dict[str, Any]:
     return {"commit": commit, "dirty": None if status is None else bool(status), "advisory_only": True}
 
 
+def _portable_manifest_view(document: dict[str, Any]) -> dict[str, Any]:
+    """Return the exact environment-independent representation covered by manifest_sha256."""
+    return {
+        "schema_version": document["schema_version"],
+        "manifest_identity": document["manifest_identity"],
+        "as_of": document["as_of"],
+        "generated": document["generated"],
+        "evidence_grade": document["evidence_grade"],
+        "promotion_status": document["promotion_status"],
+        "capture_provenance_caveat": document["capture_provenance_caveat"],
+        "inputs": {
+            "ledger": {"sha256": document["inputs"]["ledger"]["sha256"]},
+            "artifact_evidence": document["inputs"]["artifact_evidence"],
+        },
+        "rows": document["rows"],
+        "summary": document["summary"],
+    }
+
+
 def _write_new_atomically(output: Path, parent: _AnchoredDirectory, encoded: bytes) -> None:
     temporary_name = f".{output.name}.{secrets.token_hex(16)}.tmp"
     try:
@@ -469,6 +492,7 @@ def freeze_baseline(*, ledger_path: str | Path, artifact_roots: list[str | Path]
         artifact_evidence: list[dict[str, str]] = []
         for row in rows:
             artifact, evidence = _resolve_artifact(row, roots, source_tiers)
+            artifact.pop("artifact_root")
             account = _accounting(row)
             inventory_rows.append({"scan_date": row["scan_date"], "identity": row["scan_date"],
                                    "ledger_record_sha256": _sha256_bytes(_canonical_json(row)),
@@ -481,22 +505,38 @@ def freeze_baseline(*, ledger_path: str | Path, artifact_roots: list[str | Path]
                       for key in ("selected", "filled", "no_fill", "censored", "unknown")}
         project_root = Path(__file__).resolve().parent.parent
         artifact_evidence.sort(key=lambda item: (item["root"], item["path"]))
+        portable_artifact_evidence = [{"path": item["path"], "sha256": item["sha256"]} for item in artifact_evidence]
         document: dict[str, Any] = {
             "schema_version": SCHEMA_VERSION,
+            "manifest_identity": {
+                "algorithm": "sha256",
+                "canonicalization": "UTF-8 JSON with ensure_ascii=false, lexicographically sorted object keys, and separators ',' and ':'",
+                "hash_covered_fields": [
+                    "schema_version", "manifest_identity", "as_of", "generated", "evidence_grade", "promotion_status",
+                    "capture_provenance_caveat", "inputs.ledger.sha256", "inputs.artifact_evidence[].path",
+                    "inputs.artifact_evidence[].sha256", "rows", "summary",
+                ],
+                "excluded_advisory_fields": ["generator", "origin_advisory"],
+                "interpretation": "Self-consistent legacy inventory hash, not an independent source-authenticity proof.",
+            },
             "as_of": as_of,
             "generated": as_of,
-            "generator": {"source_path": "scripts/freeze_top1_baseline.py", "source_sha256": _sha256_file(Path(__file__)),
-                          "git": _git_advisory(project_root)},
             "evidence_grade": EVIDENCE_GRADE,
             "promotion_status": PROMOTION_STATUS,
             "capture_provenance_caveat": "Artifact capture provenance is not retroactively established; this inventory is legacy, non-PIT, non-execution, and non-promotable.",
-            "inputs": {"ledger": {"path": str(ledger.absolute()), "sha256": _sha256_bytes(ledger_bytes)},
-                       "artifact_roots": [str(root) for root in root_paths], "artifact_evidence": artifact_evidence},
+            "inputs": {"ledger": {"sha256": _sha256_bytes(ledger_bytes)},
+                       "artifact_evidence": portable_artifact_evidence},
+            "generator": {"source_path": "scripts/freeze_top1_baseline.py", "source_sha256": _sha256_file(Path(__file__)),
+                          "git": _git_advisory(project_root), "advisory_only": True},
             "rows": inventory_rows,
             "summary": {"ledger_rows": len(inventory_rows), "artifact_status_counts": dict(sorted(status_counts.items())),
                         "accounting": accounting, "regime_counts": dict(sorted(regime_counts.items()))},
+            "origin_advisory": {
+                "inputs": {"ledger_path": str(ledger.absolute()), "artifact_roots": [str(root) for root in root_paths],
+                           "artifact_evidence": artifact_evidence, "advisory_only": True},
+            },
         }
-        document["manifest_sha256"] = _sha256_bytes(_canonical_json(document))
+        document["manifest_sha256"] = _sha256_bytes(_canonical_json(_portable_manifest_view(document)))
         encoded = json.dumps(document, ensure_ascii=False, indent=2, sort_keys=True).encode("utf-8") + b"\n"
         _write_new_atomically(output, output_parent, encoded)
         return document

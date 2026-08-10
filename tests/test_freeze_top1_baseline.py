@@ -104,6 +104,58 @@ def test_missing_native_artifact_is_explicit_and_never_reconstructed(tmp_path):
     assert inventory["summary"]["artifact_status_counts"] == {"MISSING_NATIVE_ARTIFACT": 1}
 
 
+def test_deleted_native_artifact_leaf_is_explicit_missing_evidence(tmp_path):
+    ledger = tmp_path / "ledger.jsonl"
+    row = _row()
+    _write_ledger(ledger, [row])
+    root = tmp_path / "artifacts"
+    artifact = root / row["scan_date"] / f"top1_paper_watchlist_{row['scan_date']}.json"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text(json.dumps({"date": row["scan_date"], "sleeve": "top1_paper", "paper_only": True,
+                                    "status": "PAPER_TRACK_ONLY", "regime": row["regime"], "top1": row["top1"], "top2": row["top2"]}), encoding="utf-8")
+    artifact.unlink()
+
+    inventory = _freeze(tmp_path, ledger, [root], _output(tmp_path))
+
+    assert inventory["rows"][0]["status"] == "MISSING_NATIVE_ARTIFACT"
+    assert inventory["summary"]["artifact_status_counts"] == {"MISSING_NATIVE_ARTIFACT": 1}
+
+
+def test_manifest_sha256_is_portable_and_detects_portable_tampering(tmp_path, monkeypatch):
+    module = _load_module()
+    row = _row()
+    ledgers: list[Path] = []
+    roots: list[Path] = []
+    for name in ("machine-a", "machine-b"):
+        machine = tmp_path / name
+        machine.mkdir()
+        ledger = machine / "ledger.jsonl"
+        _write_ledger(ledger, [row])
+        root = machine / "artifacts"
+        artifact = root / row["scan_date"] / f"top1_paper_watchlist_{row['scan_date']}.json"
+        artifact.parent.mkdir(parents=True)
+        artifact.write_text(json.dumps({"date": row["scan_date"], "sleeve": "top1_paper", "paper_only": True,
+                                        "status": "PAPER_TRACK_ONLY", "regime": row["regime"], "top1": row["top1"], "top2": row["top2"],
+                                        "version": 1}), encoding="utf-8")
+        ledgers.append(ledger)
+        roots.append(root)
+    monkeypatch.setattr(module, "_git_advisory", lambda _: {"commit": "different", "dirty": False, "advisory_only": True})
+    first = _freeze(tmp_path, ledgers[0], [roots[0]], _output(tmp_path / "one"))
+    monkeypatch.setattr(module, "_git_advisory", lambda _: {"commit": "other", "dirty": True, "advisory_only": True})
+    second = _freeze(tmp_path, ledgers[1], [roots[1]], _output(tmp_path / "two"))
+
+    assert first["manifest_sha256"] == second["manifest_sha256"]
+    assert first["generator"] != second["generator"]
+    assert first["generator"]["git"]["advisory_only"] is True
+    assert "generator" in first["manifest_identity"]["excluded_advisory_fields"]
+    assert hashlib.sha256(module._canonical_json(module._portable_manifest_view(first))).hexdigest() == first["manifest_sha256"]
+    tampered = json.loads(json.dumps(first))
+    tampered["generator"]["git"]["commit"] = "TAMPERED"
+    assert hashlib.sha256(module._canonical_json(module._portable_manifest_view(tampered))).hexdigest() == first["manifest_sha256"]
+    tampered["rows"][0]["status"] = "TAMPERED"
+    assert hashlib.sha256(module._canonical_json(module._portable_manifest_view(tampered))).hexdigest() != first["manifest_sha256"]
+
+
 def test_artifact_hash_change_changes_inventory(tmp_path):
     ledger = tmp_path / "ledger.jsonl"
     _write_ledger(ledger, [_row()])
