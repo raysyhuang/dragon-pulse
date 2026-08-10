@@ -128,14 +128,19 @@ def test_rows_before_inception_are_backfill_not_forward_paper():
 
 
 def test_inception_boundary_splits_backfill_from_forward():
+    """The inception session is the last OBSERVED backfill row, so it is itself backfill.
+    Only sessions appended AFTER it were tracked forward rather than reconstructed."""
     df = synthetic()
     rows_all = sleeve.build_rows(df)
     cut = rows_all[len(rows_all) // 2]["trade_date"]
     rows = sleeve.build_rows(df, inception=cut)
+    at_cut = [r for r in rows if r["trade_date"] == cut]
     before = [r for r in rows if r["trade_date"] < cut]
-    after = [r for r in rows if r["trade_date"] >= cut]
-    assert before and after
+    after = [r for r in rows if r["trade_date"] > cut]
+    assert before and after and at_cut
     assert {r["record_origin"] for r in before} == {"BACKFILLED_FROM_HISTORY"}
+    assert at_cut[0]["record_origin"] == "BACKFILLED_FROM_HISTORY", (
+        "the inception session was reconstructed, not tracked forward")
     assert {r["record_origin"] for r in after} == {"FORWARD_PAPER"}
 
 
