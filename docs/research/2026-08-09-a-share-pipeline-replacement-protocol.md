@@ -12,7 +12,7 @@ The purpose is not to maximize an attractive backtest. A candidate must demonstr
 
 The repository's 2026-07-26 alpha-hunt report found no liquid-A-share stock-selection factor that survived its full-history, cost-aware checks. The reported survivor was ChiNext 50/200 index trend timing, a modest market-timing rule rather than stock selection. Treat that as the incumbent **reliability benchmark**, not proof it will continue to work.
 
-The existing daily top-1 paper ledger is insufficient to promote the current selector: its current committed summary contains 35 evaluated scans and its last evaluated scan is 2026-07-02. It is a stale, small forward sample.
+The existing daily top-1 paper ledger is insufficient to promote the current selector: its current committed summary contains 35 evaluated scans and its last evaluated scan is 2026-07-02. It is a stale, small forward sample. Task 5 freezes its legacy inventory at `outputs/top1_paper/baseline_inventory_2026-08-09.json` (portable SHA-256 `4200f732444a2efae5fde11bc04bcfc61cd9c86bd3cf4820e23ce6a4825c4e02`): 35 ledger rows / 35 resolved artifacts, 24 tracker-labelled filled and 11 tracker-labelled no-fill. These are saved tracker labels, not verified execution.
 
 ## Frozen research arms
 
@@ -51,7 +51,7 @@ Tasks 1–2 establish **self-consistency and source membership only**. Task 1's 
 
 Task 2 accepts no provider calls and requires a supplied `daily_basic_YYYYMMDD.csv` for every requested date, preserves each source under `sources/`, rejects fabricated/malformed listing information and invalid caps, applies `list_date <= as_of < delist_date` (where a delisting date exists), and deterministically ranks eligible names by circulating market value (`circ_mv`) then ticker.
 
-Task 2.5 is the required **capture-provenance gate** before Task 3. Every supplied CSV needs a hash-bound receipt. `OBSERVED_CAPTURE` means the receipt also binds a safe, hash-valid raw provider response copied under `raw/`. Existing historical Tushare snapshots may instead be admitted solely as `TRUSTED_HISTORICAL_ASSUMPTION`, with literal caveat `historical_tushare_trusted_assumption`: trusted history is not independently capture-proven. This is a permanent evidence limitation, never `PIT_CAPTURE_VERIFIED`. Receipts are copied under `attestations/`, all ancillary payloads are manifest-hashed, and a mixed observed/trusted bundle remains `TRUSTED_HISTORICAL_ASSUMPTION`.
+Task 2.5 is the required **capture-provenance gate** before Task 3. Every supplied CSV needs a hash-bound receipt. Where `OBSERVED_CAPTURE` is admitted, its receipt must bind a safe, hash-valid raw provider response copied under `raw/`; this is a conditional contract, not an assertion that a historical raw response exists today. Existing historical Tushare snapshots may instead be admitted solely as `TRUSTED_HISTORICAL_ASSUMPTION`, with literal caveat `historical_tushare_trusted_assumption`: trusted history is not independently capture-proven. This is a permanent evidence limitation, never `PIT_CAPTURE_VERIFIED`. Receipts are copied under `attestations/`, all ancillary payloads are manifest-hashed, and a mixed observed/trusted bundle remains `TRUSTED_HISTORICAL_ASSUMPTION`.
 
 ## Tushare source audit — 2026-08-07 close
 
@@ -111,11 +111,24 @@ A new stock-selection arm is **REJECTED** unless all are true:
 
 Passing historical gates permits only a labelled **parallel paper** sleeve. It never silently replaces the daily selector.
 
-## Next deliverables
+## Delivery status and remaining prerequisites
+
+**Completed infrastructure tasks:**
+
+- **Tasks 1–2.5:** self-consistent, hash-bound supplied bundles/schedules, deterministic membership construction, and receipt-bound capture provenance. These do not prove a vendor snapshot is authentic or complete; `OBSERVED_CAPTURE` is operator asserted, and existing historical receipts are never `PIT_CAPTURE_VERIFIED`.
+- **Tasks 3–4:** membership-checked, provenance-labelled replay accounting with explicit fills/no-fills/censoring and honest denominators; this is not live execution P&L or alpha evidence.
+- **Task 5:** portable, hash-bound B1 inventory (`outputs/top1_paper/baseline_inventory_2026-08-09.json`, SHA-256 `4200f732444a2efae5fde11bc04bcfc61cd9c86bd3cf4820e23ce6a4825c4e02`). It remains legacy, non-PIT, non-execution and non-promotable.
+- **Task 6:** infrastructure-gate documentation is recorded in `docs/research/2026-08-10-infrastructure-verification.md`. Its independent Hawk/Opus review passed after the documentation draft: `claude -p … --model claude-opus-5` returned **APPROVE** after checking citation/provenance, the capture limitation, B1's regime limitation, and the absence of production/trading scope. That approval clears only the review prerequisite; it does not authorize challenger-outcome interpretation.
+
+The Task 5 inventory's mechanical regime composition is 33/35 bull (94.2857%), 2/35 choppy and no bear. This does not invalidate or reclassify the inventory, but B1 can support only bull-heavy comparator descriptive claims—not cross-regime alpha, replacement or promotion.
+
+**Exact remaining prerequisites:**
 
 1. Source-grounded strategy and valuation-opinion register with dates/URLs and evidence tier.
 2. PIT-grade universe/data-bundle design, including delisted/suspended issuer treatment; do not repurpose the current non-PIT freezer.
 3. Repair/specify the replay harness: next-session executable fills, limits/suspensions/delists/no-fill and finite capital.
 4. Tushare financial-join coverage report by sector/board, common-period rule, `ann_date`/revision provenance and request-rate budget.
-5. Freeze/backfill the incumbent's saved artifacts through a named date before comparing any challenger.
-6. Run C3 availability feasibility probe; C2 specification follows only after steps 2–4. Then require a second independent Hawk review before results are interpreted.
+5. Freeze/backfill the incumbent only through a named date, retaining its legacy/non-execution and regime limitations, **before comparing any challenger**.
+6. Run the C3 availability feasibility probe. Only after steps 2–4 are complete, seal C2's valid input fit, parameters, full sample, calendar holdout, and thresholds before opening outcomes.
+
+Hawk approval is complete. C1/C2 or later challenger results remain **blocked from interpretation** until the applicable remaining prerequisites—especially valid input fit plus sealed preregistered parameters, full sample, calendar holdout, and thresholds—are complete under the binding decision gates.
