@@ -7,7 +7,7 @@ change was required:
   1. PIT EVIDENCE. The universe is now READ FROM a validated Task 1/2/2.5 bundle and the
      bundle is passed to the replay runner, so canonical output is
      PIT_UNIVERSE_MEMBERSHIP_ONLY rather than PIT_GRADE_FALSE. The first version
-     constructed a survivorship-free universe but produced no evidence of it.
+     constructed a survivorship-controlled universe but produced no evidence of it.
   2. FROZEN SAMPLE. The window is fixed by FROZEN_END, never by date.today(), so reruns
      cannot silently change the sample.
   3. PERSISTED STATISTICS. Beta, alpha, t(alpha), up/down attribution, half-sample split
@@ -167,7 +167,7 @@ def main() -> int:
         raise SystemExit("usage: pit_selection_test.py <work_dir>  "
                          "(expects <work_dir>/pit_bundle_66 and <work_dir>/seltest_cache)")
     bundle_dir, cache = scratch / "pit_bundle_66", scratch / "seltest_cache"
-    out_root = scratch / "pit_selection_v2"
+    out_root = scratch / "pit_selection_v3"
 
     bundle = validate_pit_bundle(bundle_dir)
     manifest = json.loads((bundle_dir / "manifest.json").read_text())
@@ -311,7 +311,20 @@ def main() -> int:
         row["excess"] = (a - b) if (a is not None and b is not None) else None
         sensitivity.append(row)
 
-    doc = {"schema_version": 2, "frozen_end": FROZEN_END, "top_k": TOP_K,
+    def sha(fp):
+        return hashlib.sha256(pathlib.Path(fp).read_bytes()).hexdigest()
+    input_binding = {
+        "study_script": {"path": "scripts/pit_selection_test.py", "sha256": sha(__file__)},
+        "panels": {f"{d}": sha(cache / f"daily_{d}.parquet")
+                   for d in sorted({p[k] for p in plan for k in ("signal", "entry", "exit")})
+                   if (cache / f"daily_{d}.parquet").exists()},
+        "daily_basic": {d: sha(cache / f"basic_{d}.parquet") for d in sig_dates
+                        if (cache / f"basic_{d}.parquet").exists()},
+        "note": ("panel bytes are HASH-BOUND here but NOT committed; an auditor holding "
+                 "the panels can verify they are the ones used, but cannot re-derive "
+                 "selection from this repository alone"),
+    }
+    doc = {"schema_version": 3, "input_binding": input_binding, "frozen_end": FROZEN_END, "top_k": TOP_K,
            "cost_bps": COST_BPS, "bundle_id": bundle.bundle_id,
            "bundle_composite_sha256": bundle.composite_sha256,
            "capture_provenance_grade": manifest["capture_provenance_grade"],
@@ -326,6 +339,13 @@ def main() -> int:
                               "holdout"),
                "multiple_testing": "none applied across seven sleeves",
                "neutralisation": "none: no sector, industry or size neutralisation",
+               "replayability": ("ACCOUNTABLE OUTCOMES, NON-REPLAYABLE SELECTION INPUTS. "
+                                 "Canonical rows carry every executed entry and exit price, "
+                                 "so all accounting is auditable from this repository. "
+                                 "Selection construction is not reproducible here because "
+                                 "the raw provider panels are hash-bound but not committed. "
+                                 "The runner's CALLER_ASSERTED_UNVERIFIED label is therefore "
+                                 "correct and remains limiting."),
                "conclusion": ("exploratory evidence about these seven sorts over this "
                               "window; does NOT close A-share factor selection")}}
     # blocker 2: strict JSON, no bare NaN anywhere
