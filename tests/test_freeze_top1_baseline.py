@@ -156,6 +156,45 @@ def test_manifest_sha256_is_portable_and_detects_portable_tampering(tmp_path, mo
     assert hashlib.sha256(module._canonical_json(module._portable_manifest_view(tampered))).hexdigest() != first["manifest_sha256"]
 
 
+def test_portable_manifest_hash_covers_declared_semantic_fields(tmp_path):
+    module = _load_module()
+    row = _row()
+    ledger = tmp_path / "ledger.jsonl"
+    _write_ledger(ledger, [row])
+    root = tmp_path / "artifacts"
+    artifact = root / row["scan_date"] / f"top1_paper_watchlist_{row['scan_date']}.json"
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text(json.dumps({"date": row["scan_date"], "sleeve": "top1_paper", "paper_only": True,
+                                    "status": "PAPER_TRACK_ONLY", "regime": row["regime"], "top1": row["top1"],
+                                    "top2": row["top2"]}), encoding="utf-8")
+    document = _freeze(tmp_path, ledger, [root], _output(tmp_path))
+    baseline = hashlib.sha256(module._canonical_json(module._portable_manifest_view(document))).hexdigest()
+    assert baseline == document["manifest_sha256"]
+
+    assert {
+        "summary", "evidence_grade", "promotion_status", "capture_provenance_caveat",
+        "inputs.artifact_evidence[].path", "inputs.artifact_evidence[].sha256", "rows",
+    } <= set(document["manifest_identity"]["hash_covered_fields"])
+
+    mutations = {
+        "summary": lambda value: {**value, "ledger_rows": value["ledger_rows"] + 1},
+        "evidence_grade": lambda value: f"{value}_ALTERED",
+        "promotion_status": lambda value: f"{value}_ALTERED",
+        "capture_provenance_caveat": lambda value: f"{value} altered",
+        "inputs.artifact_evidence[].path": lambda value: f"altered/{value}",
+        "inputs.artifact_evidence[].sha256": lambda value: "0" * len(value),
+        "rows": lambda value: [{**value[0], "status": "CONTRACT_PROBE"}, *value[1:]],
+    }
+    for field, alter in mutations.items():
+        tampered = json.loads(json.dumps(document))
+        if field.startswith("inputs.artifact_evidence"):
+            key = field.rsplit(".", 1)[1]
+            tampered["inputs"]["artifact_evidence"][0][key] = alter(tampered["inputs"]["artifact_evidence"][0][key])
+        else:
+            tampered[field] = alter(tampered[field])
+        assert hashlib.sha256(module._canonical_json(module._portable_manifest_view(tampered))).hexdigest() != baseline, field
+
+
 def test_artifact_hash_change_changes_inventory(tmp_path):
     ledger = tmp_path / "ledger.jsonl"
     _write_ledger(ledger, [_row()])
