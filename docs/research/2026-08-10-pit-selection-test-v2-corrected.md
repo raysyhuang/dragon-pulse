@@ -22,7 +22,7 @@ The bundle: `pit-universe-2021-01-29-to-2026-06-30-n1000`, composite
 66,000 schedule rows, **604 carrying a real delisting date**, capture grade
 `TRUSTED_HISTORICAL_ASSUMPTION`.
 
-## Results — 65 rebalances, PIT-bound, frozen
+## Results — artifact-bound, PIT-bound, frozen
 
 <!-- BEGIN GENERATED: results -->
 | Sleeve | mo | filled | cens | CAGR | beta | annual alpha | t | p | H1 (post-hoc) | H2 (post-hoc) |
@@ -41,45 +41,35 @@ The bundle: `pit-universe-2021-01-29-to-2026-06-30-n1000`, composite
 **No factor is statistically significant.** The largest intercept t-statistic in the study is **0.68375** (`turnover_low`, p = 0.49664, df = 63); the smallest two-sided p-value across all sleeves is **0.44446**. The half-sample columns are a POST-HOC split of a single sample and are not an out-of-sample holdout.
 <!-- END GENERATED: verdict -->
 
-Under the corrected method the apparent effect is *weaker* than in v1, consistent with v1
-carrying mild optimistic bias.
-
-`turnover_low` remains the only non-negative sleeve and remains a low-beta portfolio
-(0.52) that earns −2.75% in up months and +2.74% in down months. Its half-split is now
-**positive then negative** (+6.12% → −5.16%).
+<!-- BEGIN GENERATED: turnover_attribution -->
+`turnover_low` remains the only non-negative sleeve and remains a low-beta portfolio (0.52) that earns -2.75% in up months and +2.74% in down months. Its post-hoc half-split is **positive then negative** (+6.12% → -5.16%).
+<!-- END GENERATED: turnover_attribution -->
 
 ## Execution sensitivity — and a correction
 
 The frictionless case was defended in v1 as "conservative for a null," on the reasoning
-that constraints only reduce factor returns. **That reasoning was wrong and the data
-refutes it.**
+that constraints only reduce factor returns. **That reasoning was wrong and the persisted
+evidence below refutes it.**
 
-| Config | turnover_low | control | excess | fills |
-|---|---|---|---|---|
-| no cap, 50 slots | +0.24% | −5.87% | +6.11% | 3245 |
-| 1.02× cap, 20 slots | +0.18% | +0.49% | −0.30% | 598 |
-| 1.00× cap, 10 slots | +3.46% | −5.61% | +9.07% | 298 |
+<!-- BEGIN GENERATED: sensitivity -->
+| Config | slots | turnover_low fills | control fills | cap-censored | turnover_low | control | excess |
+|---|---|---|---|---|---|---|---|
+| no_cap_50_slots | 50 | 3245 | 3246 | 0 | +0.24% | -5.87% | +6.11% |
+| cap_1.02x_20_slots | 20 | 598 | 629 | 1950 | +0.18% | +0.49% | -0.30% |
+| cap_1.00x_10_slots | 10 | 298 | 165 | 2600 | +3.46% | -5.61% | +9.07% |
 
-Constraints do not move the estimate monotonically. They collapse the filled sample by
-80–90% and the excess **flips sign** across configurations. Under realistic execution the
-effect is not identified at all. This supports the null more strongly than the incorrect
-monotonicity argument did, but it does so by showing the quantity is unmeasurable here,
-not by showing it is negative.
+Constraints do not move the estimate monotonically. Relative to the no-cap turnover_low fill count (3245), constrained configurations fill 598, 298 positions; excess flips sign across the persisted configurations. Under these execution constraints the effect is not identified here; this is exploratory evidence, not a promotion basis.
+<!-- END GENERATED: sensitivity -->
 
 ## What this does and does not support
 
-**Supports:** across these seven sorts, on a bundle-validated survivorship-controlled universe
-over 65 monthly rebalances, no factor produced significant alpha; every sleeve that beat
-the control carried beta between 0.44 and 0.63 while every sleeve near beta 1.0 lost; and
-the one non-negative sleeve is a defensive tilt whose advantage reverses in the POST-HOC
-second half and is unidentified under execution constraints.
+<!-- BEGIN GENERATED: evidence_summary -->
+**Supports:** across these 7 sorts, on a bundle-validated survivorship-controlled universe over 65 monthly rebalances, no factor produced significant alpha. The non-negative sleeve(s) are turnover_low; sleeves beating the control in more than half their observed months have beta between 0.44 and 0.63. `turnover_low` reverses in the POST-HOC second half and is unidentified under the execution constraints above.
+<!-- END GENERATED: evidence_summary -->
 
-**Does not support**, and the v1 claim to the contrary is withdrawn: this does **not**
-close "standard A-share factor selection." Seven hand-chosen sorts at a single
-parameterisation — monthly, top-50, no sector or industry neutralisation, no sealed
-holdout, no multiple-testing adjustment, one 5.4-year window that was predominantly
-bearish — cannot settle that question. It is a strong exploratory result consistent with a
-large body of prior evidence in this repository, and it should be described that way.
+<!-- BEGIN GENERATED: scope -->
+**Does not support**, and the v1 claim to the contrary is withdrawn: this does **not** close "standard A-share factor selection." Exploratory evidence about these seven sorts over this window; does not close a-share factor selection. 7 hand-chosen sorts at a single parameterisation over a 5.4-year window cannot settle that question. Limitations remain: none: no sector, industry or size neutralisation; POST-HOC split of one sample; NOT a sealed out-of-sample holdout; multiple testing: none applied across seven sleeves. It remains research / paper-only and must not alter a selector, cron, execution rule, or order authority.
+<!-- END GENERATED: scope -->
 
 It also does not test `alpha_rs_pullback`, and it says nothing about the timing sleeve,
 which stands or falls on its own evidence.
@@ -117,9 +107,9 @@ A second audit rejected `dfe240a`. All six findings were valid and are addressed
 | Reported t is not an OLS intercept t-statistic | **Fixed.** Proper OLS with `s² = SSR/(n−2)` and `SE(α) = s·√(1/n + x̄²/Sxx)`; specification, SE, df and two-sided p are persisted. The prior figure omitted both the df correction and the leverage term. |
 | Documentation overclaims | **Fixed.** "survivorship-free" → "survivorship-controlled"; the half-split is labelled post-hoc, explicitly not out-of-sample; the stale "frictionless is conservative" header is replaced with the correction; the v1 banner no longer claims the note is "unaltered" while carrying a prepended banner. |
 
-**Corrected statistics** (OLS, df = 63) — table above is generated from `analysis.json`, not hand-written, so it cannot drift from the artifact again.
-
-No p-value in the study is below 0.44.
+<!-- BEGIN GENERATED: addendum_statistics -->
+**Corrected statistics** (OLS; the largest available regression df is 63) are generated from `analysis.json`, not hand-written. No two-sided p-value in the study is below 0.44; the smallest is 0.44446. **Status is unchanged by these fixes:** exploratory; this does not close the selection question.
+<!-- END GENERATED: addendum_statistics -->
 
 **Known remaining limitation, stated rather than omitted:** the raw cached provider panels
 (~38 MB of daily OHLCV and `daily_basic` parquet) are **not** committed. The bundle and
@@ -128,8 +118,7 @@ outcome auditable, so all accounting can be checked without them. Re-deriving th
 *selection* step from raw vendor data requires re-fetching. That is a deliberate
 size/traceability trade-off and it is an auditor's call whether it is acceptable.
 
-**Status is unchanged by these fixes:** exploratory. No factor is significant, the best
-p-value is 0.50, and this does not close the selection question.
+The generated block above states the statistics and exploratory status derived from the artifact.
 
 ---
 
@@ -149,10 +138,4 @@ A third audit returned MODIFY on three blockers. All were confirmed independentl
 
 ### Execution sensitivity (generated)
 
-<!-- BEGIN GENERATED: sensitivity -->
-| Config | slots | turnover_low fills | control fills | cap-censored | turnover_low | control | excess |
-|---|---|---|---|---|---|---|---|
-| no_cap_50_slots | 50 | 3245 | 3246 | 0 | +0.24% | -5.87% | +6.11% |
-| cap_1.02x_20_slots | 20 | 598 | 629 | 1950 | +0.18% | +0.49% | -0.30% |
-| cap_1.00x_10_slots | 10 | 298 | 165 | 2600 | +3.46% | -5.61% | +9.07% |
-<!-- END GENERATED: sensitivity -->
+The generated execution-sensitivity block above is the sole artifact-owned statement of its rows and numerical interpretation.

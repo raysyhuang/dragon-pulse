@@ -60,6 +60,15 @@ def blocks(doc: dict) -> dict[str, str]:
                f"are a POST-HOC split of a single sample and are not an out-of-sample "
                f"holdout.")
 
+    turnover = a["turnover_low"]
+    tr = turnover["regression"]
+    attribution = (
+        f"`turnover_low` remains the only non-negative sleeve and remains a low-beta "
+        f"portfolio ({num(tr['beta'])}) that earns {pct(turnover['mean_excess_up_months'])} "
+        f"in up months and {pct(turnover['mean_excess_down_months'])} in down months. "
+        f"Its post-hoc half-split is **positive then negative** "
+        f"({pct(turnover['cagr_first_half'])} → {pct(turnover['cagr_second_half'])}).")
+
     sens = ["| Config | slots | turnover_low fills | control fills | cap-censored | turnover_low | control | excess |",
             "|---|---|---|---|---|---|---|---|"]
     for s in doc["execution_sensitivity"]:
@@ -67,6 +76,46 @@ def blocks(doc: dict) -> dict[str, str]:
         sens.append(f"| {s['config']} | {s['slots']} | {tl['filled']} | {cs['filled']} | "
                     f"{tl['capacity_censored']} | {pct(tl['cagr'])} | {pct(cs['cagr'])} | "
                     f"{pct(s['excess'])} |")
+
+    no_cap = next(s for s in doc["execution_sensitivity"] if s["cap_multiple"] is None)
+    constrained = [s for s in doc["execution_sensitivity"] if s["cap_multiple"] is not None]
+    signs = {s["excess"] > 0 for s in doc["execution_sensitivity"] if s["excess"] is not None}
+    sensitivity_verdict = (
+        f"Constraints do not move the estimate monotonically. Relative to the no-cap "
+        f"turnover_low fill count ({no_cap['turnover_low']['filled']}), constrained "
+        f"configurations fill {', '.join(str(s['turnover_low']['filled']) for s in constrained)} "
+        f"positions; excess {'flips sign' if len(signs) > 1 else 'does not flip sign'} "
+        f"across the persisted configurations. Under these execution constraints the "
+        f"effect is not identified here; this is exploratory evidence, not a promotion basis.")
+
+    non_control = {k: v for k, v in a.items() if k != "control_spread"}
+    non_negative = [k for k, v in non_control.items() if v["cagr"] is not None and v["cagr"] >= 0]
+    beat_control = [v for v in non_control.values() if v["months_beating_control"] > v["months"] / 2]
+    beta_values = [v["regression"]["beta"] for v in beat_control if v["regression"]["beta"] is not None]
+    evidence_summary = (
+        f"**Supports:** across these {len(non_control)} sorts, on a bundle-validated "
+        f"survivorship-controlled universe over {doc['rebalances']} monthly rebalances, "
+        f"no factor produced significant alpha. The non-negative sleeve(s) are "
+        f"{', '.join(non_negative) or 'none'}; sleeves beating the control in more than "
+        f"half their observed months have beta between {min(beta_values):.2f} and "
+        f"{max(beta_values):.2f}. `turnover_low` reverses in the POST-HOC second half "
+        f"and is unidentified under the execution constraints above.")
+    scope = doc["scope"]
+    scope_statement = (
+        f"**Does not support**, and the v1 claim to the contrary is withdrawn: this does "
+        f"**not** close \"standard A-share factor selection.\" {scope['conclusion'].capitalize()}. "
+        f"{len(non_control)} hand-chosen sorts at a single parameterisation over a "
+        f"{a['control_spread']['months'] / 12:.1f}-year window cannot settle that "
+        f"question. Limitations remain: {scope['neutralisation']}; {scope['half_split']}; "
+        f"multiple testing: {scope['multiple_testing']}. It remains research / paper-only "
+        f"and must not alter a selector, cron, execution rule, or order authority.")
+    addendum_statistics = (
+        f"**Corrected statistics** (OLS; the largest available regression df is "
+        f"{max(v['regression']['df'] for v in a.values() if v['regression']['df'] is not None)}) "
+        f"are generated from `analysis.json`, not hand-written. No two-sided p-value in "
+        f"the study is below {min(ps):.2f}; the smallest is {min(ps):.5f}. "
+        f"**Status is unchanged by these fixes:** exploratory; this does not close the "
+        f"selection question.")
 
     ib = doc["input_binding"]
     prov = [
@@ -83,7 +132,12 @@ def blocks(doc: dict) -> dict[str, str]:
         f"{doc['scope']['replayability'].split('.')[0]}.",
     ]
     return {"results": "\n".join(rows), "verdict": verdict,
-            "sensitivity": "\n".join(sens), "provenance": "\n".join(prov)}
+            "turnover_attribution": attribution,
+            "sensitivity": "\n".join(sens) + "\n\n" + sensitivity_verdict,
+            "evidence_summary": evidence_summary,
+            "scope": scope_statement,
+            "addendum_statistics": addendum_statistics,
+            "provenance": "\n".join(prov)}
 
 
 def apply(text: str, name: str, body: str) -> str:

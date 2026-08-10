@@ -30,9 +30,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import pathlib
 import statistics as st
 import sys
+import tempfile
 
 import pandas as pd
 
@@ -43,6 +45,37 @@ from src.core.xsec_runner import run_xsec_replay             # noqa: E402
 
 class AnalysisDurabilityUncertainError(OSError):
     """The analysis artifact was linked but its directory entry was not synced."""
+
+    def __init__(self, artifact: pathlib.Path) -> None:
+        self.artifact = artifact
+        super().__init__(f"analysis artifact {artifact}: artifact may exist but durability "
+                         "is uncertain; inspect/reconcile manually")
+
+
+def publish_analysis(output: pathlib.Path, body: bytes) -> pathlib.Path:
+    """Exclusively publish durable analysis bytes without deleting a linked artifact."""
+    output.mkdir(parents=True, exist_ok=True)
+    artifact = output / "analysis.json"
+    temporary: pathlib.Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("wb", dir=output, prefix=".analysis.", delete=False) as fh:
+            temporary = pathlib.Path(fh.name)
+            fh.write(body)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.link(temporary, artifact)
+        directory_fd = os.open(output, os.O_RDONLY)
+        try:
+            try:
+                os.fsync(directory_fd)
+            except OSError as exc:
+                raise AnalysisDurabilityUncertainError(artifact) from exc
+        finally:
+            os.close(directory_fd)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+    return artifact
 
 
 FROZEN_END = "20260630"      # explicit; never date.today()
@@ -378,33 +411,7 @@ def main() -> int:
     body = json.dumps(doc, indent=2, sort_keys=True, allow_nan=False).encode()
 
     # blocker 3: atomic, no-replace publication via os.link (not check-then-write)
-    import os, tempfile
-    out_root.mkdir(parents=True, exist_ok=True)
-    ap = out_root / "analysis.json"
-    tmp = None
-    try:
-        with tempfile.NamedTemporaryFile("wb", dir=out_root, prefix=".analysis.",
-                                         delete=False) as fh:
-            tmp = pathlib.Path(fh.name)
-            fh.write(body)
-            fh.flush()
-            os.fsync(fh.fileno())
-        os.link(tmp, ap)              # no-replace; fails if ap exists, no TOCTOU window
-        directory_fd = os.open(out_root, os.O_RDONLY)
-        try:
-            try:
-                os.fsync(directory_fd)
-            except OSError as exc:
-                # Same contract as the runner: the artifact IS linked and is deliberately
-                # NOT removed. Surfacing uncertainty beats pretending it does not exist.
-                raise AnalysisDurabilityUncertainError(
-                    f"analysis artifact linked but directory sync failed; inspect and "
-                    f"reconcile: {ap}") from exc
-        finally:
-            os.close(directory_fd)
-    finally:
-        if tmp is not None:
-            tmp.unlink(missing_ok=True)
+    publish_analysis(out_root, body)
 
     print("\n" + "=" * 116)
     print(f"RESULTS — PIT-bound, frozen to {FROZEN_END}, top {TOP_K}, {COST_BPS:.0f}bps")
