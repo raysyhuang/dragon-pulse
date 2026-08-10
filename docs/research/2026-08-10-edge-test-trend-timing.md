@@ -90,3 +90,55 @@ Paper-track ChiNext 50/200 as a labelled parallel sleeve. It is the only candida
 Hold 50/200 rather than the grid-best 50/250, and report the plateau rather than the peak.
 
 This does not authorise a production selector change, and it is not evidence that Dragon Pulse's stock selection works.
+
+---
+
+## Addendum — full history and a genuine out-of-sample window
+
+The original test was capped by the cached CSVs, which begin 2014-01-02. Fetching the
+index directly returns history from **2010-05-31**, so roughly three and a half further
+years were available and untested. Re-running on the full series:
+
+**Full history 2010-05 → 2026-08** (0.5% dividends, 1.8% cash, 5 bps/side):
+
+| Arm | CAGR | Sharpe | maxDD |
+|---|---|---|---|
+| ChiNext 50/200 timed | **+11.64%** | **0.73** | **−37.3%** |
+| Buy & hold | +9.13% | 0.44 | −69.2% |
+
+**K1 extended to 44 start quarters (2012Q1–2022Q4):**
+
+- cuts drawdown in **44/44**
+- beats buy & hold on Sharpe in **44/44** — median +0.21, **worst case +0.02**
+- beats on CAGR in 35/44 (median +1.42%, worst −4.44%)
+
+The Sharpe result strengthened: at 36 start quarters it was 33/36 with a worst case of
+−0.03; with the extra history it is 44/44 and never negative.
+
+**Pre-cache out-of-sample (2011–2014), a window the original study never saw:**
+
+| Arm | CAGR | Sharpe | maxDD |
+|---|---|---|---|
+| Timed | **+13.60%** | **0.84** | **−17.8%** |
+| Buy & hold | +11.30% | 0.51 | −41.4% |
+
+Positive on all three measures in a period that played no part in selecting the rule.
+This is the closest thing to a true holdout available here, and it confirms rather than
+attenuates the effect.
+
+Nothing above changes the character of the finding: it remains a drawdown and Sharpe
+overlay on one index, not stock selection, and the rally cost is unchanged.
+
+## Paper sleeve
+
+`scripts/chinext_timing_paper_sleeve.py` records the rule daily, append-only and
+idempotent, into `outputs/paper_lab/chinext_timing_paper_ledger.jsonl`. It places no
+orders, sends no alerts, and changes no selector or cron.
+
+Rows before the inception stamp are labelled `BACKFILLED_FROM_HISTORY`; rows from
+inception onward are `FORWARD_PAPER`. This repository's evidence hierarchy puts live
+above replay above reconstruction, so the backfill must never read as forward evidence.
+
+Inception 2026-08-07, 3,733 backfilled sessions. **State at inception: CASH** — close
+3563.12 against SMA50 3847.54, so the rule is out of the market, consistent with the
+production regime gate's BEAR call the same morning.
