@@ -78,7 +78,7 @@ def fetch_index() -> pd.DataFrame:
     for start, end in (("20100101", "20180101"), ("20180101", "20260101"), ("20260101", today)):
         body = {"api_name": "index_daily", "token": token,
                 "params": {"ts_code": TS_CODE, "start_date": start, "end_date": end},
-                "fields": "trade_date,close"}
+                "fields": "trade_date,open,close"}
         raw = requests.post("https://api.tushare.pro", timeout=60, json=body).content
         digests.append(hashlib.sha256(raw).hexdigest())
         resp = json.loads(raw)
@@ -92,27 +92,39 @@ def fetch_index() -> pd.DataFrame:
     df = pd.concat(frames, ignore_index=True)
     df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d")
     df["close"] = df["close"].astype(float)
-    return df.sort_values("trade_date").drop_duplicates("trade_date").reset_index(drop=True)
+    df["open"] = df["open"].astype(float)
+    df = df.sort_values("trade_date").drop_duplicates("trade_date").reset_index(drop=True)
+    # Never admit a bar for a session that has not closed. A manual pre-close dispatch
+    # would otherwise append an incomplete intraday bar as if it were final.
+    now = datetime.now(ZoneInfo("Asia/Shanghai"))
+    if now.hour < 15:
+        df = df[df["trade_date"] < pd.Timestamp(now.date())].reset_index(drop=True)
+    return df
 
 
 def build_rows(df: pd.DataFrame, inception: str | None = None) -> list[dict]:
     """One row per session, with the position that the PRIOR session's signal dictates.
 
-    Rows dated before `inception` are BACKFILLED_FROM_HISTORY — a reconstruction, not a
-    forward paper record. Rows from inception onward are FORWARD_PAPER. This repository's
-    evidence hierarchy ranks live above replay above reconstruction, so the two must not
-    be readable as the same thing.
+    `inception` is the LAST SESSION OBSERVED at first run. Rows up to and including it
+    are BACKFILLED_FROM_HISTORY — a reconstruction. Only sessions appended AFTER that
+    point are FORWARD_PAPER. This repository's evidence hierarchy ranks live above replay
+    above reconstruction, so a backfilled row must never read as forward evidence, and
+    the inception session itself is backfill: it was reconstructed, not tracked.
     """
-    c = df["close"]
+    c, o = df["close"], df["open"]
     sma_f, sma_s = c.rolling(FAST).mean(), c.rolling(SLOW).mean()
     signal = ((c > sma_f) & (sma_f > sma_s))
-    position = signal.shift(1)                      # held over the NEXT session
+    pos = signal.shift(1).astype(float)              # held over the NEXT session
     ret = c.pct_change()
-    turn = position.astype(float).diff().abs()
+    turn = pos.diff().abs()
+    # EXECUTABLE FILL: on the day a position opens you earn open->close, not the full
+    # close-to-close move, because the order can only be placed after the signal.
+    entering = ((pos == 1) & (pos.shift(1) == 0)).astype(float)
+    entry_adj = entering * ((c / o - 1) - ret)
     cash_daily = CASH_ANNUAL / TRADING_DAYS
-    net = (position.astype(float) * ret
-           + (1 - position.astype(float)) * cash_daily
+    net = (pos * ret + entry_adj + (1 - pos) * cash_daily
            - turn * (SIDE_BPS / 10_000.0))
+    position = signal.shift(1)
 
     rows, equity = [], 1.0
     for i in range(len(df)):
@@ -122,7 +134,7 @@ def build_rows(df: pd.DataFrame, inception: str | None = None) -> list[dict]:
         date_str = df["trade_date"].iloc[i].strftime("%Y-%m-%d")
         rows.append({
             "sleeve": SLEEVE,
-            "record_origin": ("FORWARD_PAPER" if inception and date_str >= inception
+            "record_origin": ("FORWARD_PAPER" if inception and date_str > inception
                               else "BACKFILLED_FROM_HISTORY"),
             "trade_date": date_str,
             "close": round(float(c.iloc[i]), 4),
@@ -135,12 +147,22 @@ def build_rows(df: pd.DataFrame, inception: str | None = None) -> list[dict]:
             "net_return": round(float(net.iloc[i]), 8),
             "paper_equity": round(equity, 8),
             "rule": f"close > SMA{FAST} > SMA{SLOW}; signal[t] governs session t+1",
+            "fill_convention": "entry earns open->close on the switching session",
+            "capture_sha256": _CAPTURE.get("response_sha256", ""),
             "cost_bps_per_side": SIDE_BPS,
             "cash_annual_rate": CASH_ANNUAL,
             "evidence_label": EVIDENCE_LABEL,
             "execution_status": EXECUTION_STATUS,
         })
     return rows
+
+
+def _fsync_dir(path: pathlib.Path) -> None:
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
 
 
 def existing_rows() -> dict[str, dict]:
@@ -159,8 +181,10 @@ def existing_rows() -> dict[str, dict]:
     return out
 
 
-_IMMUTABLE = ("close", "sma_fast", "sma_slow", "signal_today",
-              "position_held_today", "position_next_session", "net_return")
+_IMMUTABLE = ("close", "sma_fast", "sma_slow", "signal_today", "position_held_today",
+              "position_next_session", "traded_today", "net_return", "paper_equity",
+              "record_origin", "rule", "fill_convention", "cost_bps_per_side",
+              "cash_annual_rate")
 
 
 def conflicts(existing: dict, fresh: dict) -> list[str]:
@@ -178,7 +202,7 @@ def latest_expected_session(token: str) -> str | None:
     now = datetime.now(ZoneInfo("Asia/Shanghai"))
     today = now.strftime("%Y%m%d")
     body = {"api_name": "trade_cal", "token": token,
-            "params": {"exchange": "SSE",
+            "params": {"exchange": "SZSE",   # ChiNext is a Shenzhen index
                        "start_date": (now.replace(day=1) - timedelta(days=40)).strftime("%Y%m%d"),
                        "end_date": today},
             "fields": "cal_date,is_open"}
@@ -262,16 +286,22 @@ def main() -> int:
     LEDGER.parent.mkdir(parents=True, exist_ok=True)
     if inception is None:
         INCEPTION_FILE.write_text(latest["trade_date"] + "\n")
-        print(f"  inception set to {latest['trade_date']} — later rows are FORWARD_PAPER")
+        print(f"  inception observed at {latest['trade_date']}; sessions AFTER it are FORWARD_PAPER")
+    # Durable append: write, flush, fsync, then fsync the directory, so the ledger,
+    # inception stamp and receipt cannot land partially after a crash.
     with LEDGER.open("a", encoding="utf-8") as fh:
         for r in new:
             fh.write(json.dumps(r, sort_keys=True) + "\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    _fsync_dir(LEDGER.parent)
     CAPTURE_FILE.write_text(json.dumps(
         {**_CAPTURE, "ts_code": TS_CODE, "latest_session": latest["trade_date"],
          "expected_session": expected, "freshness": state,
          "rows_appended": len(new), "ledger_rows": len(have_before) + len(new),
          "evidence_label": EVIDENCE_LABEL, "execution_status": EXECUTION_STATUS},
         indent=2, sort_keys=True) + "\n")
+    _fsync_dir(CAPTURE_FILE.parent)
 
     forward = sum(1 for r in rows if r["record_origin"] == "FORWARD_PAPER")
     print(f"  ledger {LEDGER.relative_to(ROOT)}: +{len(new)} rows "
