@@ -548,3 +548,81 @@ def test_H_content_changing_during_read_is_rejected(tmp_path: Path, monkeypatch)
     finally:
         monkeypatch.undo()
         handle.close()
+
+
+# --------------------------------------------------------------------------------------
+# I. Exactly which fields the portable hash covers
+#
+# Added after mutation testing: the portable view is an explicit INCLUDE list, and
+# neither suite would notice a field being dropped from it. Excluding the evidence or
+# promotion labels would be the worst case - the inventory could be relabelled
+# PROMOTABLE while its manifest hash still validated.
+#
+# Rather than reimplement their canonicalisation, each field is tampered with in the
+# emitted document and re-hashed through their own portable view: a covered field must
+# move the hash.
+# --------------------------------------------------------------------------------------
+
+
+MUST_BE_COVERED = [
+    ("evidence_grade", "VALIDATED_PERFORMANCE_BASELINE"),
+    ("promotion_status", "PROMOTABLE"),
+    ("capture_provenance_caveat", "fully verified"),
+    ("as_of", "1999-01-01"),
+    ("schema_version", 99),
+]
+
+
+@pytest.mark.parametrize("field,tampered", MUST_BE_COVERED)
+def test_I_tampering_a_covered_field_moves_the_hash(tmp_path: Path, field, tampered):
+    mod = _load_freezer_module()
+    ledger, root = build_inputs(tmp_path)
+    assert freeze(ledger, root, tmp_path / "o").returncode == 0
+    doc = load(tmp_path / "o")
+    recorded = doc["manifest_sha256"]
+
+    baseline = mod._sha256_bytes(mod._canonical_json(mod._portable_manifest_view(doc)))
+    assert baseline == recorded, "recomputing the portable view did not reproduce the hash"
+
+    assert field in doc, f"{field} absent from the emitted document"
+    doc[field] = tampered
+    after = mod._sha256_bytes(mod._canonical_json(mod._portable_manifest_view(doc)))
+    assert after != recorded, (
+        f"{field} is NOT covered by manifest_sha256; it could be altered undetected"
+    )
+
+
+@pytest.mark.parametrize("section", ["rows", "summary", "inputs"])
+def test_I_tampering_a_covered_section_moves_the_hash(tmp_path: Path, section):
+    mod = _load_freezer_module()
+    ledger, root = build_inputs(tmp_path)
+    assert freeze(ledger, root, tmp_path / "o").returncode == 0
+    doc = load(tmp_path / "o")
+    recorded = doc["manifest_sha256"]
+
+    assert section in doc, f"{section} absent from the emitted document"
+    if section == "rows":
+        doc["rows"][0]["status"] = "RESOLVED_NATIVE_ARTIFACT_TAMPERED"
+    elif section == "summary":
+        doc["summary"]["accounting"]["filled"] = 999
+    else:
+        doc["inputs"]["artifact_evidence"][0]["sha256"] = "0" * 64
+    after = mod._sha256_bytes(mod._canonical_json(mod._portable_manifest_view(doc)))
+    assert after != recorded, (
+        f"{section} is NOT covered by manifest_sha256; evidence could be altered undetected"
+    )
+
+
+def test_I_advisory_fields_are_deliberately_not_covered(tmp_path: Path):
+    """The converse: the excluded metadata must genuinely be excluded, or the hash is
+    not portable. Confirms the exclusion is exactly the advisory set and nothing more."""
+    mod = _load_freezer_module()
+    ledger, root = build_inputs(tmp_path)
+    assert freeze(ledger, root, tmp_path / "o").returncode == 0
+    doc = load(tmp_path / "o")
+    recorded = doc["manifest_sha256"]
+    for advisory in ("generator", "origin_advisory"):
+        if advisory in doc:
+            doc[advisory] = {"mutated": True}
+    after = mod._sha256_bytes(mod._canonical_json(mod._portable_manifest_view(doc)))
+    assert after == recorded, "an advisory field is hash-covered; the hash is not portable"
