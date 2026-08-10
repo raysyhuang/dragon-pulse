@@ -34,33 +34,48 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
-CACHE = ROOT / "outputs" / "paper_lab"
+CACHE = ROOT / "outputs" / "paper_lab" / "index_inputs"
 SIDE_BPS = 5.0          # ETF one-way cost: commission + spread, no stamp duty
 TRADING_DAYS = 243.0    # A-share year
 
 
 def load(name: str) -> pd.DataFrame:
-    df = pd.read_csv(CACHE / f"index_{name}.csv")
-    df["trade_date"] = pd.to_datetime(df["trade_date"])
+    df = pd.read_csv(CACHE / f"{name}.csv")
+    df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d")
     df = df.sort_values("trade_date").drop_duplicates("trade_date").reset_index(drop=True)
-    return df[["trade_date", "close"]]
+    return df[["trade_date", "open", "close"]]
 
 
-def equity_curve(df: pd.DataFrame, fast: int, slow: int, side_bps: float = SIDE_BPS):
+def equity_curve(df: pd.DataFrame, fast: int, slow: int, side_bps: float = SIDE_BPS,
+                 fill: str = "next_open", dividend_yield: float = 0.0,
+                 cash_annual: float = 0.0):
     """Long-or-cash trend timing, no leverage, no shorting.
 
-    NO LOOKAHEAD: the signal computed from close[t] sets the position HELD over t+1,
-    i.e. position is shifted one bar before being multiplied by the forward return.
+    NO LOOKAHEAD: the signal from close[t] sets the position held over t+1.
+
+    FILL CONVENTION. `same_close` credits the full close-to-close move on the day a
+    position changes, which silently assumes you traded at the close you were still
+    observing. That is the same-close fill this repository's replay work exists to
+    eliminate. `next_open` (the default) credits only open-to-close on an entry day,
+    which is what an ETF order placed after the signal can actually achieve.
     """
-    c = df["close"].astype(float)
+    if fill not in ("next_open", "same_close"):
+        raise ValueError("fill must be next_open or same_close")
+    c, o = df["close"].astype(float), df["open"].astype(float)
     sma_f, sma_s = c.rolling(fast).mean(), c.rolling(slow).mean()
     signal = ((c > sma_f) & (sma_f > sma_s)).astype(float)
-    position = signal.shift(1).fillna(0.0)            # <-- the only lookahead guard needed
+    position = signal.shift(1).fillna(0.0)
     ret = c.pct_change().fillna(0.0)
     turnover = position.diff().abs().fillna(0.0)
-    net = position * ret - turnover * (side_bps / 10_000.0)
+    entry_adj = pd.Series(0.0, index=c.index)
+    if fill == "next_open":
+        entering = ((position == 1) & (position.shift(1) == 0)).astype(float)
+        entry_adj = entering * ((c / o - 1) - ret)
+    d_daily, cash_daily = dividend_yield / TRADING_DAYS, cash_annual / TRADING_DAYS
+    net = (position * (ret + d_daily) + entry_adj + (1 - position) * cash_daily
+           - turnover * (side_bps / 10_000.0))
     valid = slow + 1
-    return (pd.DataFrame({"date": df["trade_date"], "net": net, "bh": ret,
+    return (pd.DataFrame({"date": df["trade_date"], "net": net, "bh": ret + d_daily,
                           "pos": position, "turn": turnover})
             .iloc[valid:].reset_index(drop=True))
 
@@ -78,8 +93,9 @@ def stats(series: pd.Series) -> dict:
     return {"ret": total, "cagr": cagr, "sharpe": sharpe, "maxdd": maxdd}
 
 
-def evaluate(df, fast, slow, start=None, end=None, side_bps=SIDE_BPS):
-    cur = equity_curve(df, fast, slow, side_bps)
+def evaluate(df, fast, slow, start=None, end=None, side_bps=SIDE_BPS,
+             fill="next_open", dividend_yield=0.0, cash_annual=0.0):
+    cur = equity_curve(df, fast, slow, side_bps, fill, dividend_yield, cash_annual)
     if start is not None:
         cur = cur[cur["date"] >= pd.Timestamp(start)]
     if end is not None:
@@ -104,102 +120,111 @@ def fmt(r) -> str:
             f"dSharpe {r['d_sharpe']:+5.2f}  dDD {r['d_maxdd']:+6.1%}  expo {r['exposure']:4.0%}")
 
 
+DIVIDEND_YIELD = {"ChiNext": 0.005, "CSI300": 0.025, "CSI500": 0.015}
+CASH_ANNUAL = 0.018
+
+
 def main():
-    print("=" * 118)
-    print("INDEPENDENT RE-TEST OF THE SURVIVING LEAD — index trend timing (long or cash)")
-    print(f"costs {SIDE_BPS:.0f} bps/side · signal from close[t] held over t+1 · no leverage, no shorting")
-    print("=" * 118)
-
+    import hashlib
+    import json
+    manifest = json.loads((CACHE / "manifest.json").read_text())
     idx = {n: load(n) for n in ("ChiNext", "CSI300", "CSI500")}
-    for n, d in idx.items():
-        print(f"  {n:8} {d['trade_date'].min():%Y-%m-%d} -> {d['trade_date'].max():%Y-%m-%d}  ({len(d)} bars)")
-
     ch = idx["ChiNext"]
+    out = {"inputs": manifest, "fill": "next_open",
+           "cash_annual": CASH_ANNUAL, "dividend_yield": DIVIDEND_YIELD,
+           "side_bps": SIDE_BPS,
+           "convention": ("signal from close[t] governs t+1; an entry day earns "
+                          "open->close, not the full close-to-close move")}
 
-    # ---------------------------------------------------------------- headline reproduction
-    print("\n" + "-" * 118)
-    print("0. REPRODUCE THE CLAIM — ChiNext 50/200, the script's hard-coded 2015-01-01 start")
-    print("-" * 118)
-    print(fmt(evaluate(ch, 50, 200, start="2015-01-01")))
+    def ev(df, name, **kw):
+        return evaluate(df, kw.pop("fast", 50), kw.pop("slow", 200),
+                        dividend_yield=DIVIDEND_YIELD[name], cash_annual=CASH_ANNUAL, **kw)
 
-    # ---------------------------------------------------------------- K1 window selection
-    print("\n" + "-" * 118)
-    print("K1. WINDOW SELECTION — same rule, every possible start quarter (this killed low_vol)")
-    print("-" * 118)
+    r = ev(ch, "ChiNext")
+    out["headline"] = {"timed": r["timed"], "buy_hold": r["bh"], "exposure": r["exposure"],
+                       "trades_per_year": r["trades_per_yr"]}
+
     rows = []
-    for start in pd.date_range("2014-03-31", "2022-12-31", freq="QE"):
-        r = evaluate(ch, 50, 200, start=start)
-        if r:
-            rows.append({"start": start.date(), "sharpe": r["timed"]["sharpe"],
-                         "bh_sharpe": r["bh"]["sharpe"], "d_sharpe": r["d_sharpe"],
-                         "ret": r["timed"]["ret"], "d_ret": r["d_ret"],
-                         "maxdd": r["timed"]["maxdd"], "d_maxdd": r["d_maxdd"]})
-    w = pd.DataFrame(rows)
-    print(f"  {len(w)} start dates tested (2014Q1 -> 2022Q4), all ending 2026-07-24\n")
-    print(f"  timed Sharpe   : min {w['sharpe'].min():5.2f}  median {w['sharpe'].median():5.2f}  max {w['sharpe'].max():5.2f}")
-    print(f"  delta Sharpe   : min {w['d_sharpe'].min():+5.2f}  median {w['d_sharpe'].median():+5.2f}  max {w['d_sharpe'].max():+5.2f}")
-    print(f"  delta maxDD    : min {w['d_maxdd'].min():+6.1%}  median {w['d_maxdd'].median():+6.1%}  max {w['d_maxdd'].max():+6.1%}")
-    print(f"  beats B&H on Sharpe : {(w['d_sharpe'] > 0).sum()}/{len(w)} starts")
-    print(f"  beats B&H on return : {(w['d_ret'] > 0).sum()}/{len(w)} starts")
-    print(f"  cuts drawdown       : {(w['d_maxdd'] > 0).sum()}/{len(w)} starts")
-    print("\n  worst 3 starts by delta-Sharpe:")
-    for _, r in w.nsmallest(3, "d_sharpe").iterrows():
-        print(f"    {r['start']}  timed Sharpe {r['sharpe']:5.2f} vs B&H {r['bh_sharpe']:5.2f}  (delta {r['d_sharpe']:+5.2f})")
-    print("  best 3 starts by delta-Sharpe:")
-    for _, r in w.nlargest(3, "d_sharpe").iterrows():
-        print(f"    {r['start']}  timed Sharpe {r['sharpe']:5.2f} vs B&H {r['bh_sharpe']:5.2f}  (delta {r['d_sharpe']:+5.2f})")
+    for start in pd.date_range("2012-03-31", "2022-12-31", freq="QE"):
+        q = ev(ch, "ChiNext", start=start)
+        if q:
+            rows.append({"start": start.strftime("%Y-%m-%d"),
+                         "d_sharpe": q["d_sharpe"], "d_maxdd": q["d_maxdd"],
+                         "d_ret": q["d_ret"]})
+    out["k1_window"] = {"starts": len(rows),
+                        "cuts_drawdown": sum(1 for x in rows if x["d_maxdd"] > 0),
+                        "beats_sharpe": sum(1 for x in rows if x["d_sharpe"] > 0),
+                        "beats_return": sum(1 for x in rows if x["d_ret"] > 0),
+                        "worst_d_sharpe": min(x["d_sharpe"] for x in rows),
+                        "median_d_sharpe": float(pd.Series([x["d_sharpe"] for x in rows]).median())}
 
-    # ---------------------------------------------------------------- K2 parameter selection
-    print("\n" + "-" * 118)
-    print("K2. PARAMETER SELECTION — full MA grid on the FULL sample (is 50/200 a peak or a plateau?)")
-    print("-" * 118)
-    fasts = [10, 20, 30, 50, 75, 100]
-    slows = [100, 150, 200, 250, 300]
     grid = []
-    for f, s in itertools.product(fasts, slows):
-        if f >= s:
+    for f, s_ in itertools.product([10, 20, 30, 50, 75, 100], [100, 150, 200, 250, 300]):
+        if f >= s_:
             continue
-        r = evaluate(ch, f, s)
-        if r:
-            grid.append({"fast": f, "slow": s, "sharpe": r["timed"]["sharpe"],
-                         "d_sharpe": r["d_sharpe"], "d_maxdd": r["d_maxdd"], "d_ret": r["d_ret"]})
-    g = pd.DataFrame(grid)
-    bh_full = evaluate(ch, 50, 200)["bh"]
-    print(f"  full sample B&H: Sharpe {bh_full['sharpe']:.2f}, maxDD {bh_full['maxdd']:.1%}\n")
-    print("  timed Sharpe by (fast, slow):")
-    print(g.pivot(index="fast", columns="slow", values="sharpe").round(2).to_string())
-    print(f"\n  cells tested {len(g)} · beats B&H Sharpe in {(g['d_sharpe'] > 0).sum()}/{len(g)}"
-          f" · beats B&H return in {(g['d_ret'] > 0).sum()}/{len(g)}"
-          f" · cuts drawdown in {(g['d_maxdd'] > 0).sum()}/{len(g)}")
-    print(f"  Sharpe across grid: min {g['sharpe'].min():.2f}  median {g['sharpe'].median():.2f}  max {g['sharpe'].max():.2f}")
-    cell = g[(g["fast"] == 50) & (g["slow"] == 200)].iloc[0]
-    pct = (g["sharpe"] < cell["sharpe"]).mean()
-    print(f"  50/200 sits at the {pct:.0%} percentile of the grid  (peak => lucky cell; mid => plateau)")
+        g = ev(ch, "ChiNext", fast=f, slow=s_)
+        if g:
+            grid.append({"fast": f, "slow": s_, "sharpe": g["timed"]["sharpe"],
+                         "d_sharpe": g["d_sharpe"], "d_maxdd": g["d_maxdd"]})
+    cell = next(x for x in grid if x["fast"] == 50 and x["slow"] == 200)
+    out["k2_grid"] = {"cells": len(grid),
+                      "cuts_drawdown": sum(1 for x in grid if x["d_maxdd"] > 0),
+                      "beats_sharpe": sum(1 for x in grid if x["d_sharpe"] > 0),
+                      "percentile_50_200": float(
+                          sum(1 for x in grid if x["sharpe"] < cell["sharpe"]) / len(grid)),
+                      "best": max(grid, key=lambda x: x["sharpe"])}
 
-    # ---------------------------------------------------------------- K3 index specificity
-    print("\n" + "-" * 118)
-    print("K3. INDEX SPECIFICITY — identical 50/200 rule, full available sample")
-    print("-" * 118)
+    out["k3_indices"] = {n: {"timed": ev(d, n)["timed"], "buy_hold": ev(d, n)["bh"]}
+                         for n, d in idx.items()}
+
+    mid = ch["trade_date"].iloc[len(ch) // 2].strftime("%Y-%m-%d")
+    out["split_post_hoc"] = {"split_at": mid,
+                             "first": ev(ch, "ChiNext", end=mid)["timed"],
+                             "second": ev(ch, "ChiNext", start=mid)["timed"],
+                             "note": "POST-HOC split, not a sealed holdout"}
+    h = ev(ch, "ChiNext", end="2014-01-02")
+    out["pre_cache_window"] = {"window": "2010-05..2014-01", "timed": h["timed"],
+                               "buy_hold": h["bh"],
+                               "note": ("a window the original cached study could not see; "
+                                        "it is out-of-cache, NOT a preregistered holdout")}
+
+    out["cost_sensitivity"] = [
+        {"side_bps": b, **{k: v for k, v in ev(ch, "ChiNext", side_bps=b)["timed"].items()}}
+        for b in (0, 5, 10, 20, 50)]
+
+    be = {}
     for n, d in idx.items():
-        print(f"  {n:8} {fmt(evaluate(d, 50, 200))}")
+        r_ = None
+        for dy in [x / 2000 for x in range(0, 241)]:
+            t = evaluate(d, 50, 200, dividend_yield=dy, cash_annual=CASH_ANNUAL)
+            if t["timed"]["cagr"] <= t["bh"]["cagr"]:
+                r_ = dy
+                break
+        be[n] = {"cagr_break_even_yield": r_, "assumed_yield": DIVIDEND_YIELD[n]}
+    out["dividend_break_even"] = be
 
-    # ---------------------------------------------------------------- split sample
-    print("\n" + "-" * 118)
-    print("SPLIT SAMPLE — ChiNext 50/200, first half vs second half of available data")
-    print("-" * 118)
-    mid = ch["trade_date"].iloc[len(ch) // 2]
-    print(f"  split at {mid:%Y-%m-%d}")
-    print(f"  first  half  {fmt(evaluate(ch, 50, 200, end=mid))}")
-    print(f"  second half  {fmt(evaluate(ch, 50, 200, start=mid))}")
+    payload = json.dumps(out, sort_keys=True, separators=(",", ":"), allow_nan=False,
+                         default=float).encode()
+    out["analysis_sha256"] = hashlib.sha256(payload).hexdigest()
+    dest = ROOT / "outputs" / "paper_lab" / "timing_study_analysis.json"
+    dest.write_text(json.dumps(out, indent=2, sort_keys=True, default=float) + "\n")
 
-    # ---------------------------------------------------------------- cost sensitivity
-    print("\n" + "-" * 118)
-    print("COST SENSITIVITY — ChiNext 50/200, full sample")
-    print("-" * 118)
-    for bps in (0, 5, 10, 20, 50):
-        r = evaluate(ch, 50, 200, side_bps=bps)
-        print(f"  {bps:3.0f} bps/side: Sharpe {r['timed']['sharpe']:5.2f}  ret {r['timed']['ret']:+7.1%}  "
-              f"turnover {r['trades_per_yr']:.1f} side-trades/yr")
+    hl = out["headline"]
+    print("ChiNext 50/200, executable next-open fill, dividends and cash included")
+    print(f"  timed  CAGR {hl['timed']['cagr']:+.2%}  Sharpe {hl['timed']['sharpe']:.2f}  "
+          f"maxDD {hl['timed']['maxdd']:.1%}  exposure {hl['exposure']:.0%}")
+    print(f"  B&H    CAGR {hl['buy_hold']['cagr']:+.2%}  Sharpe {hl['buy_hold']['sharpe']:.2f}  "
+          f"maxDD {hl['buy_hold']['maxdd']:.1%}")
+    k1, k2 = out["k1_window"], out["k2_grid"]
+    print(f"  K1 {k1['cuts_drawdown']}/{k1['starts']} cut DD, {k1['beats_sharpe']}/{k1['starts']} "
+          f"beat Sharpe (worst {k1['worst_d_sharpe']:+.2f})")
+    print(f"  K2 {k2['cuts_drawdown']}/{k2['cells']} cut DD, 50/200 at "
+          f"{k2['percentile_50_200']:.0%} percentile")
+    print(f"  break-even dividend yield: " +
+          ", ".join(f"{n} {v['cagr_break_even_yield']:.2%}" if v['cagr_break_even_yield']
+                    else f"{n} none" for n, v in be.items()))
+    print(f"  analysis_sha256 {out['analysis_sha256']}")
+    print(f"  written {dest.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

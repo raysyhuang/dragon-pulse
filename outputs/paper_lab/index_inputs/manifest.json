@@ -1,0 +1,30 @@
+{
+  "captured_at": "2026-08-10T00:00:00Z",
+  "caveat": "historical_tushare_trusted_assumption",
+  "endpoint": "index_daily",
+  "provenance_grade": "TRUSTED_HISTORICAL_ASSUMPTION",
+  "provider": "tushare",
+  "series": {
+    "CSI300": {
+      "first": "20090105",
+      "last": "20260810",
+      "rows": 4275,
+      "sha256": "436d70ea656612c1c81cd8b81884a53ff8ebd340ddb36dcc9810eea870792b25",
+      "ts_code": "000300.SH"
+    },
+    "CSI500": {
+      "first": "20090105",
+      "last": "20260810",
+      "rows": 4275,
+      "sha256": "faf2b3dd39b16d3e8779fded8090fea9a8d738ef946b26f6c77fb9cc4cae5038",
+      "ts_code": "000905.SH"
+    },
+    "ChiNext": {
+      "first": "20100531",
+      "last": "20260810",
+      "rows": 3933,
+      "sha256": "c2d6333a33cbbbf3912a015abf77e71572fad0b0008a73217d3f2be2be01acfd",
+      "ts_code": "399006.SZ"
+    }
+  }
+}

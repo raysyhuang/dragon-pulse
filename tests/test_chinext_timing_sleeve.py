@@ -40,8 +40,9 @@ def synthetic(n: int = 900, seed: int = 7) -> pd.DataFrame:
                             np.full(n - 2 * (n // 3), 0.0008)])
     ret = drift + rng.normal(0, 0.015, n)
     close = 1000 * np.exp(np.cumsum(ret))
+    gap = 1 + rng.normal(0, 0.004, n)          # overnight gap -> open != close
     return pd.DataFrame({"trade_date": pd.bdate_range("2015-01-01", periods=n),
-                         "close": close})
+                         "open": close / gap, "close": close})
 
 
 # --------------------------------------------------------------------------------------
@@ -55,6 +56,13 @@ def test_provider_url_is_https_never_plaintext():
     src = (ROOT / "scripts" / "chinext_timing_paper_sleeve.py").read_text()
     assert "http://api.tushare.pro" not in src
     assert "https://api.tushare.pro" in src
+
+
+def test_entry_day_uses_open_to_close_not_full_close_to_close():
+    """The executable-fill guard: on a switching session the sleeve must not credit the
+    full close-to-close move, which would assume trading at the close it just observed."""
+    src = (ROOT / "scripts" / "chinext_timing_paper_sleeve.py").read_text()
+    assert "entry_adj" in src and "c / o - 1" in src
 
 
 def test_query_window_is_closed_never_open_ended():
@@ -92,10 +100,10 @@ def test_sleeve_matches_the_study_implementation():
     cannot be compared with the historical result."""
     df = synthetic()
     rows = sleeve.build_rows(df)
-    cur = study.equity_curve(df, sleeve.FAST, sleeve.SLOW)
+    cur = study.equity_curve(df, sleeve.FAST, sleeve.SLOW, fill="next_open",
+                             cash_annual=sleeve.CASH_ANNUAL)
     bt = {d.strftime("%Y-%m-%d"): (float(p), float(n))
           for d, p, n in zip(cur["date"], cur["pos"], cur["net"])}
-    cash = sleeve.CASH_ANNUAL / sleeve.TRADING_DAYS
     compared = 0
     for r in rows:
         if r["trade_date"] not in bt:
@@ -104,7 +112,7 @@ def test_sleeve_matches_the_study_implementation():
         pos, net = bt[r["trade_date"]]
         assert bool(pos) == r["position_held_today"]
         # the study carries no cash yield; add it to compare like for like.
-        assert r["net_return"] == pytest.approx(net + (1 - pos) * cash, abs=1e-8)
+        assert r["net_return"] == pytest.approx(net, abs=1e-8)
     assert compared > 500
 
 
