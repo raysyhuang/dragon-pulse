@@ -36,6 +36,35 @@ import pandas as pd
 import requests
 
 
+def unpack(resp: object, required: tuple[str, ...], what: str) -> list[dict]:
+    """Validate a provider response and return rows keyed by FIELD NAME.
+
+    Positional indexing is unsafe: a reordered or renamed schema is silently misread.
+    An audit showed a calendar with field names `x, y` being accepted and returning a
+    plausible date, and a list-shaped response escaping as AttributeError.
+    """
+    if not isinstance(resp, dict):
+        raise ProviderError(f"{what}: response is {type(resp).__name__}, expected object")
+    if resp.get("code") != 0:
+        raise ProviderError(f"{what}: {resp.get('msg')}")
+    data = resp.get("data")
+    if not isinstance(data, dict):
+        raise ProviderError(f"{what}: data is not an object")
+    fields, items = data.get("fields"), data.get("items")
+    if not isinstance(fields, list) or not isinstance(items, list):
+        raise ProviderError(f"{what}: fields/items are not lists")
+    missing = [f for f in required if f not in fields]
+    if missing:
+        raise ProviderError(f"{what}: response is missing required fields {missing}; got {fields}")
+    idx = {f: fields.index(f) for f in required}
+    rows = []
+    for row in items:
+        if not isinstance(row, (list, tuple)) or len(row) != len(fields):
+            raise ProviderError(f"{what}: malformed row shape")
+        rows.append({f: row[i] for f, i in idx.items()})
+    return rows
+
+
 class ProviderError(RuntimeError):
     """The provider failed. Distinct from a market holiday or from stale data."""
 
@@ -87,15 +116,8 @@ def fetch_index() -> pd.DataFrame:
             resp = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise ProviderError(f"unparseable response for {start}..{end}: {exc}") from exc
-        if not isinstance(resp, dict) or resp.get("code") != 0:
-            raise ProviderError(f"tushare error for {start}..{end}: "
-                                f"{resp.get('msg') if isinstance(resp, dict) else 'bad shape'}")
-        data = resp.get("data")
-        if (not isinstance(data, dict) or not isinstance(data.get("items"), list)
-                or not isinstance(data.get("fields"), list)
-                or not {"trade_date", "open", "close"}.issubset(data["fields"])):
-            raise ProviderError(f"malformed response shape for {start}..{end}")
-        frames.append(pd.DataFrame(data["items"], columns=data["fields"]))
+        rows = unpack(resp, ("trade_date", "open", "close"), f"index_daily {start}..{end}")
+        frames.append(pd.DataFrame(rows, columns=["trade_date", "open", "close"]))
     _CAPTURE["response_sha256"] = hashlib.sha256("".join(digests).encode()).hexdigest()
     _CAPTURE["captured_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     _CAPTURE["query_end_date"] = today
@@ -221,11 +243,13 @@ def existing_rows() -> dict[str, dict]:
         if not line.strip():
             continue
         row = json.loads(line)
-        missing = [k for k in ROW_SCHEMA if k not in row]
-        if missing:
-            raise SystemExit(f"ledger row {n} does not match the row schema "
-                             f"(missing {', '.join(missing)}); refusing to append to a "
-                             f"ledger whose rows cannot be fully compared")
+        if set(row) != set(ROW_SCHEMA):
+            missing = sorted(set(ROW_SCHEMA) - set(row))
+            extra = sorted(set(row) - set(ROW_SCHEMA))
+            raise SystemExit(
+                f"ledger row {n} does not match the row schema exactly "
+                f"(missing {missing}, unexpected {extra}); an unexpected field is unknown "
+                f"semantic drift that reconciliation would ignore, so the append is refused")
         day = row["trade_date"]
         if day in out and out[day] != row:
             raise SystemExit(f"ledger already contains conflicting rows for {day}; "
@@ -270,16 +294,13 @@ def latest_expected_session(token: str) -> str | None:
                        "end_date": today},
             "fields": "cal_date,is_open"}
     resp = requests.post("https://api.tushare.pro", timeout=60, json=body).json()
-    if resp.get("code") != 0:
-        raise ProviderError(f"trade_cal failed: {resp.get('msg')}")
-    data = resp.get("data")
-    if (not isinstance(data, dict) or not isinstance(data.get("items"), list)
-            or not isinstance(data.get("fields"), list)):
-        raise ProviderError("malformed trade_cal response shape")
+    rows = unpack(resp, ("cal_date", "is_open"), "trade_cal")
     try:
-        opens = sorted(r[0] for r in data["items"] if int(r[1]) == 1)
-    except (TypeError, ValueError, IndexError) as exc:
+        opens = sorted(str(r["cal_date"]) for r in rows if int(r["is_open"]) == 1)
+    except (TypeError, ValueError) as exc:
         raise ProviderError(f"unusable trade_cal rows: {exc}") from exc
+    if any(not (len(d) == 8 and d.isdigit()) for d in opens):
+        raise ProviderError("trade_cal returned non-YYYYMMDD session dates")
     if not opens:
         # Syntactically valid but empty: we cannot tell a holiday from an outage, so we
         # must not write. Returning None here previously still appended and exited 0.
