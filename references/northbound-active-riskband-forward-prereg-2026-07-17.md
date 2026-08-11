@@ -90,3 +90,16 @@ Consequences for the readout:
 1. `data_quality` for any current date is capped at `active_rank_only`. `flow_confirmed` can never be true, and the probe now records `flow_confirmation_possible: false` so this ceiling is visible in the artifact rather than inferred.
 2. The sleeve remains **paper-only**, and its blocker should be restated as a design question — whether an active-turnover rank alone is admissible evidence — not as a data-repair task. This amendment does not answer that question and does not promote anything.
 3. This is an operational-status correction, not a parameter change. Frozen parameters and prior outcomes are untouched.
+
+## Amendment 3 — 2026-08-11 UTC, sleeve retired with no readout
+
+**Decision: retire `northbound_active_riskband_paper`.** The pre-open feed, source probe, and open-check jobs are removed from `cn-morning.yml`, and all sleeve alerts are off. This closes the forward window **without a readout** and **without promotion**.
+
+The window never became measurable. Across 31 watchlists (2026-06-30 → 2026-08-11) producing 53 picks, **zero** `northbound_paper_execution_check_*.json` artifacts exist. This document defines an eligible pick as one carrying an open-check result, so the readout trigger — 8 matured eligible picks — stood at **0/8** and could not advance. `send_open_check()` returned exit 0 when the quote provider returned nothing, so the CI job passed green every morning while recording no execution evidence. That failure mode is fixed and regression-tested (a dead provider now exits non-zero; a genuinely empty watchlist still exits 0) before disablement, so the same silence cannot recur elsewhere in the sleeve.
+
+Two independent reasons the window was not worth restarting:
+
+1. **Flow confirmation is permanently unavailable** (Amendment 2). Neither route to `flow_confirmed` can ever open.
+2. **Active-turnover rank carries little selection information.** The 53 picks span roughly 7 distinct tickers; `300750.SZ` appears on 22 of 31 sessions and `603259.SH` on 10. Rank ≤5 by northbound turnover returns a near-constant mega-cap list, consistent with the 2026-07-25 full-scale diagnostic that found 98.6% of alpha picks already northbound-held.
+
+**Active-rank-only is not admissible promotion evidence, and this amendment does not make it so.** No parameter was changed, no outcome was reinterpreted, and no result is promoted. Existing artifacts are retained, unmodified, as PAPER-only historical evidence. The script stays in the tree behind `--allow-retired` for backfill and audit; live modes exit non-zero so a leftover scheduler surfaces instead of silently resuming.

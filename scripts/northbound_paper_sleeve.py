@@ -38,6 +38,19 @@ logger = logging.getLogger(__name__)
 # this repo can recover holding deltas for a later date.
 NORTHBOUND_HOLDING_LAST_DATE = "2024-08-16"
 
+# Retired 2026-08-11. Kept for historical/backfill research behind --allow-retired;
+# the CI jobs and alerts are gone. See prereg Amendment 3. Do not restart this as a
+# live feed and do not re-scope active-rank-only into an admissible promotion path.
+SLEEVE_RETIRED = True
+RETIREMENT_NOTE = (
+    "northbound_active_riskband_paper is RETIRED (2026-08-11). Flow confirmation is "
+    "permanently unavailable (per-stock northbound holdings ended "
+    f"{NORTHBOUND_HOLDING_LAST_DATE}; hsgt_top10 net_amount is unpopulated), and 31 "
+    "sessions produced 0 execution checks, so the pre-registered readout never "
+    "advanced past 0 eligible picks. Existing artifacts remain PAPER-only historical "
+    "evidence. Use --allow-retired for research; never for alerting."
+)
+
 
 @dataclass
 class PaperPick:
@@ -625,8 +638,17 @@ def send_open_check(date_str: str) -> int:
 
     open_prices = fetch_open_prices([p.get("ticker", "") for p in picks])
     if not open_prices:
-        logger.warning("Open prices unavailable; skip northbound paper open check for now.")
-        return 0
+        # A dead provider is a failure, not an empty result. This returned 0 for
+        # 31 sessions while the quote endpoint was down: CI stayed green, no
+        # execution-check artifact was ever written, and the pre-registered
+        # readout counter sat at 0 eligible picks without anyone being told.
+        logger.error(
+            "Open prices unavailable for %d northbound paper picks — provider returned "
+            "nothing. No execution check written for %s.",
+            len(picks),
+            date_str,
+        )
+        return 2
     results = run_preflight(picks=picks, open_prices=open_prices, prev_volumes={})
 
     out = PROJECT_ROOT / "outputs" / date_str / f"northbound_paper_execution_check_{date_str}.json"
@@ -694,14 +716,27 @@ def send_open_check(date_str: str) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Northbound active risk-band paper sleeve")
+    parser = argparse.ArgumentParser(description="Northbound active risk-band paper sleeve (RETIRED)")
     parser.add_argument("--date", default=pd.Timestamp.now(tz="Asia/Shanghai").strftime("%Y-%m-%d"))
     parser.add_argument("--mode", choices=["preopen", "open_check", "source_probe"], default="preopen")
     parser.add_argument("--top-n", type=int, default=5)
     parser.add_argument("--no-alert", action="store_true")
+    parser.add_argument(
+        "--allow-retired",
+        action="store_true",
+        help="Run a retired mode for historical/backfill research only. Never for alerting.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+    if SLEEVE_RETIRED and not args.allow_retired:
+        # The CI jobs are gone, but a leftover cron on another host would happily
+        # keep alerting. Exit non-zero so a forgotten scheduler surfaces instead
+        # of quietly resuming a retired sleeve.
+        logger.error("%s", RETIREMENT_NOTE)
+        return 3
+
     if args.mode == "open_check":
         return send_open_check(args.date)
     if args.mode == "source_probe":

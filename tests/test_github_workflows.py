@@ -16,9 +16,6 @@ def test_cn_morning_workflow_has_same_day_preopen_scan_and_open_check():
     jobs = workflow["jobs"]
     assert jobs["preopen-scan"]["if"] == "github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'preopen_scan'"
     assert jobs["preflight"]["if"] == "github.event.schedule == '35 1 * * 1-5' || github.event.schedule == '55 1 * * 1-5' || inputs.mode == 'open_check'"
-    assert jobs["northbound-paper-preopen"]["if"] == "github.event.schedule == '15 23 * * 0-4' || inputs.mode == 'northbound_paper_preopen'"
-    assert jobs["northbound-paper-open-check"]["if"] == "always() && (github.event.schedule == '35 1 * * 1-5' || github.event.schedule == '55 1 * * 1-5' || inputs.mode == 'northbound_paper_open_check')"
-    assert jobs["northbound-source-probe"]["if"] == "github.event.schedule == '0 4 * * 1-5' || github.event.schedule == '30 7 * * 1-5' || github.event.schedule == '0 9 * * 1-5'"
 
     preopen_run = "\n".join(
         step.get("run", "") for step in jobs["preopen-scan"]["steps"]
@@ -34,26 +31,26 @@ def test_cn_morning_workflow_has_same_day_preopen_scan_and_open_check():
     assert "Missing same-day watchlist" in preflight_run
     assert "sort -t_ -k3 -r | head -1" not in preflight_run
 
-    nb_preopen_run = "\n".join(
-        step.get("run", "") for step in jobs["northbound-paper-preopen"]["steps"]
-    )
-    assert "python scripts/northbound_paper_sleeve.py --mode preopen" in nb_preopen_run
-    assert "northbound_paper_watchlist_${TRADE_DATE}.json" in nb_preopen_run
-    assert "scripts/gha_push_with_rebase.sh main 3" in nb_preopen_run
 
-    nb_open_run = "\n".join(
-        step.get("run", "") for step in jobs["northbound-paper-open-check"]["steps"]
-    )
-    assert "python scripts/northbound_paper_sleeve.py --mode open_check" in nb_open_run
-    assert "northbound_paper_execution_check_${TRADE_DATE}.json" in nb_open_run
-    assert "scripts/gha_push_with_rebase.sh main 3" in nb_open_run
+def test_cn_morning_workflow_has_no_retired_northbound_sleeve():
+    """The northbound paper sleeve was retired 2026-08-11 (prereg Amendment 3).
 
-    nb_probe_run = "\n".join(
-        step.get("run", "") for step in jobs["northbound-source-probe"]["steps"]
-    )
-    assert "python scripts/northbound_paper_sleeve.py --mode source_probe" in nb_probe_run
-    assert "northbound_source_probe_${TRADE_DATE}_${PROBE_SLOT}.json" in nb_probe_run
-    assert "scripts/gha_push_with_rebase.sh main 3" in nb_probe_run
+    It must not reappear as a scheduled job, a dispatch mode, or a stray cron —
+    retirement that only lives in a doc gets undone by the next workflow edit.
+    """
+    workflow_path = REPO_ROOT / ".github" / "workflows" / "cn-morning.yml"
+    workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+
+    assert not [job for job in workflow["jobs"] if "northbound" in job]
+    assert "northbound" not in workflow_path.read_text(encoding="utf-8").lower()
+
+    modes = workflow[True]["workflow_dispatch"]["inputs"]["mode"]["options"]
+    assert modes == ["preopen_scan", "open_check"]
+
+    # The three probe crons existed only to feed the sleeve.
+    schedules = [item["cron"] for item in workflow[True]["schedule"]]
+    for retired_cron in ("0 4 * * 1-5", "30 7 * * 1-5", "0 9 * * 1-5"):
+        assert retired_cron not in schedules
 
 
 def test_cn_nightly_workflow_uses_same_push_helper():

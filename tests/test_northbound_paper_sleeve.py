@@ -308,3 +308,73 @@ def test_discontinued_holding_delta_is_graded_as_permanent():
     # wait for one are unsatisfiable — the readout must be able to see that.
     assert quality["flow_confirmation_possible"] is False
     assert any("permanently unavailable" in gap for gap in quality["data_gaps"])
+
+
+def _write_watchlist(tmp_path, monkeypatch, module, picks):
+    monkeypatch.setattr(module, "PROJECT_ROOT", tmp_path)
+    out = tmp_path / "outputs" / "2026-08-11"
+    out.mkdir(parents=True)
+    (out / "northbound_paper_watchlist_2026-08-11.json").write_text(
+        json.dumps({"date": "2026-08-11", "picks": picks}, ensure_ascii=False), encoding="utf-8"
+    )
+    return out
+
+
+def test_open_check_fails_loudly_when_provider_returns_no_prices(tmp_path, monkeypatch):
+    """A dead quote provider must not exit green just because it produced nothing.
+
+    This silently returned 0 for 31 sessions, so CI passed daily while the
+    pre-registered readout never advanced past 0 eligible picks.
+    """
+    module = load_northbound_module()
+    out = _write_watchlist(tmp_path, monkeypatch, module, [{"ticker": "603259.SH", "score": 116}])
+    monkeypatch.setattr(module, "fetch_open_prices", lambda tickers: {})
+
+    rc = module.send_open_check("2026-08-11")
+
+    assert rc != 0, "dead provider must be a non-zero exit"
+    assert not (out / "northbound_paper_execution_check_2026-08-11.json").exists()
+
+
+def test_open_check_succeeds_when_watchlist_is_legitimately_empty(tmp_path, monkeypatch):
+    """No candidates is a real result — only a failed provider is an error."""
+    module = load_northbound_module()
+    _write_watchlist(tmp_path, monkeypatch, module, [])
+
+    def unreachable(tickers):  # pragma: no cover - must never run
+        raise AssertionError("no picks means no quote lookup")
+
+    monkeypatch.setattr(module, "fetch_open_prices", unreachable)
+
+    assert module.send_open_check("2026-08-11") == 0
+
+
+def test_retired_sleeve_refuses_to_run_and_alert(monkeypatch, capsys):
+    """A leftover cron on another host must not resume a retired sleeve."""
+    module = load_northbound_module()
+    assert module.SLEEVE_RETIRED is True
+
+    def unreachable(*args, **kwargs):  # pragma: no cover - must never run
+        raise AssertionError("retired sleeve must not reach its alert path")
+
+    monkeypatch.setattr(module, "send_preopen_alert", unreachable)
+    monkeypatch.setattr(module, "send_open_check", unreachable)
+    monkeypatch.setattr(module, "save_source_probe", unreachable)
+
+    for mode in ("preopen", "open_check", "source_probe"):
+        monkeypatch.setattr(sys, "argv", ["northbound_paper_sleeve.py", "--mode", mode])
+        assert module.main() == 3, f"{mode} must exit non-zero while retired"
+
+
+def test_retired_sleeve_still_runs_for_historical_research(monkeypatch):
+    """--allow-retired keeps backfill and audit of existing artifacts working."""
+    module = load_northbound_module()
+    called = []
+    monkeypatch.setattr(module, "send_open_check", lambda date: called.append(date) or 0)
+    monkeypatch.setattr(
+        sys, "argv",
+        ["northbound_paper_sleeve.py", "--mode", "open_check", "--date", "2026-08-10", "--allow-retired"],
+    )
+
+    assert module.main() == 0
+    assert called == ["2026-08-10"]
