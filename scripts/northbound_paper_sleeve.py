@@ -31,6 +31,13 @@ from scripts.morning_check import fetch_open_prices, run_preflight  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
+# Last trading day with per-stock northbound holdings. The exchanges ended daily
+# per-stock disclosure from 2024-08-19; both vendors we can reach stop on the same
+# day (Eastmoney RPT_MUTUAL_HOLDSTOCKNDATE_STA and Tushare hk_hold, checked
+# 2026-08-11), so this is a disclosure change, not a provider outage. Nothing in
+# this repo can recover holding deltas for a later date.
+NORTHBOUND_HOLDING_LAST_DATE = "2024-08-16"
+
 
 @dataclass
 class PaperPick:
@@ -197,7 +204,13 @@ def assess_data_quality(
         gaps.append(f"latest hsgt_top10 trade_date {source_trade_date} is older than asof {asof_date}")
     if net_amount_non_null <= 0:
         gaps.append("hsgt_top10 net_amount/buy/sell are not populated; active-rank turnover only")
-    if holding_delta_rows <= 0 or holding_delta_status != "ok":
+    holding_delta_discontinued = "discontinued_after" in holding_delta_status
+    if holding_delta_discontinued:
+        gaps.append(
+            "holding-delta replacement is permanently unavailable: per-stock northbound "
+            f"holdings ended {NORTHBOUND_HOLDING_LAST_DATE}"
+        )
+    elif holding_delta_rows <= 0 or holding_delta_status != "ok":
         gaps.append(f"holding-delta replacement unavailable: {holding_delta_status}")
 
     flow_confirmed = net_amount_non_null > 0 or (holding_delta_status == "ok" and holding_delta_rows > 0)
@@ -214,6 +227,10 @@ def assess_data_quality(
         "flow_confirmed": flow_confirmed,
         "data_gaps": gaps,
         "label": "北向活跃榜/成交活跃纸面跟踪" if not flow_confirmed else "北向资金流确认纸面跟踪",
+        # Both flow-confirmation routes are gone: hsgt_top10 stopped populating
+        # net_amount and per-stock holdings ended. Recorded so the readout cannot
+        # mistake a permanent ceiling for a gap that might close on its own.
+        "flow_confirmation_possible": not (holding_delta_discontinued and net_amount_non_null <= 0),
     }
 
 
@@ -267,7 +284,14 @@ def fetch_holding_delta_map(source_date: str) -> tuple[dict[str, dict], str]:
     This is a replacement candidate for missing hsgt_top10 net_amount fields.
     If the public Eastmoney wrapper changes or fails, the paper sleeve still
     emits active-rank picks and records the gap.
+
+    Per-stock northbound holdings stop at NORTHBOUND_HOLDING_LAST_DATE, so for
+    any later date this returns the discontinuation status without a network
+    call. Earlier dates still hit the provider for backfill and research.
     """
+    if _iso_date(source_date) > NORTHBOUND_HOLDING_LAST_DATE:
+        return {}, f"northbound_holding_delta_discontinued_after_{NORTHBOUND_HOLDING_LAST_DATE}"
+
     try:
         import akshare as ak  # pyright: ignore[reportMissingModuleSource]
     except Exception as exc:

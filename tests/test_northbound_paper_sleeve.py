@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 
 def load_northbound_module():
@@ -181,7 +182,8 @@ def test_holding_delta_parser_error_is_distinguished_from_provider_unavailabilit
     )
     monkeypatch.setitem(sys.modules, "akshare", fake_akshare)
 
-    holdings, status = module.fetch_holding_delta_map("2026-07-15")
+    # Pre-cutoff date: past 2024-08-16 the provider is never called at all.
+    holdings, status = module.fetch_holding_delta_map("2024-07-15")
 
     assert holdings == {}
     assert status.startswith("eastmoney_holding_delta_parser_error: TypeError:")
@@ -251,3 +253,58 @@ def test_build_picks_meta_exposes_data_quality_gaps(monkeypatch):
     assert pick["northbound_flow_confirmed"] is False
     assert pick["regime_at_signal"] == "bear"
     assert pick["breadth_at_signal"] == 0.3656
+
+
+def test_holding_delta_skips_provider_after_disclosure_cutoff(monkeypatch):
+    """Per-stock northbound holdings ended 2024-08-16 — no call, no scary error."""
+    module = load_northbound_module()
+
+    def explode(*args, **kwargs):  # pragma: no cover - must never run
+        raise AssertionError("provider must not be called past the cutoff")
+
+    monkeypatch.setitem(sys.modules, "akshare", types.SimpleNamespace(stock_hsgt_stock_statistics_em=explode))
+
+    rows, status = module.fetch_holding_delta_map("2026-08-11")
+    assert rows == {}
+    assert status == "northbound_holding_delta_discontinued_after_2024-08-16"
+
+
+def test_holding_delta_still_queries_provider_before_cutoff(monkeypatch):
+    """Backfill and research on pre-cutoff dates must keep working."""
+    module = load_northbound_module()
+    calls = []
+
+    def fake(symbol, start_date, end_date):
+        calls.append((symbol, start_date, end_date))
+        return pd.DataFrame(
+            {
+                "持股日期": ["2024-08-15", "2024-08-16"],
+                "股票代码": ["603259", "603259"],
+                "持股数量": [131009296, 129971941],
+                "持股数量占发行股百分比": [4.5, 4.4],
+            }
+        )
+
+    monkeypatch.setitem(sys.modules, "akshare", types.SimpleNamespace(stock_hsgt_stock_statistics_em=fake))
+
+    rows, status = module.fetch_holding_delta_map("2024-08-16")
+    assert calls, "provider should be queried for a pre-cutoff date"
+    assert status == "ok"
+    assert rows["603259.SH"]["holding_delta_vol"] == pytest.approx(-1_037_355)
+
+
+def test_discontinued_holding_delta_is_graded_as_permanent():
+    module = load_northbound_module()
+    quality = module.assess_data_quality(
+        asof_date="2026-08-11",
+        source_trade_date="2026-08-10",
+        source_status="ok",
+        net_amount_non_null=0,
+        holding_delta_status="northbound_holding_delta_discontinued_after_2024-08-16",
+        holding_delta_rows=0,
+    )
+    assert quality["data_quality"] == "active_rank_only"
+    # Neither flow-confirmation route can ever return, so promotion criteria that
+    # wait for one are unsatisfiable — the readout must be able to see that.
+    assert quality["flow_confirmation_possible"] is False
+    assert any("permanently unavailable" in gap for gap in quality["data_gaps"])

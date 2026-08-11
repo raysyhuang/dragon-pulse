@@ -96,11 +96,13 @@ def _section_line() -> str:
 
 
 # Hosts that cannot be auto-detected announce themselves via DP_RUN_ORIGIN.
+# The VPS *is* the mirror — one box, one tag — so both spellings resolve to
+# DP_VPS rather than making one host look like two.
 _ORIGIN_TAGS = {
     "gh": "DP_GH",
     "github": "DP_GH",
     "vps": "DP_VPS",
-    "mirror": "DP_MIRROR",
+    "mirror": "DP_VPS",
     "local": "DP_LOCAL",
 }
 

@@ -75,3 +75,18 @@ For the full sample and each available `regime_at_signal` group, publish:
 4. target, stop, time, same-bar-stop-first, and unresolved counts;
 5. realised R distribution (median, mean, p10, p90) and the pre-registered decision;
 6. skipped-entry counterfactual outcomes, clearly separated from realised outcomes.
+
+## Amendment 2 — 2026-08-11 UTC, flow confirmation is permanently unavailable
+
+The sleeve's recorded promotion blocker was "paper-only active-rank lead until `net_amount` or holding-delta works". **Neither route can ever open**, so that condition is unsatisfiable as written and must not be read as a gap that time will close.
+
+- `hsgt_top10` returns rank and turnover but no populated `net_amount`/`buy`/`sell`.
+- Per-stock northbound holdings — the designated replacement — end at **2024-08-16**. The exchanges dropped daily per-stock disclosure from 2024-08-19.
+
+Verified 2026-08-11 against two independent vendors, both of which stop on the same day: Eastmoney `RPT_MUTUAL_HOLDSTOCKNDATE_STA` (every `INTERVAL_TYPE`) and Tushare `hk_hold` (1,573 rows on 2024-08-16, 0 rows on 2024-08-19 and every date after). The report AkShare's `stock_hsgt_stock_statistics_em` wraps, `RPT_MUTUAL_STOCK_NORTHSTA`, now returns `服务器繁忙` for every query while sibling reports on the same host succeed — a retired report, not an outage and not an IP block.
+
+Consequences for the readout:
+
+1. `data_quality` for any current date is capped at `active_rank_only`. `flow_confirmed` can never be true, and the probe now records `flow_confirmation_possible: false` so this ceiling is visible in the artifact rather than inferred.
+2. The sleeve remains **paper-only**, and its blocker should be restated as a design question — whether an active-turnover rank alone is admissible evidence — not as a data-repair task. This amendment does not answer that question and does not promote anything.
+3. This is an operational-status correction, not a parameter change. Frozen parameters and prior outcomes are untouched.

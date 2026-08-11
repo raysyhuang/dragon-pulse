@@ -140,6 +140,7 @@ def expandable(header: str, rows: list[str]) -> str:
 
 
 _STATUS_CN = (
+    ("discontinued_after", "已停止披露"),
     ("parser_error", "解析失败"),
     ("missing tushare_token", "缺少 Tushare 令牌"),
     ("no rows", "无数据"),
@@ -168,6 +169,7 @@ def humanize_status(status: object, *, ok_label: str = "正常") -> str:
 
 _GAP_CN = (
     (re.compile(r"older than asof"), "榜单日期滞后于今日"),
+    (re.compile(r"permanently unavailable"), "增持数据已于2024-08-16停止披露（不可恢复）"),
     (re.compile(r"net_amount"), "无净买入数据，仅成交额排名"),
     (re.compile(r"holding-delta"), "增持替代源不可用"),
     (re.compile(r"unavailable/degraded"), "榜单数据源异常"),

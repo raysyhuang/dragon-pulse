@@ -32,7 +32,7 @@ def test_github_actions_self_identifies(monkeypatch):
 
 @pytest.mark.parametrize(
     ("origin", "expected"),
-    [("vps", "DP_VPS"), ("VPS", "DP_VPS"), ("mirror", "DP_MIRROR"), ("local", "DP_LOCAL")],
+    [("vps", "DP_VPS"), ("VPS", "DP_VPS"), ("mirror", "DP_VPS"), ("local", "DP_LOCAL")],
 )
 def test_declared_origin_wins(monkeypatch, origin, expected):
     monkeypatch.setenv("DP_RUN_ORIGIN", origin)
@@ -43,7 +43,15 @@ def test_declared_origin_overrides_github_detection(monkeypatch):
     """A mirror that replays a workflow must not claim to be the CI pipeline."""
     monkeypatch.setenv("GITHUB_ACTIONS", "true")
     monkeypatch.setenv("DP_RUN_ORIGIN", "mirror")
-    assert run_source_tag() == "DP_MIRROR"
+    assert run_source_tag() == "DP_VPS"
+
+
+def test_vps_and_mirror_are_one_host(monkeypatch):
+    """The VPS is the mirror, so both spellings must not look like two hosts."""
+    monkeypatch.setenv("DP_RUN_ORIGIN", "vps")
+    vps = run_source_tag()
+    monkeypatch.setenv("DP_RUN_ORIGIN", "mirror")
+    assert run_source_tag() == vps
 
 
 def test_unknown_origin_is_labelled_not_silently_local(monkeypatch):
