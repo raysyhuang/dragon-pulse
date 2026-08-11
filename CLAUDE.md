@@ -83,6 +83,10 @@ value = get_config_value(config, "mean_reversion", "holding_period", default=3)
 
 - `TUSHARE_TOKEN` — required for Tushare market-cap ranking and backup data
 - `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` — for scan alerts
+- `DP_RUN_ORIGIN` — host label prefixed to every Telegram alert (`vps` → `[DP_VPS]`,
+  `mirror` → `[DP_MIRROR]`). GitHub Actions self-identifies as `[DP_GH]` and an
+  unset value on any other machine is `[DP_LOCAL]`; set this on every non-CI host
+  that sends alerts, otherwise its messages are indistinguishable from a laptop run.
 
 ## China A-Share Specifics
 

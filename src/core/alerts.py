@@ -95,12 +95,30 @@ def _section_line() -> str:
     return "\u2500" * 28
 
 
-def run_source_tag() -> str:
-    """Where this alert was produced: the GitHub Actions pipeline or a local run.
+# Hosts that cannot be auto-detected announce themselves via DP_RUN_ORIGIN.
+_ORIGIN_TAGS = {
+    "gh": "DP_GH",
+    "github": "DP_GH",
+    "vps": "DP_VPS",
+    "mirror": "DP_MIRROR",
+    "local": "DP_LOCAL",
+}
 
-    Mirrors MAS's MAS_GH convention. Local scans are a real fallback path (e.g. when
-    a data provider is down in CI), so the two must be distinguishable in Telegram.
+
+def run_source_tag() -> str:
+    """Where this alert was produced: GitHub Actions, a VPS, a mirror, or local.
+
+    Mirrors MAS's MAS_GH convention. Every host is a real path that can fire the
+    same alert — a VPS cron and the CI pipeline both send to one chat — so the
+    origin has to be readable at a glance when two messages disagree.
+
+    GitHub Actions self-identifies. Any other host sets ``DP_RUN_ORIGIN``
+    (``vps``/``mirror``/…); an unrecognised value is passed through uppercased so
+    a new host is still labelled rather than silently reported as local.
     """
+    origin = (os.environ.get("DP_RUN_ORIGIN") or "").strip().lower()
+    if origin:
+        return _ORIGIN_TAGS.get(origin, f"DP_{re.sub(r'[^A-Z0-9_]', '_', origin.upper())}"[:16])
     if os.environ.get("GITHUB_ACTIONS") == "true" or os.environ.get("GITHUB_RUN_ID"):
         return "DP_GH"
     return "DP_LOCAL"
