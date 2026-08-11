@@ -104,40 +104,58 @@ def _send_scan_alert(result: dict) -> None:
         }
         acc_label = ACC_MODE_CN.get(acc_mode, acc_mode.upper())
 
+        from src.core.message_format import RULE, append_footer, meta_line, pick_block, title_line
+
+        alert_title = f"\U0001f409 龙脉扫描 — {scan_date}"
         lines = [
-            f"<b>\U0001f409 龙脉扫描 — {scan_date}</b>",
-            f"市场状态: {emoji} <b>{regime_label}</b> | 宽度: {breadth:.0%}",
-            f"信号: {result.get('signals_total', 0)} | 入选: {eligible} | 日质量: {dq_score:.0f}/100 → <b>{acc_label}</b>",
-            "",
+            title_line("", alert_title),
+            meta_line(
+                f"{emoji} <b>{regime_label}</b>",
+                f"宽度 {breadth:.0%}",
+                f"选股 <b>{len(picks)}</b>",
+            ),
+            RULE,
         ]
 
         if not picks:
             if acc_mode == "breadth_suppressed":
-                lines.append("\U0001f4c9 市场宽度受限 — 今日无选股。")
+                lines.append("今日无选股 — 市场宽度受限")
             elif acc_mode == "abstain":
-                lines.append("\u23f8 日质量过低 — 放弃选股。")
+                lines.append("今日无选股 — 日质量过低，主动放弃")
             else:
-                lines.append("今日无选股。")
+                lines.append("今日无选股 — 无信号通过筛选")
         else:
             for i, p in enumerate(picks, 1):
-                display = _ticker_display(p["ticker"], p.get("name_cn", ""))
-                lines.append(
-                    f"<b>{i}. {display}</b> "
-                    f"评分: {p['score']:.0f}"
+                reason = _translate_reason_summary(p.get("reason_summary", ""))
+                lines += pick_block(
+                    index=i,
+                    display=_ticker_display(p["ticker"], p.get("name_cn", "")),
+                    entry=p.get("entry_price"),
+                    stop=p.get("stop_loss"),
+                    target=p.get("target_1"),
+                    max_entry=p.get("max_entry_price"),
+                    holding=p.get("holding_period"),
+                    score=p.get("score"),
+                    sub=reason,
                 )
-                max_entry_str = f" 上限=\u00a5{p['max_entry_price']:.2f}" if p.get("max_entry_price") else ""
-                lines.append(
-                    f"   入场: \u00a5{p['entry_price']:.2f}{max_entry_str} | "
-                    f"止损: \u00a5{p['stop_loss']:.2f} | 目标: \u00a5{p['target_1']:.2f} | "
-                    f"持仓: {p['holding_period']}天"
-                )
-                if p.get("reason_summary"):
-                    lines.append(f"   {_translate_reason_summary(p['reason_summary'])}")
                 lines.append("")
+
+        append_footer(
+            lines,
+            [
+                "<i>"
+                + meta_line(
+                    f"信号 {result.get('signals_total', 0)}",
+                    f"入选 {eligible}",
+                    f"日质量 {dq_score:.0f}/100 → {acc_label}",
+                )
+                + "</i>"
+            ],
+        )
 
         mgr = AlertManager(alert_config)
         mgr.send_alert(
-            title=f"龙脉扫描: {scan_date}",
+            title=alert_title,
             message="\n".join(lines),
             data={"asof": scan_date},
             priority="high" if picks else "low",

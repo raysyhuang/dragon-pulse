@@ -417,60 +417,47 @@ def send_open_pending_alert(
         emoji = _regime_emoji(regime)
         scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
 
+        from src.core.message_format import RULE, append_footer, meta_line, pick_block, title_line
+
+        alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
         lines = [
-            f"<b>\U0001f409 龙脉扫描 — {today_str} 开盘检查</b>{scan_label}",
-            f"市场状态: {emoji} <b>{regime_label}</b> | 选股: <b>{len(wl_picks)}</b> | 股池: {universe_size}",
-            "",
+            title_line("", alert_title),
+            meta_line(
+                f"{emoji} <b>{regime_label}</b>",
+                f"选股 <b>{len(wl_picks)}</b>",
+                f"股池 {universe_size}",
+            ),
+            RULE,
         ]
 
         for i, pick in enumerate(wl_picks, 1):
-            ticker = pick.get("ticker", "?")
-            name_cn = pick.get("name_cn", pick.get("name", ticker))
-            display = _ticker_display(ticker, name_cn)
-            score = pick.get("score", 0)
-            entry = pick.get("entry_price", 0)
-            max_entry = pick.get("max_entry_price")
-            stop = pick.get("stop_loss", 0)
-            t1 = pick.get("target_1", 0)
-            hold = pick.get("holding_period", "?")
-
-            try:
-                entry_val = float(entry)
-                entry_text = f"\u00a5{entry_val:.2f}"
-            except (TypeError, ValueError):
-                entry_text = "n/a"
-            max_str = ""
-            if max_entry is not None:
-                try:
-                    max_str = f" 上限=\u00a5{float(max_entry):.2f}"
-                except (TypeError, ValueError):
-                    pass
-            try:
-                stop_text = f"\u00a5{float(stop):.2f}"
-            except (TypeError, ValueError):
-                stop_text = "n/a"
-            try:
-                t1_text = f"\u00a5{float(t1):.2f}"
-            except (TypeError, ValueError):
-                t1_text = "n/a"
-
-            lines.append(f"\u23f3 <b>{i}. {display}</b>  [待定]")
-            lines.append(
-                f"   评分: {score:.0f} | 入场: {entry_text}{max_str} | "
-                f"止损: {stop_text} | 目标: {t1_text} | 持仓: {hold}天"
+            reason = _translate_reason_summary(pick.get("reason_summary", ""))
+            lines += pick_block(
+                index=i,
+                display=_ticker_display(
+                    pick.get("ticker", "?"),
+                    pick.get("name_cn", pick.get("name", "")),
+                ),
+                entry=pick.get("entry_price"),
+                stop=pick.get("stop_loss"),
+                target=pick.get("target_1"),
+                max_entry=pick.get("max_entry_price"),
+                holding=pick.get("holding_period"),
+                score=pick.get("score"),
+                icon="\u23f3",
+                tag="待定",
+                sub=reason,
             )
-            reason = pick.get("reason_summary")
-            if reason:
-                lines.append(f"   {_translate_reason_summary(reason)}")
             lines.append("")
 
-        lines.append(
-            "\u26a0\ufe0f 开盘价尚未公布 — 跳空检查将在09:25上海时间后执行"
+        append_footer(
+            lines,
+            ["<i>\u26a0\ufe0f 开盘价尚未公布 — 跳空检查将在 09:25(上海) 后执行</i>"],
         )
 
         mgr = AlertManager(alert_config)
         mgr.send_alert(
-            title=f"龙脉扫描 — {today_str} 开盘检查",
+            title=alert_title,
             message="\n".join(lines),
             data={"asof": date_str},
             priority="low",
@@ -589,22 +576,22 @@ def main():
                 scan_label = f" (scan: {date_str})" if date_str != today_str else ""
                 from src.core.alerts import _regime_cn
                 regime_label = _regime_cn(regime)
+                from src.core.message_format import RULE, append_footer, meta_line, title_line
+
+                alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
                 lines = [
-                    f"<b>\U0001f409 龙脉扫描 — {today_str} 开盘检查</b>{scan_label}",
-                    f"市场状态: {emoji} <b>{regime_label}</b>",
-                    "",
+                    title_line("", alert_title),
+                    meta_line(f"{emoji} <b>{regime_label}</b>", "选股 <b>0</b>"),
+                    RULE,
                 ]
 
                 if scan_health == "degraded":
-                    lines.append(
-                        f"\u26a0\ufe0f <b>数据异常</b> — 扫描不完整 "
-                        f"(已下载 {downloaded}/{universe}, "
-                        f"状态: {dl_health})"
-                    )
+                    lines.append("\u26a0\ufe0f <b>数据异常 — 扫描不完整，请检查数据源</b>")
+                    lines.append(RULE)
+                    detail = [f"<i>已下载 {downloaded}/{universe} · 状态 {dl_health}</i>"]
                     if circuit_breaker:
-                        lines.append(f"熔断: {circuit_breaker}")
-                    lines.append("")
-                    lines.append("无选股 — 扫描数据不完整，请检查数据源。")
+                        detail.append(f"<i>熔断 {circuit_breaker}</i>")
+                    lines.extend(detail)
                     priority = "high"
                 else:
                     regime_detail = {}
@@ -614,18 +601,16 @@ def main():
                     breadth = regime_detail.get("market_breadth_pct_above_sma20")
 
                     if acceptance_mode == "breadth_suppressed" and breadth is not None:
-                        lines.append(
-                            f"无选股 — 市场宽度受限 "
-                            f"(宽度 {breadth:.1%})，"
-                            f"{signals} 个信号已被过滤。"
-                        )
+                        lines.append("今日无选股 — 市场宽度受限")
+                        lines.append(RULE)
+                        lines.append(f"<i>宽度 {breadth:.1%} · {signals} 个信号已被过滤</i>")
                     else:
-                        lines.append("今日无选股 — 未通过筛选。")
+                        lines.append("今日无选股 — 无信号通过筛选")
                     priority = "low"
 
                 mgr = AlertManager(alert_config)
                 mgr.send_alert(
-                    title=f"龙脉扫描 — {today_str} 开盘检查",
+                    title=alert_title,
                     message="\n".join(lines),
                     data={"asof": date_str},
                     priority=priority,
@@ -743,65 +728,61 @@ def main():
 
             emoji = _regime_emoji(regime)
             scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
-            lines = [
-                f"<b>\U0001f409 龙脉扫描 — {today_str} 开盘检查</b>{scan_label}",
-                f"市场状态: {emoji} <b>{regime_label}</b> | 选股: <b>{len(wl_picks)}</b> | 股池: {universe_size}",
-                "",
-            ]
+            from src.core.message_format import RULE, append_footer, meta_line, pick_block, title_line
 
+            alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
             ACTION_CN = {"GO": "执行", "WARN": "注意", "CANCEL": "取消"}
+            ICON = {"GO": "\u2705", "WARN": "\u26a0\ufe0f", "CANCEL": "\u274c"}
             go_picks = [r for r in results if r.action == "GO"]
             warn_picks = [r for r in results if r.action == "WARN"]
             cancel_picks = [r for r in results if r.action == "CANCEL"]
 
-            # Per-pick details with execution verdict
+            lines = [
+                title_line("", alert_title),
+                meta_line(
+                    f"{emoji} <b>{regime_label}</b>",
+                    f"执行 <b>{len(go_picks)}</b>",
+                    f"注意 {len(warn_picks)}",
+                    f"取消 {len(cancel_picks)}",
+                ),
+                RULE,
+            ]
+
             for i, r in enumerate(results, 1):
-                icon = {
-                    "GO": "\u2705", "WARN": "\u26a0\ufe0f", "CANCEL": "\u274c"
-                }.get(r.action, "?")
-                display = _ticker_display(r.ticker, r.name_cn)
-                action_label = ACTION_CN.get(r.action, r.action)
-                lines.append(f"{icon} <b>{i}. {display}</b>  [{action_label}]")
-
-                # Full pick details from watchlist
                 wp = pick_map.get(r.ticker, {})
-                score = wp.get("score", 0)
-                entry = r.entry_price
-                stop = wp.get("stop_loss", 0)
-                t1 = wp.get("target_1", 0)
-                hold = wp.get("holding_period", "?")
-                max_entry = wp.get("max_entry_price")
-                max_str = f" 上限=\u00a5{max_entry:.2f}" if max_entry else ""
-                lines.append(
-                    f"   评分: {score:.0f} | 入场: \u00a5{entry:.2f}{max_str} | "
-                    f"止损: \u00a5{stop:.2f} | 目标: \u00a5{t1:.2f} | 持仓: {hold}天"
-                )
-
-                # Open price + gap
+                extras = []
                 if r.open_price:
-                    lines.append(
-                        f"   开盘: \u00a5{r.open_price:.2f} (跳空: {r.gap_pct:+.1f}%)"
-                    )
-
-                # Reasons (warnings/cancellations)
-                if r.reasons:
-                    for reason in r.reasons:
-                        lines.append(f"   \u2192 {reason}")
-
-                # Reason summary from watchlist
-                if wp.get("reason_summary") and r.action == "GO":
-                    lines.append(f"   {_translate_reason_summary(wp['reason_summary'])}")
-
+                    extras.append(f"开盘 \u00a5{r.open_price:.2f}（跳空 {r.gap_pct:+.1f}%）")
+                reason = (
+                    _translate_reason_summary(wp["reason_summary"])
+                    if wp.get("reason_summary") and r.action == "GO"
+                    else ""
+                )
+                lines += pick_block(
+                    index=i,
+                    display=_ticker_display(r.ticker, r.name_cn),
+                    entry=r.entry_price,
+                    stop=wp.get("stop_loss"),
+                    target=wp.get("target_1"),
+                    max_entry=wp.get("max_entry_price"),
+                    holding=wp.get("holding_period"),
+                    score=wp.get("score"),
+                    icon=ICON.get(r.action, "\u2022"),
+                    tag=ACTION_CN.get(r.action, r.action),
+                    extras=extras,
+                    notes=list(r.reasons),
+                    sub=reason,
+                )
                 lines.append("")
 
-            # Summary line
-            lines.append(
-                f"\U0001f4ca 执行: {len(go_picks)} | 注意: {len(warn_picks)} | 取消: {len(cancel_picks)}"
+            append_footer(
+                lines,
+                [f"<i>股池 {universe_size} · 昨夜选股 {len(wl_picks)}</i>"],
             )
 
             mgr = AlertManager(alert_config)
             mgr.send_alert(
-                title=f"龙脉扫描 — {today_str} 开盘检查",
+                title=alert_title,
                 message="\n".join(lines),
                 data={"asof": date_str},
                 priority="high" if go_picks else "low",

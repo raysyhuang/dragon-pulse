@@ -9,6 +9,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 from zoneinfo import ZoneInfo
 
+
+def _plain_first_line(message: str) -> str:
+    """First line of a Telegram message with HTML tags stripped."""
+    import re
+
+    return re.sub(r"</?[^>]+>", "", message.lstrip().split("\n", 1)[0]).strip()
+
 import pandas as pd
 
 
@@ -218,11 +225,13 @@ def test_send_open_pending_alert_writes_marker_and_sends_message(tmp_path, monke
     kwargs = send_alert.call_args.kwargs
     msg = kwargs["message"]
     assert "[待定]" in msg
-    assert "评分: 92" in msg
-    assert "止损:" in msg
-    assert "目标:" in msg
+    assert "评分 92" in msg
+    assert "止损 " in msg
+    assert "目标 " in msg
     assert "RSI2超卖=100" in msg
     assert "开盘价尚未公布" in msg
+    # Header must equal the alert title so AlertManager does not repeat it.
+    assert _plain_first_line(msg) == kwargs["title"]
 
 
 def test_send_open_pending_alert_skips_stale_prior_day_watchlist(tmp_path, monkeypatch):

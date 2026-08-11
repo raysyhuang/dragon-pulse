@@ -519,35 +519,69 @@ def send_preopen_alert(date_str: str, picks: list[PaperPick], meta: dict, path: 
         logger.info("Telegram not configured; saved artifact only: %s", path)
         return
 
-    source_date = meta.get("source_trade_date") or "n/a"
+    from src.core.message_format import (
+        RULE,
+        append_footer,
+        expandable,
+        humanize_gap,
+        humanize_status,
+        meta_line,
+        pick_block,
+        title_line,
+    )
+
+    QUALITY_CN = {
+        "flow_confirmed": "北向资金流已确认",
+        "flow_confirmed_but_lagged": "资金流已确认（数据滞后）",
+        "active_rank_only": "仅活跃榜排名（无资金流）",
+        "unavailable": "数据源不可用",
+    }
+    source_date = meta.get("source_trade_date") or "无"
+    quality = QUALITY_CN.get(meta.get("data_quality"), str(meta.get("data_quality", "未知")))
+    alert_title = f"🧪 北向纸面袖珍盘 — {date_str}"
+
     lines = [
-        f"<b>🧪 北向活跃榜纸面跟踪 — {date_str}</b>",
-        "状态: <b>PAPER ONLY / 不进实盘龙脉排名</b>",
-        f"数据质量: <b>{meta.get('data_quality', 'unknown')}</b> | 标签: {meta.get('label', '北向活跃榜/成交活跃纸面跟踪')}",
-        f"来源: hsgt_top10 {source_date} | 规则: rank≤5 + stop风险4–7%",
-        f"增持替代源: {meta.get('holding_delta_status', 'n/a')} | 发布探针: 已记录",
-        "缺口: " + "；".join(meta.get("data_gaps", [])[:3]) if meta.get("data_gaps") else "缺口: 无",
-        "",
+        title_line("", alert_title),
+        meta_line("<b>PAPER ONLY</b>", "不进实盘龙脉排名", f"候选 <b>{len(picks)}</b>"),
+        RULE,
     ]
     if not picks:
-        lines.append(f"今日无北向纸面候选。数据状态: {meta.get('source_status')}")
+        lines.append(f"今日无北向纸面候选 — {humanize_status(meta.get('source_status'))}")
     else:
         for i, p in enumerate(picks, 1):
-            display = _ticker_display(p.ticker, p.name_cn)
-            lines.append(f"🧪 <b>{i}. {display}</b> [纸面]")
-            lines.append(
-                f"   评分: {p.score:.0f} | rank: {p.rank} | 入场: ¥{p.entry_price:.2f} 上限=¥{p.max_entry_price:.2f}"
-            )
-            lines.append(
-                f"   止损: ¥{p.stop_loss:.2f} | 目标: ¥{p.target_1:.2f} | 持仓: {p.holding_period}天 | stop风险: {p.stop_risk_pct:.1f}%"
-            )
+            extras = [f"北向排名 #{p.rank}"]
             if p.holding_delta_vol is not None:
-                lines.append(f"   北向持股变化: {p.holding_delta_vol:+.0f}股")
+                extras.append(f"北向持股变化 {p.holding_delta_vol:+,.0f}股")
+            lines += pick_block(
+                index=i,
+                display=_ticker_display(p.ticker, p.name_cn),
+                entry=p.entry_price,
+                stop=p.stop_loss,
+                target=p.target_1,
+                max_entry=p.max_entry_price,
+                holding=p.holding_period,
+                score=p.score,
+                extras=extras,
+            )
             lines.append("")
-    lines.append("用途: 2–4周forward paper，验证fill/开盘追高/5D bracket/发布滞后。")
+
+    append_footer(
+        lines,
+        [expandable(
+            "数据与规则",
+            [
+                f"数据质量 · {quality}",
+                f"榜单来源 · hsgt_top10 {source_date}",
+                "筛选规则 · 北向排名≤5 且 止损风险 4–7%",
+                f"增持替代源 · {humanize_status(meta.get('holding_delta_status'))}",
+                *[f"• {humanize_gap(gap)}" for gap in meta.get("data_gaps", [])[:4]],
+                "用途 · 2–4周 forward paper，验证成交、开盘追高、5日 bracket、发布滞后。",
+            ],
+        )],
+    )
 
     AlertManager(alert_config).send_alert(
-        title=f"北向纸面袖珍盘 — {date_str}",
+        title=alert_title,
         message="\n".join(lines),
         data={"asof": date_str},
         priority="low",
@@ -588,10 +622,18 @@ def send_open_check(date_str: str) -> int:
     go = [r for r in results if r.action == "GO"]
     warn = [r for r in results if r.action == "WARN"]
     cancel = [r for r in results if r.action == "CANCEL"]
+    from src.core.message_format import RULE, append_footer, meta_line, pick_block, title_line
+
+    alert_title = f"🧪 北向纸面袖珍盘 — {date_str} 开盘检查"
     lines = [
-        f"<b>🧪 北向纸面袖珍盘 — {date_str} 开盘检查</b>",
-        "状态: <b>PAPER ONLY / 不进实盘龙脉排名</b>",
-        "",
+        title_line("", alert_title),
+        meta_line(
+            "<b>PAPER ONLY</b>",
+            f"执行 {len(go)}",
+            f"注意 {len(warn)}",
+            f"取消 {len(cancel)}",
+        ),
+        RULE,
     ]
     action_cn = {"GO": "纸面执行", "WARN": "纸面注意", "CANCEL": "纸面取消"}
     icon = {"GO": "✅", "WARN": "⚠️", "CANCEL": "❌"}
@@ -599,20 +641,27 @@ def send_open_check(date_str: str) -> int:
         r = result_map.get(pick.get("ticker"))
         if r is None:
             continue
-        display = _ticker_display(r.ticker, r.name_cn)
-        lines.append(f"{icon.get(r.action, '?')} <b>{i}. {display}</b> [{action_cn.get(r.action, r.action)}]")
-        lines.append(
-            f"   入场: ¥{r.entry_price:.2f} 上限=¥{float(pick.get('max_entry_price', 0)):.2f} | "
-            f"止损: ¥{float(pick.get('stop_loss', 0)):.2f} | 目标: ¥{float(pick.get('target_1', 0)):.2f}"
+        gap = f"开盘 ¥{r.open_price:.2f}（跳空 {r.gap_pct:+.1f}%）" if r.open_price else "开盘 —"
+        lines += pick_block(
+            index=i,
+            display=_ticker_display(r.ticker, r.name_cn),
+            entry=r.entry_price,
+            stop=pick.get("stop_loss"),
+            target=pick.get("target_1"),
+            max_entry=pick.get("max_entry_price"),
+            holding=pick.get("holding_period"),
+            score=pick.get("score"),
+            icon=icon.get(r.action, "•"),
+            tag=action_cn.get(r.action, r.action),
+            extras=[gap],
+            notes=list(r.reasons),
         )
-        lines.append(f"   开盘: ¥{r.open_price:.2f} (跳空: {r.gap_pct:+.1f}%)")
-        for reason in r.reasons:
-            lines.append(f"   → {reason}")
         lines.append("")
-    lines.append(f"📊 纸面执行: {len(go)} | 注意: {len(warn)} | 取消: {len(cancel)}")
+
+    append_footer(lines, [f"<i>纸面跟踪 · 共 {len(results)} 只</i>"])
 
     AlertManager(alert_config).send_alert(
-        title=f"北向纸面袖珍盘 — {date_str} 开盘检查",
+        title=alert_title,
         message="\n".join(lines),
         data={"asof": date_str},
         priority="low",

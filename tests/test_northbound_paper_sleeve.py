@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import sys
 import types
 from pathlib import Path
@@ -99,6 +100,37 @@ def test_send_preopen_alert_labels_paper_only(monkeypatch, tmp_path):
     assert "北向A" in msg
     assert "北向持股变化" in msg
     assert "forward paper" in msg
+    # Header must equal the alert title so AlertManager does not repeat it.
+    first_line = re.sub(r"</?[^>]+>", "", msg.lstrip().split("\n", 1)[0]).strip()
+    assert first_line == send_alert.call_args.kwargs["title"]
+    # Raw exception text stays in the artifact, never in the Telegram body.
+    assert "NoneType" not in msg
+
+
+def test_send_preopen_alert_hides_raw_exception_text(monkeypatch, tmp_path):
+    module = load_northbound_module()
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    meta = {
+        "source_trade_date": "2026-06-26",
+        "data_quality": "active_rank_only",
+        "holding_delta_status": (
+            "eastmoney_holding_delta_parser_error: TypeError: "
+            "'NoneType' object is not subscriptable"
+        ),
+        "data_gaps": [
+            "latest hsgt_top10 trade_date 2026-06-26 is older than asof 2026-06-29",
+            "hsgt_top10 net_amount/buy/sell are not populated; active-rank turnover only",
+        ],
+    }
+
+    with patch("src.core.alerts.AlertManager.send_alert", return_value={"telegram": True}) as send_alert:
+        module.send_preopen_alert("2026-06-29", [], meta, tmp_path / "x.json")
+
+    msg = send_alert.call_args.kwargs["message"]
+    assert "TypeError" not in msg and "NoneType" not in msg
+    assert "解析失败" in msg
+    assert "榜单日期滞后于今日" in msg
 
 
 def test_source_probe_records_top10_and_holding_delta_status(tmp_path, monkeypatch):
