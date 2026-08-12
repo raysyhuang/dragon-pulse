@@ -1038,6 +1038,10 @@ def main():
         # Defaults; overridden by acceptance paths below
         day_acceptance_mode = "off"
         day_eligible_count = len(sorted_picks)
+        # Only the acceptance paths compute breadth. Leaving it None on the
+        # legacy top-N path keeps the column honest rather than reporting a
+        # measured zero for a number nobody measured.
+        above_sma20 = None
 
         if args.acceptance_mode == "off":
             # Legacy: simple top-N
@@ -1142,7 +1146,7 @@ def main():
                 "wins": 0, "losses": 0, "holds": 0, "no_data": 0,
                 "acceptance_mode": day_acceptance_mode,
                 "eligible_count": day_eligible_count,
-                "breadth_above_sma20": round(above_sma20, 4),
+                "breadth_above_sma20": None if above_sma20 is None else round(above_sma20, 4),
             })
             if (i + 1) % 20 == 0:
                 elapsed = time.time() - t_start
@@ -1234,7 +1238,7 @@ def main():
             "wins": wins, "losses": losses, "holds": holds, "no_data": no_data,
             "acceptance_mode": day_acceptance_mode,
             "eligible_count": day_eligible_count,
-            "breadth_above_sma20": round(above_sma20, 4),
+            "breadth_above_sma20": None if above_sma20 is None else round(above_sma20, 4),
         })
 
         elapsed = time.time() - t_start
