@@ -51,7 +51,7 @@ def load_index(code):
         body = json.dumps({"api_name": "index_daily", "token": TOKEN,
                            "params": {"ts_code": code, "start_date": f"{y}0101", "end_date": f"{y}1231"},
                            "fields": ""}).encode()
-        req = urllib.request.Request("http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
+        req = urllib.request.Request("https://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
         r = json.loads(urllib.request.urlopen(req, timeout=40).read())
         if r.get("code") == 0 and r["data"]["items"]:
             frames.append(pd.DataFrame(r["data"]["items"], columns=r["data"]["fields"]))
