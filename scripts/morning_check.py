@@ -418,7 +418,7 @@ def send_open_pending_alert(
         scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
 
         from src.core.io import read_reconciliation
-        from src.core.message_format import (RULE, append_footer, meta_line, pick_block, 
+        from src.core.message_format import (RULE, append_footer, meta_line, pick_block,
                                              reconciliation_line, title_line)
 
         alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
@@ -580,7 +580,7 @@ def main():
                 from src.core.alerts import _regime_cn
                 regime_label = _regime_cn(regime)
                 from src.core.io import read_reconciliation
-                from src.core.message_format import (RULE, append_footer, meta_line, 
+                from src.core.message_format import (RULE, append_footer, meta_line,
                                                      reconciliation_line, title_line)
 
                 alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
@@ -735,7 +735,7 @@ def main():
             emoji = _regime_emoji(regime)
             scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
             from src.core.io import read_reconciliation
-            from src.core.message_format import (RULE, append_footer, meta_line, pick_block, 
+            from src.core.message_format import (RULE, append_footer, meta_line, pick_block,
                                                  reconciliation_line, title_line)
 
             alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"

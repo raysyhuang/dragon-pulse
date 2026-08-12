@@ -64,3 +64,39 @@ def test_cn_nightly_workflow_uses_same_push_helper():
     assert "scripts/gha_push_with_rebase.sh main 3" in run_blocks
     assert "pushed=false" not in run_blocks
     assert "git stash push --include-untracked" not in run_blocks
+
+
+def test_ci_collects_root_level_tests_not_just_the_tests_directory():
+    """`pytest tests/` left tracked root-level suites outside the gate.
+
+    test_retry_logic.py (5) and test_telegram_tracking.py (1) live at the repo
+    root, so scoping collection to tests/ meant six tracked tests never ran in
+    CI — passing locally while nothing would catch them breaking.
+    """
+    ci = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    pytest_lines = [
+        ln.strip() for ln in ci.splitlines()
+        if ln.strip().startswith("pytest ") and "--cov" in ln
+    ]
+
+    assert pytest_lines, "no pytest invocation found in ci.yml"
+    for line in pytest_lines:
+        assert not line.startswith("pytest tests/"), (
+            f"collection scoped to tests/, root-level suites would be skipped: {line}"
+        )
+
+
+def test_no_tracked_python_file_posts_to_tushare_over_cleartext():
+    """Repo-wide generalisation of the per-script rule in test_chinext_timing_sleeve.
+
+    The token travels in the POST body, so http:// sends it in cleartext, and a
+    scheduled job turns occasional exposure into daily exposure. This was already
+    enforced for one script; six other call sites across five files were still
+    plaintext. Asserting it repo-wide is what stops the next one.
+    """
+    offenders = []
+    for path in list((REPO_ROOT / "scripts").rglob("*.py")) + list((REPO_ROOT / "src").rglob("*.py")):
+        if "http://api.tushare.pro" in path.read_text(encoding="utf-8"):
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+
+    assert not offenders, f"cleartext Tushare endpoint in: {offenders}"

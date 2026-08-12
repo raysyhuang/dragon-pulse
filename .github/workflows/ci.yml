@@ -72,7 +72,10 @@ jobs:
       
       - name: Run tests with coverage
         run: |
-          pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing
+          # Unscoped on purpose: `pytest tests/` silently skipped the tracked
+          # root-level suites (test_retry_logic.py, test_telegram_tracking.py),
+          # so six tests sat outside the gate and could rot unnoticed.
+          pytest -v --cov=src --cov-report=xml --cov-report=term-missing
         env:
           # Don't fail on missing API keys during tests
           POLYGON_API_KEY: ""

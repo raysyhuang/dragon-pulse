@@ -59,7 +59,7 @@ TOKEN = _load_token()
 
 def _call(api: str, params: dict) -> pd.DataFrame:
     body = json.dumps({"api_name": api, "token": TOKEN, "params": params, "fields": ""}).encode()
-    req = urllib.request.Request("http://api.tushare.pro", data=body,
+    req = urllib.request.Request("https://api.tushare.pro", data=body,
                                  headers={"Content-Type": "application/json"})
     for _ in range(3):
         try:
