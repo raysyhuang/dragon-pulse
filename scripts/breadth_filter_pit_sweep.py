@@ -68,6 +68,39 @@ def build_cuts(scanned: pd.Series, thresholds, quantiles) -> list[tuple[str, flo
     return cuts
 
 
+def permutation_test(kept: pd.Series, dropped: pd.Series, iters: int = 20000, seed: int = 0) -> dict:
+    """Would this split of per-trade returns arise by chance from a random split?
+
+    The compounded sim reports whichever arm won; it cannot say whether the gap
+    is signal. The filter's whole claim is that trades on high-breadth days are
+    better trades, so test that claim directly on the trades themselves. With a
+    few hundred trades and a near-zero baseline expectancy, the honest answer is
+    often "cannot tell" — which is a result, not a failure.
+    """
+    import numpy as np
+
+    k = kept.dropna().to_numpy(dtype=float)
+    d = dropped.dropna().to_numpy(dtype=float)
+    if len(k) < 2 or len(d) < 2:
+        return {"n_kept": int(len(k)), "n_dropped": int(len(d)), "p_value": None}
+    observed = k.mean() - d.mean()
+    pool = np.concatenate([k, d])
+    rng = np.random.default_rng(seed)
+    hits = 0
+    for _ in range(iters):
+        rng.shuffle(pool)
+        if abs(pool[: len(k)].mean() - pool[len(k) :].mean()) >= abs(observed):
+            hits += 1
+    return {
+        "n_kept": int(len(k)),
+        "n_dropped": int(len(d)),
+        "mean_kept_pct": round(float(k.mean()), 3),
+        "mean_dropped_pct": round(float(d.mean()), 3),
+        "diff_pct": round(float(observed), 3),
+        "p_value": round((hits + 1) / (iters + 1), 4),
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--daily", required=True)
@@ -117,8 +150,10 @@ def main() -> int:
     # the engine happened to fire.
     cuts = build_cuts(breadth.dropna(), args.thresholds, args.quantiles)
 
+    perms: dict = {}
     for label, thr in cuts:
-        kept = detail[detail["_breadth"] >= thr].drop(columns=["_breadth"])
+        mask = detail["_breadth"] >= thr
+        kept = detail[mask].drop(columns=["_breadth"])
         if kept.empty:
             print(f"  {label} (breadth>={thr:.3f}): 0 trades — skipped")
             continue
@@ -126,8 +161,13 @@ def main() -> int:
         kept.to_csv(path, index=False)
         files.append(str(path))
         counts[f"{label}:breadth>={thr:.3f}"] = len(kept)
+        pt = permutation_test(detail.loc[mask, "pnl_pct"], detail.loc[~mask, "pnl_pct"])
+        perms[label] = {"threshold": thr, **pt}
+        pv = "n/a" if pt.get("p_value") is None else f"{pt['p_value']:.3f}"
         print(f"  {label} (breadth>={thr:.3f}): {len(kept):4d} trades kept "
-              f"({len(kept) / max(len(detail), 1) * 100:.0f}% of baseline)")
+              f"({len(kept) / max(len(detail), 1) * 100:.0f}% of baseline)  "
+              f"kept {pt.get('mean_kept_pct', float('nan')):+.2f}% vs dropped "
+              f"{pt.get('mean_dropped_pct', float('nan')):+.2f}% per trade, p={pv}")
 
     cmd = [args.python, str(PROJECT_ROOT / "scripts" / "portfolio_sim_v2.py"), *files,
            "--position-pct", *[str(p) for p in args.position_pct],
@@ -158,7 +198,9 @@ def main() -> int:
                   f"{r['utilization_pct']:>8.1f}")
 
     verdict = out_dir / "breadth_filter_sweep.json"
-    verdict.write_text(json.dumps({"trade_counts": counts, "sim": summary}, indent=2, default=str))
+    verdict.write_text(json.dumps(
+        {"trade_counts": counts, "permutation_tests": perms, "sim": summary},
+        indent=2, default=str))
     print(f"\nwrote {verdict}")
     return 0
 
