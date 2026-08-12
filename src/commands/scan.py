@@ -104,7 +104,15 @@ def _send_scan_alert(result: dict) -> None:
         }
         acc_label = ACC_MODE_CN.get(acc_mode, acc_mode.upper())
 
-        from src.core.message_format import RULE, append_footer, meta_line, pick_block, title_line
+        from src.core.io import count_abstention_streak
+        from src.core.message_format import (
+            RULE,
+            abstention_note,
+            append_footer,
+            meta_line,
+            pick_block,
+            title_line,
+        )
 
         alert_title = f"\U0001f409 龙脉扫描 — {scan_date}"
         lines = [
@@ -124,6 +132,10 @@ def _send_scan_alert(result: dict) -> None:
                 lines.append("今日无选股 — 日质量过低，主动放弃")
             else:
                 lines.append("今日无选股 — 无信号通过筛选")
+            streak, since = count_abstention_streak(scan_date, current_picks=0)
+            note = abstention_note(streak, since)
+            if note:
+                lines.append(note)
         else:
             for i, p in enumerate(picks, 1):
                 reason = _translate_reason_summary(p.get("reason_summary", ""))

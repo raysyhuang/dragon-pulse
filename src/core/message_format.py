@@ -123,6 +123,18 @@ def pick_block(
     return lines
 
 
+def abstention_note(streak: int, first_date: str | None = None) -> str:
+    """Render a run of empty sessions, so silence never passes for breakage.
+
+    Empty below two sessions — one quiet day is ordinary and a counter on it
+    would just add noise to the layout.
+    """
+    if streak < 2:
+        return ""
+    since = f" · 自 {first_date[5:]}" if first_date and len(first_date) >= 10 else ""
+    return f"<i>连续第 {streak} 个交易日无选股{since}</i>"
+
+
 def append_footer(lines: list[str], rows: list[str]) -> None:
     """Close a message with a rule + de-emphasised context, trimming blank tails."""
     while lines and not lines[-1].strip():

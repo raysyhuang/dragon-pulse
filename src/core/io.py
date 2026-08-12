@@ -126,3 +126,60 @@ def save_run_metadata(
     metadata_file = run_dir / "run_metadata.json"
     return save_json(metadata, metadata_file)
 
+
+
+def count_abstention_streak(
+    asof_date: str,
+    *,
+    root_dir: str = "outputs",
+    current_picks: Optional[int] = None,
+) -> tuple[int, Optional[str]]:
+    """Count consecutive scanned sessions ending at ``asof_date`` that emitted no picks.
+
+    A correctly-abstaining scanner and a broken one send byte-identical "no
+    picks" alerts, so the run length is the only thing that distinguishes them
+    from a phone. Returns ``(streak, first_date)`` where ``first_date`` is the
+    oldest session in the run, or ``(0, None)`` when the latest session picked.
+
+    Dates with no readable ``scan_results_<date>.json`` are skipped rather than
+    treated as a break: the archive only holds days the scanner actually ran, so
+    a missing file is absence of evidence, not evidence of a pick.
+    ``current_picks`` supplies today's count directly for callers that compose
+    the alert before the artifact lands on disk.
+    """
+    root = Path(root_dir)
+    names = set()
+    if root.is_dir():
+        for child in root.iterdir():
+            if not child.is_dir():
+                continue
+            try:
+                datetime.strptime(child.name, "%Y-%m-%d")
+            except ValueError:
+                continue
+            if child.name <= asof_date:
+                names.add(child.name)
+    if current_picks is not None:
+        names.add(asof_date)
+
+    streak = 0
+    first: Optional[str] = None
+    for name in sorted(names, reverse=True):
+        if name == asof_date and current_picks is not None:
+            picks = int(current_picks)
+        else:
+            path = root / name / f"scan_results_{name}.json"
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            picks_list = data.get("picks")
+            if not isinstance(picks_list, list):
+                continue
+            picks = len(picks_list)
+        if picks:
+            break
+        streak += 1
+        first = name
+
+    return streak, first

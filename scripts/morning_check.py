@@ -576,7 +576,14 @@ def main():
                 scan_label = f" (scan: {date_str})" if date_str != today_str else ""
                 from src.core.alerts import _regime_cn
                 regime_label = _regime_cn(regime)
-                from src.core.message_format import RULE, append_footer, meta_line, title_line
+                from src.core.io import count_abstention_streak
+                from src.core.message_format import (
+                    RULE,
+                    abstention_note,
+                    append_footer,
+                    meta_line,
+                    title_line,
+                )
 
                 alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
                 lines = [
@@ -606,6 +613,10 @@ def main():
                         lines.append(f"<i>宽度 {breadth:.1%} · {signals} 个信号已被过滤</i>")
                     else:
                         lines.append("今日无选股 — 无信号通过筛选")
+                    streak, since = count_abstention_streak(date_str, current_picks=0)
+                    note = abstention_note(streak, since)
+                    if note:
+                        lines.append(note)
                     priority = "low"
 
                 mgr = AlertManager(alert_config)
