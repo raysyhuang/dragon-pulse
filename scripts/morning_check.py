@@ -429,7 +429,7 @@ def send_open_pending_alert(
                 f"选股 <b>{len(wl_picks)}</b>",
                 f"股池 {universe_size}",
             ),
-            reconciliation_line(read_reconciliation(date_str)),
+            reconciliation_line(read_reconciliation(date_str), date_str),
             RULE,
         ]
 
@@ -587,7 +587,7 @@ def main():
                 lines = [
                     title_line("", alert_title),
                     meta_line(f"{emoji} <b>{regime_label}</b>", "选股 <b>0</b>"),
-                    reconciliation_line(read_reconciliation(date_str)),
+                    reconciliation_line(read_reconciliation(date_str), date_str),
                     RULE,
                 ]
 
@@ -753,7 +753,7 @@ def main():
                     f"注意 {len(warn_picks)}",
                     f"取消 {len(cancel_picks)}",
                 ),
-                reconciliation_line(read_reconciliation(date_str)),
+                reconciliation_line(read_reconciliation(date_str), date_str),
                 RULE,
             ]
 

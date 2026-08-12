@@ -205,13 +205,23 @@ def test_tushare_is_queried_before_ifind_so_fabrication_cannot_agree(recon, monk
 
 # --- alert surface --------------------------------------------------------
 
+def _artifact(*, agreed=4, total=4, date="2026-08-12", **over):
+    """A contract-valid artifact; keyword overrides let a test break exactly one field."""
+    from src.core.message_format import RECONCILIATION_CHECK_NAME
+    rows = [{"agree": i < agreed} for i in range(total)]
+    art = {"check": RECONCILIATION_CHECK_NAME, "binding": False, "asof": date,
+           "agreed": agreed, "total": total, "rows": rows}
+    art.update(over)
+    return art
+
+
 def _fmt():
     from src.core import message_format
     return message_format
 
 
 def test_missing_artifact_reads_as_unverified_never_healthy():
-    line = _fmt().reconciliation_line(None)
+    line = _fmt().reconciliation_line(None, "2026-08-12")
 
     assert "无法验证" in line
     assert "正常" not in line          # must never imply the data was checked
@@ -219,7 +229,7 @@ def test_missing_artifact_reads_as_unverified_never_healthy():
 
 
 def test_pass_line_claims_only_what_was_measured():
-    line = _fmt().reconciliation_line({"agreed": 4, "total": 4})
+    line = _fmt().reconciliation_line(_artifact(agreed=4, total=4), "2026-08-12")
 
     assert "✅" in line and "4/4" in line
     assert "EOD" in line and "未复权" in line   # scope, not a vendor certification
@@ -227,7 +237,7 @@ def test_pass_line_claims_only_what_was_measured():
 
 
 def test_partial_agreement_is_a_visible_failure():
-    line = _fmt().reconciliation_line({"agreed": 2, "total": 4})
+    line = _fmt().reconciliation_line(_artifact(agreed=2, total=4), "2026-08-12")
 
     assert "未通过 2/4" in line
     assert "<b>" in line               # bold: above the fold, not buried
@@ -235,7 +245,7 @@ def test_partial_agreement_is_a_visible_failure():
 
 
 def test_zero_total_is_not_reported_as_a_pass():
-    line = _fmt().reconciliation_line({"agreed": 0, "total": 0})
+    line = _fmt().reconciliation_line(_artifact(agreed=0, total=0), "2026-08-12")
 
     assert "✅" not in line
 
@@ -286,7 +296,7 @@ def test_rendered_morning_message_places_status_above_the_fold():
     lines = [
         fmt.title_line("", "🐉 龙脉扫描 — 2026-08-12 开盘检查"),
         fmt.meta_line("🔴 <b>熊市</b>", "选股 <b>0</b>"),
-        fmt.reconciliation_line({"agreed": 4, "total": 4}),
+        fmt.reconciliation_line(_artifact(agreed=4, total=4), "2026-08-12"),
         fmt.RULE,
         "今日无选股 — 无信号通过筛选",
     ]
@@ -304,7 +314,84 @@ def test_all_three_morning_layouts_carry_the_status_line():
     """Guards against wiring only the layout that happened to be under test."""
     source = (PROJECT_ROOT / "scripts" / "morning_check.py").read_text(encoding="utf-8")
 
-    assert source.count("reconciliation_line(read_reconciliation(date_str))") == 3
+    assert source.count("reconciliation_line(read_reconciliation(date_str), date_str)") == 3
     # and it precedes the rule in every one of them
-    for block in source.split("reconciliation_line(read_reconciliation(date_str)),")[1:]:
+    for block in source.split("reconciliation_line(read_reconciliation(date_str), date_str),")[1:]:
         assert block.lstrip().startswith("RULE,"), "status line must sit directly above RULE"
+
+
+# --- artifact identity contract (adversarial review, PR #17) --------------
+
+def test_foreign_artifact_at_the_expected_path_is_not_green():
+    """The exact payload from the review: right path, wrong everything else."""
+    forged = {"check": "UNRELATED", "binding": True, "asof": "1999-01-01",
+              "agreed": 4, "total": 4}
+
+    line = _fmt().reconciliation_line(forged, "2026-08-12")
+
+    assert "无法验证" in line
+    assert "✅" not in line
+
+
+@pytest.mark.parametrize("field,value", [
+    ("check", "SOMETHING_ELSE"),          # not this check
+    ("check", None),                      # unlabelled
+    ("binding", True),                    # claims to be binding
+    ("binding", "false"),                 # string, not the boolean
+    ("binding", None),                    # absent
+    ("asof", "2026-08-11"),               # yesterday's run vouching for today
+    ("agreed", True),                     # bool sneaking in as int 1
+    ("total", True),
+    ("agreed", 4.0),                      # float, not int
+    ("total", "4"),                       # string digit
+    ("total", 0),                         # nothing was checked
+    ("total", -1),
+    ("agreed", -1),
+    ("agreed", 5),                        # agreed > total
+    ("rows", []),                         # counts unbacked by rows
+    ("rows", "four"),
+])
+def test_each_contract_violation_degrades_to_unverified(field, value):
+    art = _artifact(agreed=4, total=4)
+    art[field] = value
+
+    assert not _fmt().reconciliation_is_valid(art, "2026-08-12")
+    assert "✅" not in _fmt().reconciliation_line(art, "2026-08-12")
+
+
+def test_rows_must_corroborate_the_agreed_count():
+    art = _artifact(agreed=4, total=4)
+    art["rows"][0]["agree"] = False   # counts say 4, rows say 3
+
+    assert not _fmt().reconciliation_is_valid(art, "2026-08-12")
+
+
+def test_a_wholly_valid_artifact_still_passes():
+    assert _fmt().reconciliation_is_valid(_artifact(agreed=4, total=4), "2026-08-12")
+
+
+def test_real_emitted_artifact_satisfies_its_own_contract(recon, tmp_path):
+    """The writer and the reader must agree, or green is unreachable in production."""
+    from dataclasses import asdict
+    rows = [recon.Row(code=i.code, name=i.name, kind=i.kind, tushare=1.0, ifind=1.0, agree=True)
+            for i in recon.INSTRUMENTS]
+    artifact = {
+        "check": recon.CHECK_NAME, "binding": False, "asof": "2026-08-12",
+        "session": "20260811", "agreed": len(rows), "total": len(rows),
+        "rows": [asdict(r) for r in rows],
+    }
+
+    assert _fmt().reconciliation_is_valid(artifact, "2026-08-12")
+
+
+# --- canonical provider transport ----------------------------------------
+
+def test_canonical_provider_url_is_https(recon):
+    """Shipping the Tushare token over cleartext would undercut the premise."""
+    assert recon.TUSHARE_ENDPOINT.startswith("https://")
+
+
+def test_no_cleartext_tushare_url_remains_in_this_script():
+    source = (PROJECT_ROOT / "scripts" / "source_reconciliation.py").read_text(encoding="utf-8")
+
+    assert "http://api.tushare.pro" not in source

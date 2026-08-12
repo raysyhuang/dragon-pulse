@@ -123,20 +123,59 @@ def pick_block(
     return lines
 
 
-def reconciliation_line(recon: dict | None) -> str:
+RECONCILIATION_CHECK_NAME = "SOURCE_RECONCILIATION_HEALTHCHECK_NON_BINDING"
+
+
+def reconciliation_is_valid(recon: object, expected_date: str) -> bool:
+    """Does this artifact actually attest to today's check, in full?
+
+    Reading counts out of whatever JSON happens to sit at the expected path is
+    not verification — it trusts the filename. A stale artifact from a previous
+    run, an unrelated tool's output, or a hand-edited file would all render
+    green while attesting to nothing. Since this line reaches a human who then
+    places IBKR orders, only an artifact matching the contract exactly may show
+    a pass; everything else degrades to unverified.
+    """
+    if not isinstance(recon, dict):
+        return False
+    if recon.get("check") != RECONCILIATION_CHECK_NAME:
+        return False
+    if recon.get("binding") is not False:          # identity, not truthiness
+        return False
+    if recon.get("asof") != expected_date:         # a prior run must not vouch for today
+        return False
+
+    agreed, total = recon.get("agreed"), recon.get("total")
+    for value in (agreed, total):
+        # bool is an int subclass; True would otherwise sail through as 1.
+        if isinstance(value, bool) or not isinstance(value, int):
+            return False
+    if total <= 0 or not (0 <= agreed <= total):
+        return False
+
+    rows = recon.get("rows")
+    if not isinstance(rows, list) or len(rows) != total:
+        return False
+    if sum(1 for r in rows if isinstance(r, dict) and r.get("agree") is True) != agreed:
+        return False
+    return True
+
+
+def reconciliation_line(recon: dict | None, expected_date: str) -> str:
     """Top-of-message cross-source status for the morning alert.
 
     Sits above the fold rather than in the collapsed diagnostics block: a health
     check nobody reads is the failure mode this whole layer exists to remove.
     A pass is worded to claim exactly what was measured — four anchors, EOD,
     unadjusted — because "数据正常" would be a broader promise than the check makes.
-    A missing artifact is reported as unverified, never as healthy.
+
+    ``expected_date`` is required rather than optional: an artifact that cannot
+    be tied to the session being reported on is not evidence about it.
     """
-    if not recon:
-        return "数据交叉核验：⚠️ <b>无法验证</b>（未运行 · 主扫描仍为 TuShare）"
-    agreed = int(recon.get("agreed") or 0)
-    total = int(recon.get("total") or 0)
-    if total and agreed == total:
+    if not reconciliation_is_valid(recon, expected_date):
+        return "数据交叉核验：⚠️ <b>无法验证</b>（无有效核验记录 · 主扫描仍为 TuShare）"
+    agreed, total = int(recon["agreed"]), int(recon["total"])
+    if agreed == total:
         return f"数据交叉核验：✅ {agreed}/{total} 锚点一致（仅 EOD 未复权收盘）"
     return f"数据交叉核验：⚠️ <b>未通过 {agreed}/{total}</b>（主扫描仍为 TuShare）"
 

@@ -52,13 +52,19 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
+# TLS, with ordinary certificate verification. This script exists to protect
+# source integrity; shipping the canonical token over cleartext HTTP while doing
+# so would undercut the entire premise. Exposed as a constant so a regression
+# test can assert the scheme.
+TUSHARE_ENDPOINT = "https://api.tushare.pro"
 IFIND_BASE = "https://api-mcp.51ifind.com:8643/ds-mcp-servers/"
 
 # Named deliberately. A pass means four anchor instruments' unadjusted EOD closes
 # matched — nothing about financials, adjusted series, full-market coverage, or
 # whether iFinD could substitute for Tushare. The label travels with the artifact
 # so downstream readers cannot quietly upgrade it into "data verified".
-CHECK_NAME = "SOURCE_RECONCILIATION_HEALTHCHECK_NON_BINDING"
+sys.path.insert(0, str(PROJECT_ROOT))
+from src.core.message_format import RECONCILIATION_CHECK_NAME as CHECK_NAME  # noqa: E402
 
 # Instruments to reconcile. Index first — it is the regime gate's own input, so
 # a divergence there changes what the scanner does. The equities widen coverage
@@ -125,7 +131,7 @@ def _secret(name: str) -> str:
 def tushare_call(token: str, api: str, params: dict, fields: str = "") -> list[dict]:
     body = json.dumps({"api_name": api, "token": token, "params": params, "fields": fields}).encode()
     req = urllib.request.Request(
-        "http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"}
+        TUSHARE_ENDPOINT, data=body, headers={"Content-Type": "application/json"}
     )
     try:
         r = json.loads(urllib.request.urlopen(req, timeout=60).read())
