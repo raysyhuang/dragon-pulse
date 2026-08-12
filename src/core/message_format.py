@@ -123,6 +123,24 @@ def pick_block(
     return lines
 
 
+def reconciliation_line(recon: dict | None) -> str:
+    """Top-of-message cross-source status for the morning alert.
+
+    Sits above the fold rather than in the collapsed diagnostics block: a health
+    check nobody reads is the failure mode this whole layer exists to remove.
+    A pass is worded to claim exactly what was measured — four anchors, EOD,
+    unadjusted — because "数据正常" would be a broader promise than the check makes.
+    A missing artifact is reported as unverified, never as healthy.
+    """
+    if not recon:
+        return "数据交叉核验：⚠️ <b>无法验证</b>（未运行 · 主扫描仍为 TuShare）"
+    agreed = int(recon.get("agreed") or 0)
+    total = int(recon.get("total") or 0)
+    if total and agreed == total:
+        return f"数据交叉核验：✅ {agreed}/{total} 锚点一致（仅 EOD 未复权收盘）"
+    return f"数据交叉核验：⚠️ <b>未通过 {agreed}/{total}</b>（主扫描仍为 TuShare）"
+
+
 def append_footer(lines: list[str], rows: list[str]) -> None:
     """Close a message with a rule + de-emphasised context, trimming blank tails."""
     while lines and not lines[-1].strip():
