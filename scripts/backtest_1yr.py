@@ -284,7 +284,56 @@ def apply_score_floor(
     return [candidate for candidate in candidates if candidate[1].score >= score_floor]
 
 
-def get_cn_trading_days(start: date, end: date, bundle_dir: str | Path | None = None) -> list[date]:
+PIT_SCHEDULE_PROVENANCE = "TRUSTED_HISTORICAL_ASSUMPTION"
+
+
+def dump_pit_schedule(schedule, path, *, universe_n: int, rebalance_months: int) -> str:
+    """Freeze the membership schedule and return its sha256.
+
+    Labelled TRUSTED_HISTORICAL_ASSUMPTION deliberately. The provider answers a
+    historical market-cap query with what it believes today; it does not attest
+    to what it would have said on the rebalance date. Freezing makes the replay
+    reproducible, which is a different and weaker claim than making it correct,
+    and the label keeps those apart.
+    """
+    payload = {
+        "artifact": "DP_PIT_MEMBERSHIP_SCHEDULE",
+        "provenance": PIT_SCHEDULE_PROVENANCE,
+        "provenance_note": (
+            "Membership is provider-CURRENT as-of resolution, not provider-as-of. "
+            "No source receipt attests to the ranking on the rebalance date."
+        ),
+        "universe_n": universe_n,
+        "rebalance_months": rebalance_months,
+        "rebalances": [
+            {"date": d.isoformat(), "members": sorted(members)} for d, members in schedule
+        ],
+    }
+    blob = json.dumps(payload, indent=2, sort_keys=False)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(blob, encoding="utf-8")
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def load_pit_schedule(path):
+    """Read a frozen schedule. Fails closed on a shape it cannot trust."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("artifact") != "DP_PIT_MEMBERSHIP_SCHEDULE":
+        raise RuntimeError(f"{path} is not a PIT membership schedule")
+    rebalances = data.get("rebalances")
+    if not isinstance(rebalances, list) or not rebalances:
+        raise RuntimeError(f"{path} contains no rebalances")
+    out = []
+    for r in rebalances:
+        members = r.get("members")
+        if not isinstance(members, list) or not members:
+            raise RuntimeError(f"{path} has a rebalance with no members: {r.get('date')}")
+        out.append((datetime.strptime(r["date"], "%Y-%m-%d").date(), set(members)))
+    return sorted(out, key=lambda x: x[0])
+
+
+def get_cn_trading_days(start: date, end: date, bundle_dir: str | Path | None = None,
+                        calendar_receipt: str | Path | None = None) -> list[date]:
     """Real SSE open sessions, fetched and validated — never a weekday guess.
 
     Fails closed. An approximate calendar is what produced trades on days the
@@ -298,6 +347,23 @@ def get_cn_trading_days(start: date, end: date, bundle_dir: str | Path | None = 
     # column IS the session receipt — real sessions, hash-bound, no provider.
     # Reaching for the network here would break the offline guarantee that is the
     # whole point of bundle mode.
+    # A frozen trade_cal receipt makes the calendar replayable without a provider.
+    # Without this, an offline PIT replay still needed the network for its session
+    # list, so freezing only the membership schedule would not have closed the gap.
+    if calendar_receipt:
+        payload = json.loads(Path(calendar_receipt).read_text(encoding="utf-8"))
+        data = payload.get("data", {})
+        if data.get("fields") != ["cal_date", "is_open"]:
+            raise RuntimeError(f"frozen calendar receipt has unexpected schema: {data.get('fields')}")
+        days = sorted(
+            datetime.strptime(str(row[0]), "%Y%m%d").date()
+            for row in data.get("items", []) if int(row[1]) == 1
+        )
+        days = [d for d in days if start <= d <= end]
+        if not days:
+            raise RuntimeError(f"frozen calendar receipt covers no sessions in {start}..{end}")
+        return days
+
     if bundle_dir:
         index_csv = Path(bundle_dir) / "prices" / "000300.SH.csv"
         if not index_csv.is_file():
@@ -683,6 +749,12 @@ def main():
                              "point_in_time = top-N by market cap as of each rebalance (unbiased)")
     parser.add_argument("--universe-n", type=int, default=1000,
                         help="Universe size (top-N by market cap)")
+    parser.add_argument("--calendar-in", default="",
+                        help="Replay from a frozen trade_cal receipt; skips the provider entirely.")
+    parser.add_argument("--pit-schedule-out", default="",
+                        help="Freeze the point-in-time membership schedule to this path.")
+    parser.add_argument("--pit-schedule-in", default="",
+                        help="Replay from a frozen membership schedule; skips the provider entirely.")
     parser.add_argument("--universe-rebalance-months", type=int, default=1,
                         help="Point-in-time universe rebalance cadence in months")
     parser.add_argument("--outputs-root", default="outputs",
@@ -746,7 +818,8 @@ def main():
     config_excluded_regimes = parse_regime_set((config.get("acceptance") or {}).get("excluded_regimes", []))
     excluded_regimes |= config_excluded_regimes
 
-    trading_days = get_cn_trading_days(start_date, end_date, bundle_dir=args.input_bundle or None)
+    trading_days = get_cn_trading_days(start_date, end_date, bundle_dir=args.input_bundle or None,
+                                       calendar_receipt=args.calendar_in or None)
     if args.max_days > 0:
         trading_days = trading_days[:args.max_days]
 
@@ -792,10 +865,26 @@ def main():
                 logger.error("No execution watchlist tickers found under %s for %s to %s", args.outputs_root, args.start, args.end)
                 return 1
         elif args.universe_mode == "point_in_time":
-            pit_schedule = build_pit_universe_schedule(start_date, end_date, n=args.universe_n, rebalance_months=args.universe_rebalance_months, provider_config=provider_config)
+            # The membership schedule decides which signals can exist at all, so a
+            # replay that rebuilds it from a live provider is not reproducible:
+            # get_top_n_cn_by_market_cap_asof returns the provider's CURRENT answer
+            # for a historical date, which drifts with restatements and delistings.
+            # A frozen schedule makes signal generation replayable offline; without
+            # one, only the results and the ledger were ever verifiable.
+            if args.pit_schedule_in:
+                pit_schedule = load_pit_schedule(args.pit_schedule_in)
+                logger.info("PIT schedule loaded from %s (%d rebalances) — no provider call",
+                            args.pit_schedule_in, len(pit_schedule))
+            else:
+                pit_schedule = build_pit_universe_schedule(start_date, end_date, n=args.universe_n, rebalance_months=args.universe_rebalance_months, provider_config=provider_config)
             if not pit_schedule:
                 logger.error("Point-in-time universe build returned no members.")
                 return 1
+            if args.pit_schedule_out:
+                dump_pit_schedule(pit_schedule, args.pit_schedule_out,
+                                  universe_n=args.universe_n,
+                                  rebalance_months=args.universe_rebalance_months)
+                logger.info("PIT schedule frozen to %s", args.pit_schedule_out)
             universe = sorted({ticker for _, members in pit_schedule for ticker in members})
         else:
             universe = get_top_n_cn_by_market_cap(n=args.universe_n, provider_config=provider_config)

@@ -101,6 +101,9 @@ def main() -> int:
         "recomputable": bool(args.cache_url) or "VERIFY_ARTIFACT_ONLY_NOT_RECOMPUTABLE",
         "claim_boundary": [
             "Corrected-but-unattested diagnostic measurement.",
+            "Signal generation IS now offline-reproducible from the frozen schedule, "
+            "calendar receipt and price cache; membership correctness remains a "
+            "TRUSTED_HISTORICAL_ASSUMPTION, not an attested fact.",
             "Supports only: the live 30-session drought has historical precedent.",
             "Does NOT update the playbook, endorse the annualised return, alter the "
             "selector, or reopen the PR #16 breadth conclusion.",
@@ -136,6 +139,22 @@ def main() -> int:
             "receipt_file": "trade_cal_receipt.json",
         },
         "inputs": {
+            "pit_membership_schedule": {
+                "file": "pit_membership_schedule.json",
+                "sha256": sha256_file(run / "pit_membership_schedule.json")
+                          if (run / "pit_membership_schedule.json").exists() else None,
+                "provenance": "TRUSTED_HISTORICAL_ASSUMPTION",
+                "note": ("Membership is provider-CURRENT as-of resolution, not provider-as-of; "
+                         "no receipt attests to the ranking on the rebalance date. Freezing makes "
+                         "signal generation reproducible, which is weaker than making it correct."),
+                "consume_with": "--pit-schedule-in",
+            },
+            "trade_cal_receipt": {
+                "file": "trade_cal_receipt.json",
+                "sha256": sha256_file(run / "trade_cal_receipt.json")
+                          if (run / "trade_cal_receipt.json").exists() else None,
+                "consume_with": "--calendar-in",
+            },
             "snapshot_cache": {
                 **{k: v for k, v in snaps.items() if k != "files"},
                 "download_url": args.cache_url or None,
