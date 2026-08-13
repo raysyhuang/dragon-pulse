@@ -14,8 +14,12 @@ import argparse
 import hashlib
 import json
 import logging
+import os
+import ssl
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -281,14 +285,29 @@ def apply_score_floor(
 
 
 def get_cn_trading_days(start: date, end: date) -> list[date]:
-    """Generate weekdays between start and end (approximate CN trading calendar)."""
-    days = []
-    current = start
-    while current <= end:
-        if current.weekday() < 5:
-            days.append(current)
-        current += timedelta(days=1)
-    return days
+    """Fetch and validate real SSE open sessions from TuShare's trade calendar."""
+    token = os.environ.get("TUSHARE_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("TUSHARE_TOKEN is required to obtain authoritative SSE trading sessions")
+    params = {"exchange": "SSE", "start_date": start.strftime("%Y%m%d"), "end_date": end.strftime("%Y%m%d"), "is_open": "1"}
+    body = json.dumps({"api_name": "trade_cal", "token": token, "params": params, "fields": "cal_date,is_open"}, separators=(",", ":")).encode("utf-8")
+    try:
+        request = urllib.request.Request("https://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
+        payload = json.loads(urllib.request.urlopen(request, timeout=45, context=ssl.create_default_context()).read())
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"unable to fetch authoritative SSE trading calendar: {exc}") from exc
+    if payload.get("code") != 0:
+        raise RuntimeError(f"TuShare trade_cal rejected request: {payload.get('msg', '')}")
+    data = payload.get("data", {})
+    if data.get("fields") != ["cal_date", "is_open"]:
+        raise RuntimeError(f"unexpected trade_cal schema: {data.get('fields')}")
+    try:
+        sessions = sorted(datetime.strptime(str(row[0]), "%Y%m%d").date() for row in data.get("items", []) if int(row[1]) == 1)
+    except (IndexError, TypeError, ValueError) as exc:
+        raise RuntimeError("malformed trade_cal rows") from exc
+    if not sessions or sessions[0] < start or sessions[-1] > end or any(day < start or day > end for day in sessions):
+        raise RuntimeError("trade_cal returned invalid session bounds")
+    return sessions
 
 
 def evaluate_pick(
