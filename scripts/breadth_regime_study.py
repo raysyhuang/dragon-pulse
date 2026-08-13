@@ -84,7 +84,7 @@ def call(api: str, params: dict, fields: str = "", tries: int = 6) -> dict:
     for attempt in range(tries):
         try:
             req = urllib.request.Request(
-                "http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"}
+                "https://api.tushare.pro", data=body, headers={"Content-Type": "application/json"}
             )
             r = json.loads(urllib.request.urlopen(req, timeout=90).read())
             if r.get("code") == 0:

@@ -36,7 +36,7 @@ TOK = _token()
 
 def call(api, params):
     body = json.dumps({"api_name": api, "token": TOK, "params": params, "fields": ""}).encode()
-    req = urllib.request.Request("http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
+    req = urllib.request.Request("https://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
     for _ in range(3):
         try:
             r = json.loads(urllib.request.urlopen(req, timeout=45).read())

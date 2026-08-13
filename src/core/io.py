@@ -183,3 +183,18 @@ def count_abstention_streak(
         first = name
 
     return streak, first
+
+
+def read_reconciliation(date: str, *, root_dir: str = "outputs") -> Optional[dict]:
+    """Load the day's cross-source health check, or None when it did not run.
+
+    Returns None rather than raising: the check is non-binding, so its absence
+    must degrade the alert to "unverified" and never block or crash the morning
+    message that carries the actual picks.
+    """
+    path = Path(root_dir) / date / f"source_reconciliation_{date}.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None

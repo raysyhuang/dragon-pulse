@@ -54,7 +54,7 @@ def _index_daily(code: str, tok: str) -> pd.DataFrame:
         body = json.dumps({"api_name": "index_daily", "token": tok,
                            "params": {"ts_code": code, "start_date": f"{y}0101", "end_date": f"{y}1231"},
                            "fields": ""}).encode()
-        req = urllib.request.Request("http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
+        req = urllib.request.Request("https://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
         r = json.loads(urllib.request.urlopen(req, timeout=40).read())
         if r.get("code") == 0 and r["data"]["items"]:
             frames.append(pd.DataFrame(r["data"]["items"], columns=r["data"]["fields"]))
@@ -84,7 +84,7 @@ def refresh_indices() -> None:
             continue
         body = json.dumps({"api_name": "index_daily", "token": tok,
                            "params": {"ts_code": code, "start_date": start, "end_date": today}, "fields": ""}).encode()
-        req = urllib.request.Request("http://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
+        req = urllib.request.Request("https://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
         r = json.loads(urllib.request.urlopen(req, timeout=40).read())
         if r.get("code") == 0 and r["data"]["items"]:
             new = pd.DataFrame(r["data"]["items"], columns=r["data"]["fields"])

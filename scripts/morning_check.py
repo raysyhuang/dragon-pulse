@@ -417,7 +417,9 @@ def send_open_pending_alert(
         emoji = _regime_emoji(regime)
         scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
 
-        from src.core.message_format import RULE, append_footer, meta_line, pick_block, title_line
+        from src.core.io import read_reconciliation
+        from src.core.message_format import (RULE, append_footer, meta_line, pick_block,
+                                             reconciliation_line, title_line)
 
         alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
         lines = [
@@ -427,6 +429,7 @@ def send_open_pending_alert(
                 f"选股 <b>{len(wl_picks)}</b>",
                 f"股池 {universe_size}",
             ),
+            reconciliation_line(read_reconciliation(date_str), date_str),
             RULE,
         ]
 
@@ -576,12 +579,13 @@ def main():
                 scan_label = f" (scan: {date_str})" if date_str != today_str else ""
                 from src.core.alerts import _regime_cn
                 regime_label = _regime_cn(regime)
-                from src.core.io import count_abstention_streak
+                from src.core.io import count_abstention_streak, read_reconciliation
                 from src.core.message_format import (
                     RULE,
                     abstention_note,
                     append_footer,
                     meta_line,
+                    reconciliation_line,
                     title_line,
                 )
 
@@ -589,6 +593,7 @@ def main():
                 lines = [
                     title_line("", alert_title),
                     meta_line(f"{emoji} <b>{regime_label}</b>", "选股 <b>0</b>"),
+                    reconciliation_line(read_reconciliation(date_str), date_str),
                     RULE,
                 ]
 
@@ -739,7 +744,9 @@ def main():
 
             emoji = _regime_emoji(regime)
             scan_label = f" (扫描: {date_str})" if date_str != today_str else ""
-            from src.core.message_format import RULE, append_footer, meta_line, pick_block, title_line
+            from src.core.io import read_reconciliation
+            from src.core.message_format import (RULE, append_footer, meta_line, pick_block,
+                                                 reconciliation_line, title_line)
 
             alert_title = f"\U0001f409 龙脉扫描 — {today_str} 开盘检查{scan_label}"
             ACTION_CN = {"GO": "执行", "WARN": "注意", "CANCEL": "取消"}
@@ -756,6 +763,7 @@ def main():
                     f"注意 {len(warn_picks)}",
                     f"取消 {len(cancel_picks)}",
                 ),
+                reconciliation_line(read_reconciliation(date_str), date_str),
                 RULE,
             ]
 

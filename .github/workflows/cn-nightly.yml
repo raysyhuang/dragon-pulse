@@ -98,6 +98,24 @@ jobs:
             cat "${WL_FILE}" | python -m json.tool | head -30
           fi
 
+      - name: Source reconciliation health check (NON-BINDING)
+        if: steps.check.outputs.skip != 'true'
+        continue-on-error: true
+        env:
+          TUSHARE_TOKEN: ${{ secrets.TUSHARE_TOKEN }}
+          IFIND_API_KEY: ${{ secrets.IFIND_API_KEY }}
+        run: |
+          TRADE_DATE="${{ steps.date.outputs.trade_date }}"
+          # SOURCE_RECONCILIATION_HEALTHCHECK_NON_BINDING.
+          # Cross-checks four anchor instruments' unadjusted EOD closes against
+          # iFinD. Deliberately continue-on-error: TuShare stays canonical, and a
+          # divergence or an unreachable second provider must never block the
+          # scan, alter the day's artifacts, or turn a legitimate no-pick day
+          # into a false failure. The result reaches the morning alert as a
+          # status line; failure here is reported, not enforced.
+          python scripts/source_reconciliation.py --date "${TRADE_DATE}" || \
+            echo "reconciliation did not pass — surfaced in the morning alert, scan unaffected"
+
       - name: Top-1/day paper track (A/B vs live top-2 + CSI300)
         if: steps.check.outputs.skip != 'true'
         continue-on-error: true
