@@ -1,8 +1,8 @@
 {
   "artifact": "DP_REPLAY_BUNDLE_PIT5Y_FINAL",
-  "status": "RESEARCH_ONLY_NON_BINDING",
+  "status": "SUPERSEDED_INVALID_FOR_VERIFICATION",
   "ratified": false,
-  "recomputable": true,
+  "recomputable": false,
   "claim_boundary": [
     "Corrected-but-unattested diagnostic measurement.",
     "Supports only: the live 30-session drought has historical precedent.",
@@ -64,5 +64,15 @@
     "backtest_detail_pit5y_final__equity_curve_20.0pct.csv": "7333dede1508ae52c80510aaa65509d75db0d1466aa98ff6fbb038c7174de366",
     "portfolio_sim_v2_summary.json": "21c92587756356d7b447d8f51ce4051125af2cb578de2a42ca0919c4d8d3431b"
   },
-  "bundle_composite_sha256": "f1d133ec8e4af1037bb9a1c572b5a4144e20becbaa67c5c4f7ffbd6d21660b44"
+  "bundle_composite_sha256": "f1d133ec8e4af1037bb9a1c572b5a4144e20becbaa67c5c4f7ffbd6d21660b44",
+  "superseded_reason": [
+    "Output artifacts were generated BEFORE the max_drawdown_pct -> per_trade_compounded_dd_pct rename, so the committed summary does not match its own generator.",
+    "get_cn_trading_days required a live provider, breaking sealed offline bundle replay.",
+    "Pick counts were reported as 641 without reconciling the summary's 616 (filled) \u2014 641 emitted = 616 filled + 25 skipped."
+  ],
+  "superseded_scope": "output hashes and bundle_composite_sha256 are INVALID for verification",
+  "still_valid": {
+    "snapshot_cache_archive_sha256": "3b4bc3d67733547fda2115d2ffc98571130cbb5dd891f6dc605ac345d7f22b76",
+    "note": "the release asset is inputs-only and unaffected; it will be re-referenced by the rebuilt bundle"
+  }
 }
