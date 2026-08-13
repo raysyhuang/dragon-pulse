@@ -109,18 +109,41 @@ def main() -> int:
             "selector, or reopen the PR #16 breadth conclusion.",
         ],
         "hash_algorithm": HASH_SPEC,
+        # The live-acquisition form was published here, which would send a reviewer
+        # to a provider and rebuild the universe rather than replay it. What follows
+        # is the command that actually reproduces this bundle offline.
         "command": (
             f"python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 "
             f"--universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent "
-            f"--label {lab} --out-dir {run} --price-snapshot-dir {run}/snapshots "
-            f"--dump-picks {run}/picks.json"
+            f"--label {lab} --out-dir <OUT> --price-snapshot-dir <EXTRACTED>/snapshots "
+            f"--pit-schedule-in <BUNDLE>/pit_membership_schedule.json "
+            f"--calendar-in <BUNDLE>/trade_cal_receipt.json "
+            f"--dump-picks <OUT>/picks.json"
         ),
+        "clean_machine_reproduction": [
+            "git clone <repo> && git checkout <replay_code_commit>",
+            f"curl -L -o snapshots.tgz {args.cache_url or '<cache_url>'}",
+            "shasum -a 256 snapshots.tgz   # must equal snapshot_archive.sha256",
+            "tar -xzf snapshots.tgz -C <EXTRACTED>",
+            "python scripts/verify_replay_bundle.py --run-dir <BUNDLE>   # hashes + offline replay",
+            "# or run the command above directly with TUSHARE_TOKEN unset and no network",
+        ],
         "sim_command": (
             f"python scripts/portfolio_sim_v2.py {detail} --position-pct 20 --max-concurrent 5"
         ),
         "code": {
-            "git_base": subprocess.run(["git", "rev-parse", "HEAD"],
-                                       capture_output=True, text=True).stdout.strip(),
+            # A bundle cannot name the commit that contains it: writing the bundle
+            # creates the commit. Recording HEAD here therefore always lags by one,
+            # which is exactly the mismatch review caught (git_base dc5b646 against
+            # head edc8a11). The content hashes below are self-consistent and are
+            # the authoritative identity; this SHA is the commit whose code RAN the
+            # replay, which is a different and weaker claim.
+            "identity_note": ("replay_code_commit is the commit whose code produced this "
+                              "replay. It is NOT the PR head and cannot be: committing this "
+                              "file advances head. Verify against the *_sha256 fields."),
+            "authoritative_identity": "runner_sha256 + simulator_sha256 + config_sha256",
+            "replay_code_commit": subprocess.run(["git", "rev-parse", "HEAD"],
+                                                 capture_output=True, text=True).stdout.strip(),
             "runner_sha256": sha256_file(PROJECT_ROOT / "scripts" / "backtest_1yr.py"),
             "simulator_sha256": sha256_file(PROJECT_ROOT / "scripts" / "portfolio_sim_v2.py"),
             "config_sha256": sha256_file(PROJECT_ROOT / "config" / "default.yaml"),

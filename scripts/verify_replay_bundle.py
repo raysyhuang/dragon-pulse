@@ -180,6 +180,7 @@ def main() -> int:
         "verifier": "DP_REPLAY_BUNDLE_VERIFIER",
         "verified_at_utc": datetime.now(timezone.utc).isoformat(),
         "commit_under_test": head,
+        "replay_code_commit_in_bundle": bundle.get("code", {}).get("replay_code_commit"),
         "bundle_artifact": bundle["artifact"],
         "bundle_composite_sha256": bundle.get("bundle_composite_sha256"),
         "replay_executed": not args.skip_replay,

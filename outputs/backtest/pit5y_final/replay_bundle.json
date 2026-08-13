@@ -10,10 +10,20 @@
     "Does NOT update the playbook, endorse the annualised return, alter the selector, or reopen the PR #16 breadth conclusion."
   ],
   "hash_algorithm": "sha256 over file bytes; a composite is sha256 over the newline-joined 'name:sha256' pairs of its members, sorted by name",
-  "command": "python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_final --out-dir outputs/backtest/pit5y_final --price-snapshot-dir outputs/backtest/pit5y_final/snapshots --dump-picks outputs/backtest/pit5y_final/picks.json",
+  "command": "python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_final --out-dir <OUT> --price-snapshot-dir <EXTRACTED>/snapshots --pit-schedule-in <BUNDLE>/pit_membership_schedule.json --calendar-in <BUNDLE>/trade_cal_receipt.json --dump-picks <OUT>/picks.json",
+  "clean_machine_reproduction": [
+    "git clone <repo> && git checkout <replay_code_commit>",
+    "curl -L -o snapshots.tgz https://github.com/raysyhuang/dragon-pulse/releases/download/pit5y-replay-cache-v1/dp-pit5y-final-snapshots.tgz",
+    "shasum -a 256 snapshots.tgz   # must equal snapshot_archive.sha256",
+    "tar -xzf snapshots.tgz -C <EXTRACTED>",
+    "python scripts/verify_replay_bundle.py --run-dir <BUNDLE>   # hashes + offline replay",
+    "# or run the command above directly with TUSHARE_TOKEN unset and no network"
+  ],
   "sim_command": "python scripts/portfolio_sim_v2.py outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv --position-pct 20 --max-concurrent 5",
   "code": {
-    "git_base": "dc5b64623f9aae1ffe376ecc3b7b777dd2686cfe",
+    "identity_note": "replay_code_commit is the commit whose code produced this replay. It is NOT the PR head and cannot be: committing this file advances head. Verify against the *_sha256 fields.",
+    "authoritative_identity": "runner_sha256 + simulator_sha256 + config_sha256",
+    "replay_code_commit": "edc8a1183297ca63fa2b52713bbdf851eaf89c20",
     "runner_sha256": "55ab66ca6f560d5eaca50a147a53c45e62514d87787ed1a585f1939a4ccafe60",
     "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
     "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
