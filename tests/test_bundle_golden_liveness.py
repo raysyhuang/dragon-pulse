@@ -105,30 +105,63 @@ def test_daily_breadth_column_is_blank_when_acceptance_is_off(tmp_path):
         assert row["breadth_above_sma20"] == ""
 
 
-def test_sealed_bundle_replay_needs_no_provider_and_no_env(tmp_path, monkeypatch):
-    """Bundle mode must resolve its calendar offline, from the bundle's own receipt.
+def _no_network_env(tmp_path):
+    """Env for a child interpreter that cannot open a socket.
 
-    Acceptance is not "the test passes without a token" — it is that a sealed
-    replay completes with TUSHARE_TOKEN unset AND .env unreachable AND the
-    network refused, using the manifest-hashed CSI300 price file as the session
-    receipt. The earlier calendar fix traded the offline guarantee for accuracy
-    and nobody noticed, because every dev machine has a token in .env.
+    A monkeypatch in the pytest process does NOT cross subprocess.run — the
+    child is a fresh interpreter and inherits none of it. Demonstrated: with the
+    parent patched, the child still reached the internet. sitecustomize is
+    imported by the child at startup, before the runner, so the block is real.
     """
-    import socket
-
-    bundle = make_golden_mr_bundle(tmp_path)
-    out_dir = tmp_path / "out"
-
+    site = tmp_path / "nonet"
+    site.mkdir(exist_ok=True)
+    # Block connecting, not the socket type. Replacing socket.socket breaks
+    # `class SSLSocket(socket)` in ssl.py at import time, which fails the run for
+    # the wrong reason and would read as "attempted network".
+    (site / "sitecustomize.py").write_text(
+        "import socket\n"
+        "def _blocked(*a, **k):\n"
+        "    raise RuntimeError('NETWORK_BLOCKED_BY_TEST')\n"
+        "socket.create_connection = _blocked\n"
+        "socket.socket.connect = _blocked\n"
+        "socket.socket.connect_ex = _blocked\n",
+        encoding="utf-8",
+    )
     env = dict(os.environ)
     env.pop("TUSHARE_TOKEN", None)
-    env["HOME"] = str(tmp_path)          # nothing to fall back to
-    env["DP_TEST_NO_NETWORK"] = "1"
+    env["HOME"] = str(tmp_path)                 # .env fallback unreachable
+    env["PYTHONPATH"] = str(site)
+    return env
 
-    # Prove the receipt is what gets used: block sockets in-process too.
-    def _no_network(*_a, **_kw):
-        raise AssertionError("bundle mode attempted a network call")
 
-    monkeypatch.setattr(socket, "create_connection", _no_network)
+def test_the_network_blocker_actually_blocks(tmp_path):
+    """Positive control. Without it, a sitecustomize that failed to load would
+    make the offline test pass for the wrong reason — which is the exact class
+    of false green this suite keeps catching."""
+    env = _no_network_env(tmp_path)
+
+    probe = subprocess.run(
+        [sys.executable, "-c",
+         "import socket; socket.create_connection(('example.com', 80), timeout=2)"],
+        capture_output=True, text=True, env=env, timeout=60,
+    )
+
+    assert probe.returncode != 0, "network blocker is not in effect"
+    assert "NETWORK_BLOCKED_BY_TEST" in probe.stderr
+
+
+def test_sealed_bundle_replay_needs_no_provider_and_no_env(tmp_path):
+    """A sealed replay must complete offline, from the bundle's own receipt.
+
+    Acceptance is not "passes without a token" — it is that the run finishes
+    with TUSHARE_TOKEN unset, .env unreachable, and every socket call raising
+    inside the child process. The earlier calendar fix traded the offline
+    guarantee for accuracy and went unnoticed, because dev machines always have
+    a token in .env.
+    """
+    bundle = make_golden_mr_bundle(tmp_path)
+    out_dir = tmp_path / "out"
+    env = _no_network_env(tmp_path)
 
     completed = subprocess.run(
         [sys.executable, "scripts/backtest_1yr.py", "--input-bundle", str(bundle),
@@ -138,8 +171,9 @@ def test_sealed_bundle_replay_needs_no_provider_and_no_env(tmp_path, monkeypatch
         cwd=PROJECT_ROOT, capture_output=True, text=True, check=False, env=env,
     )
 
-    assert completed.returncode == 0, completed.stderr
+    assert "NETWORK_BLOCKED_BY_TEST" not in completed.stderr, "bundle mode attempted a network call"
     assert "TUSHARE_TOKEN required" not in completed.stderr
+    assert completed.returncode == 0, completed.stderr
     assert (out_dir / "backtest_daily.csv").exists()
 
 
