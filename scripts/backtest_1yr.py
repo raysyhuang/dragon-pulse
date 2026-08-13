@@ -112,6 +112,35 @@ def _snapshot_path(snapshot_dir: Path, ticker: str) -> Path:
     return snapshot_dir / f"{safe}.csv"
 
 
+def _snapshot_covers_range(df: pd.DataFrame, start: date, end: date) -> bool:
+    """Return whether a cached frame spans both requested calendar endpoints."""
+    if df.empty:
+        return False
+    index = pd.to_datetime(df.index, errors="coerce")
+    if index.isna().any():
+        return False
+    return index.min().date() <= start and index.max().date() >= end
+
+
+def _assert_csi_regime_coverage(csi300_df: pd.DataFrame, trading_days: list[date], sma_long: int) -> None:
+    """Fail before replay when CSI300 cannot form a regime on every scan day."""
+    if not trading_days:
+        raise ValueError("CSI300 regime coverage inadequate: no requested trading days")
+    if csi300_df.empty:
+        raise ValueError("CSI300 regime coverage inadequate: no CSI300 data")
+    index = pd.to_datetime(csi300_df.index, errors="coerce")
+    if index.isna().any() or len(csi300_df) < sma_long + 1:
+        raise ValueError("CSI300 regime coverage inadequate: insufficient rows or invalid dates")
+    first_required = trading_days[0]
+    available_before_first = int((index.date <= first_required).sum())
+    if available_before_first < sma_long + 1 or index.max().date() < trading_days[-1]:
+        raise ValueError(
+            "CSI300 regime coverage inadequate: "
+            f"need >= {sma_long + 1} rows through {first_required} and data through {trading_days[-1]}; "
+            f"got {available_before_first} rows and last={index.max().date()}"
+        )
+
+
 def _read_price_snapshot(snapshot_dir: Path, ticker: str) -> pd.DataFrame:
     path = _snapshot_path(snapshot_dir, ticker)
     if not path.exists():
@@ -729,10 +758,15 @@ def main():
         snapshot_dir = Path(args.price_snapshot_dir) if args.price_snapshot_dir else None
         price_snapshot_mode = "read_write" if snapshot_dir else "off"
         csi300_full = _read_price_snapshot(snapshot_dir, csi_symbol) if snapshot_dir else pd.DataFrame()
-        if csi300_full.empty:
+        if csi300_full.empty or not _snapshot_covers_range(csi300_full, start_date - timedelta(days=LOOKBACK_DAYS), end_date):
             csi300_data, _ = download_daily_range_fn(tickers=[csi_symbol], start=dl_start_str, end=dl_end_str, provider_config=provider_config)
             csi300_full = csi300_data.get(csi_symbol, pd.DataFrame())
-            if snapshot_dir and not csi300_full.empty:
+            if not _snapshot_covers_range(csi300_full, start_date - timedelta(days=LOOKBACK_DAYS), end_date):
+                raise ValueError(
+                    f"CSI300 snapshot/download lacks requested coverage {dl_start_str} through {end_date}; "
+                    "refusing a regime-starved replay"
+                )
+            if snapshot_dir:
                 _write_price_snapshot(snapshot_dir, csi_symbol, csi300_full)
 
         snapshot_data, snapshot_missing = ({}, list(universe))
@@ -769,6 +803,7 @@ def main():
         return name in alpha_engines and bool((alpha_config.get(name) or {}).get("enabled", False))
     sma_short = int(get_config_value(config, "mean_reversion", "regime", "sma_short", default=20))
     sma_long = int(get_config_value(config, "mean_reversion", "regime", "sma_long", default=50))
+    _assert_csi_regime_coverage(csi300_full, trading_days, sma_long)
 
     # --- Precompute features and date indices for all tickers (avoids repeated slicing) ---
     logger.info("Precomputing technical features for %d tickers...", len(data_map))
