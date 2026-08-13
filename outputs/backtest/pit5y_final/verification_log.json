@@ -1,0 +1,37 @@
+{
+  "verifier": "DP_REPLAY_BUNDLE_VERIFIER",
+  "verified_at_utc": "2026-08-13T14:49:16.575678+00:00",
+  "commit_under_test": "4a11cdebdf3929d25af6d782f2a4d20980db1df6",
+  "bundle_artifact": "DP_REPLAY_BUNDLE_PIT5Y_FINAL",
+  "bundle_composite_sha256": "1921a50db7c36d12c3257cb6d7d8ee4af6d624e1015619db541dc322ba413cba",
+  "replay_executed": false,
+  "result": "PASS",
+  "checks": [
+    {
+      "check": "archive sha256 matches committed value",
+      "ok": true,
+      "detail": "3b4bc3d67733547f\u2026 vs 3b4bc3d67733547f\u2026"
+    },
+    {
+      "check": "pit_membership_schedule sha256 matches bundle",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "trade_cal_receipt sha256 matches bundle",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "schedule declares TRUSTED_HISTORICAL_ASSUMPTION",
+      "ok": true,
+      "detail": "membership is provider-current, not attested as-of"
+    },
+    {
+      "check": "every price file matches snapshot_manifest",
+      "ok": true,
+      "detail": "1897 files, 0 mismatched"
+    }
+  ],
+  "boundary": "Verifies the published artifacts reproduce. Does NOT ratify the strategy numbers, and does not upgrade membership beyond TRUSTED_HISTORICAL_ASSUMPTION."
+}
