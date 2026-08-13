@@ -547,11 +547,33 @@ def _sector_cap(
     info_map: dict[str, dict],
     max_per_sector: int = 1,
 ) -> list[tuple[str, object]]:
-    """Enforce max picks per industry sector."""
+    """Enforce max picks per industry sector, refusing to guess when sector data is absent.
+
+    The old default collapsed every unknown ticker into one bucket called
+    "unknown", so with max_per_sector=1 an offline replay that had lost its
+    industry metadata silently admitted exactly ONE pick per day and exited
+    cleanly. That halved a five-year replay from 641 picks to 322 and looked
+    like a successful run.
+
+    Two unknown tickers may or may not share a sector. Collapsing them assumes
+    they do; separating them assumes they do not. Neither is knowable, so the
+    cap refuses instead: a sector limit cannot be enforced without sector data.
+    """
+    missing = sorted({
+        sig.ticker for _engine, sig in candidates
+        if not ((info_map.get(sig.ticker, {}) or {}).get("industry") or "").strip()
+    })
+    if missing and len(candidates) > max_per_sector:
+        raise ValueError(
+            f"sector cap of {max_per_sector} cannot be applied: no industry for "
+            f"{len(missing)} candidate(s) e.g. {missing[:3]}. Supply basic_info "
+            f"(--basic-info-in for offline replays) rather than defaulting to 'unknown'."
+        )
+
     sector_counts: dict[str, int] = {}
     result: list[tuple[str, object]] = []
     for engine, sig in candidates:
-        industry = (info_map.get(sig.ticker, {}) or {}).get("industry", "unknown") or "unknown"
+        industry = (info_map.get(sig.ticker, {}) or {}).get("industry") or "unknown"
         if sector_counts.get(industry, 0) < max_per_sector:
             result.append((engine, sig))
             sector_counts[industry] = sector_counts.get(industry, 0) + 1

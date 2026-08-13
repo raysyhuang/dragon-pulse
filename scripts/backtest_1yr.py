@@ -749,6 +749,10 @@ def main():
                              "point_in_time = top-N by market cap as of each rebalance (unbiased)")
     parser.add_argument("--universe-n", type=int, default=1000,
                         help="Universe size (top-N by market cap)")
+    parser.add_argument("--basic-info-in", default="",
+                        help="Replay from frozen basic_info (industry/ST); skips the provider.")
+    parser.add_argument("--basic-info-out", default="",
+                        help="Freeze the basic_info map to this path.")
     parser.add_argument("--calendar-in", default="",
                         help="Replay from a frozen trade_cal receipt; skips the provider entirely.")
     parser.add_argument("--pit-schedule-out", default="",
@@ -924,8 +928,22 @@ def main():
 
         info_map: dict[str, dict] = {}
         if args.acceptance_mode == "live_equivalent":
-            from src.core.cn_data import get_cn_basic_info
-            info_map = get_cn_basic_info(universe, provider_config=provider_config)
+            if args.basic_info_in:
+                # Industry metadata decides the sector cap and therefore how many
+                # picks a day yields. Freezing prices, calendar and membership but
+                # not this left signal generation provider-dependent.
+                info_map = json.loads(Path(args.basic_info_in).read_text(encoding="utf-8"))
+                logger.info("basic_info loaded from %s (%d tickers) — no provider call",
+                            args.basic_info_in, len(info_map))
+            else:
+                from src.core.cn_data import get_cn_basic_info
+                info_map = get_cn_basic_info(universe, provider_config=provider_config)
+            if args.basic_info_out:
+                Path(args.basic_info_out).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.basic_info_out).write_text(
+                    json.dumps(info_map, indent=2, sort_keys=True, ensure_ascii=False),
+                    encoding="utf-8")
+                logger.info("basic_info frozen to %s", args.basic_info_out)
 
     csi300_full = csi300_full.rename(columns={column: column.lower() for column in csi300_full.columns if column in ("Open", "High", "Low", "Close", "Volume")})
 

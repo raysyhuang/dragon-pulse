@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 
 MINI_TICKER = "000001.SZ"
+MINI_TICKER_B = "000002.SZ"
 CSI300 = "000300.SH"
 SIGNAL_DATE = "2025-12-31"
 
@@ -67,8 +68,19 @@ def make_offline_replay_fixture(tmp_path: Path) -> dict[str, Path]:
         closes.loc[pd.Timestamp(day)] = px
     csi = pd.Series(range(len(dates)), index=dates, dtype=float) * 0.2 + 4000.0
 
+    # Two candidates in DIFFERENT sectors. A one-ticker fixture cannot exercise a
+    # per-sector cap at all, which is exactly why it stayed green while the real
+    # replay was silently halving every day's picks to one.
     _ohlcv(closes).to_csv(snapshots / f"{MINI_TICKER}.csv", index_label="Date", float_format="%.2f")
+    _ohlcv(closes * 1.01).to_csv(snapshots / f"{MINI_TICKER_B}.csv", index_label="Date", float_format="%.2f")
     _ohlcv(csi).to_csv(snapshots / f"{CSI300}.csv", index_label="Date", float_format="%.2f")
+
+    # Frozen industry metadata: absent, the sector cap has nothing to enforce on.
+    basic_info = root / "basic_info.json"
+    basic_info.write_text(json.dumps({
+        MINI_TICKER:   {"name_cn": "MiniA", "industry": "SectorAlpha", "is_st": False},
+        MINI_TICKER_B: {"name_cn": "MiniB", "industry": "SectorBeta",  "is_st": False},
+    }, indent=2, ensure_ascii=False), encoding="utf-8")
 
     # Frozen membership: one rebalance covering the window, one member.
     schedule = root / "pit_membership_schedule.json"
@@ -79,9 +91,9 @@ def make_offline_replay_fixture(tmp_path: Path) -> dict[str, Path]:
             "Membership is provider-CURRENT as-of resolution, not provider-as-of. "
             "Synthetic fixture: membership is asserted, not sourced."
         ),
-        "universe_n": 1,
+        "universe_n": 2,
         "rebalance_months": 1,
-        "rebalances": [{"date": "2025-01-01", "members": [MINI_TICKER]}],
+        "rebalances": [{"date": "2025-01-01", "members": [MINI_TICKER, MINI_TICKER_B]}],
     }, indent=2), encoding="utf-8")
 
     # Frozen calendar in raw trade_cal response shape, covering the fixture's days.
@@ -94,4 +106,5 @@ def make_offline_replay_fixture(tmp_path: Path) -> dict[str, Path]:
         },
     }), encoding="utf-8")
 
-    return {"root": root, "snapshots": snapshots, "schedule": schedule, "calendar": cal}
+    return {"root": root, "snapshots": snapshots, "schedule": schedule,
+            "calendar": cal, "basic_info": basic_info}

@@ -118,6 +118,7 @@ def main() -> int:
             f"--label {lab} --out-dir <OUT> --price-snapshot-dir <EXTRACTED>/snapshots "
             f"--pit-schedule-in <BUNDLE>/pit_membership_schedule.json "
             f"--calendar-in <BUNDLE>/trade_cal_receipt.json "
+            f"--basic-info-in <BUNDLE>/basic_info.json "
             f"--dump-picks <OUT>/picks.json"
         ),
         "clean_machine_reproduction": [
@@ -171,6 +172,15 @@ def main() -> int:
                          "no receipt attests to the ranking on the rebalance date. Freezing makes "
                          "signal generation reproducible, which is weaker than making it correct."),
                 "consume_with": "--pit-schedule-in",
+            },
+            "basic_info": {
+                "file": "basic_info.json",
+                "sha256": sha256_file(run / "basic_info.json")
+                          if (run / "basic_info.json").exists() else None,
+                "note": ("Industry metadata drives the per-sector cap and therefore how many "
+                         "picks a day yields. Omitting it made an offline replay return 322 "
+                         "picks against a published 641, silently and with exit 0."),
+                "consume_with": "--basic-info-in",
             },
             "trade_cal_receipt": {
                 "file": "trade_cal_receipt.json",

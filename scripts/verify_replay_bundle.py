@@ -115,7 +115,8 @@ def main() -> int:
 
     # --- 2. frozen input identity -------------------------------------------
     for key, fname in (("pit_membership_schedule", "pit_membership_schedule.json"),
-                       ("trade_cal_receipt", "trade_cal_receipt.json")):
+                       ("trade_cal_receipt", "trade_cal_receipt.json"),
+                       ("basic_info", "basic_info.json")):
         rec = bundle.get("inputs", {}).get(key) or {}
         path = run / fname
         if not path.exists():
@@ -148,7 +149,8 @@ def main() -> int:
                "--acceptance-mode", "live_equivalent", "--label", "verify",
                "--out-dir", str(out), "--price-snapshot-dir", str(snaps),
                "--pit-schedule-in", str(run / "pit_membership_schedule.json"),
-               "--calendar-in", str(run / "trade_cal_receipt.json")]
+               "--calendar-in", str(run / "trade_cal_receipt.json"),
+               "--basic-info-in", str(run / "basic_info.json")]
         print("  replaying offline (this takes minutes)…")
         r = subprocess.run(cmd, cwd=PROJECT_ROOT, capture_output=True, text=True,
                            env=_offline_env(scratch), timeout=7200)

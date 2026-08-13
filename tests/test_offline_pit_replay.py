@@ -132,17 +132,19 @@ def test_a_schedule_with_an_empty_rebalance_is_rejected(tmp_path):
 # Mandatory gate: runs on every PR, no dependency on the release archive.
 # ---------------------------------------------------------------------------
 
-def _run_offline(tmp_path, *, schedule, calendar, snapshots, start, end, label):
+def _run_offline(tmp_path, *, schedule, calendar, snapshots, start, end, label,
+                 basic_info=None, acceptance='off'):
     return subprocess.run(
         [sys.executable, "scripts/backtest_1yr.py",
          "--start", start, "--end", end,
          "--universe-mode", "point_in_time", "--engines", "mr_only",
          "--config", "config/experiments/mr_a0_baseline.yaml",
-         "--acceptance-mode", "off", "--top-n", "1",
+         "--acceptance-mode", acceptance, "--top-n", "2",
          "--label", label, "--out-dir", str(tmp_path / f"out_{label}"),
          "--price-snapshot-dir", str(snapshots),
          "--pit-schedule-in", str(schedule),
-         "--calendar-in", str(calendar)],
+         "--calendar-in", str(calendar),
+         *(["--basic-info-in", str(basic_info)] if basic_info else [])],
         cwd=PROJECT_ROOT, capture_output=True, text=True,
         env=_offline_env(tmp_path), timeout=900,
     )
@@ -158,7 +160,7 @@ def test_fixture_offline_replay_rebuilds_signals_with_no_provider(tmp_path):
 
     r = _run_offline(tmp_path, schedule=fx["schedule"], calendar=fx["calendar"],
                      snapshots=fx["snapshots"], start="2025-12-31", end="2025-12-31",
-                     label="fixture_ok")
+                     label="fixture_ok", basic_info=fx["basic_info"])
 
     assert "NETWORK_BLOCKED_BY_TEST" not in r.stderr, "replay attempted a network call"
     assert "TUSHARE_TOKEN" not in r.stderr, "replay demanded a provider token"
@@ -224,3 +226,54 @@ def test_corrupt_calendar_receipt_fails_closed(tmp_path):
 
     assert r.returncode != 0
     assert "unexpected schema" in r.stderr
+
+
+def test_sector_cap_refuses_when_industry_is_missing(tmp_path):
+    """The regression that survived every previous gate, pinned on the real function.
+
+    With industry metadata absent, _sector_cap collapsed every candidate into one
+    bucket named "unknown" and admitted exactly ONE pick per day, turning a
+    641-pick replay into 322 with a clean exit and no warning.
+
+    This is a direct test rather than an end-to-end one on purpose: the offline
+    fixture's signal clears --acceptance-mode off but not live_equivalent, so no
+    candidate ever reaches the sector cap through that path. A fixture that cannot
+    reach the code under test is how this shipped in the first place.
+    """
+    from src.pipelines.funnel import _sector_cap
+
+    class _Sig:
+        def __init__(self, ticker): self.ticker = ticker
+
+    candidates = [("e", _Sig("A")), ("e", _Sig("B"))]
+
+    with pytest.raises(ValueError, match="sector cap"):
+        _sector_cap(candidates, {}, 1)
+
+    with pytest.raises(ValueError, match="industry"):
+        _sector_cap(candidates, {"A": {"industry": "Alpha"}, "B": {"industry": ""}}, 1)
+
+
+def test_sector_cap_does_not_refuse_when_the_cap_cannot_bind(tmp_path):
+    """One candidate cannot violate a cap of one, so missing metadata is moot."""
+    from src.pipelines.funnel import _sector_cap
+
+    class _Sig:
+        def __init__(self, ticker): self.ticker = ticker
+
+    assert len(_sector_cap([("e", _Sig("A"))], {}, 1)) == 1
+
+
+def test_sector_cap_admits_one_per_sector_when_metadata_is_present(tmp_path):
+    """Positive counterpart: two candidates in two sectors must both survive."""
+    from src.pipelines.funnel import _sector_cap
+
+    class _Sig:
+        def __init__(self, t): self.ticker = t
+
+    cands = [("e", _Sig("A")), ("e", _Sig("B"))]
+    info = {"A": {"industry": "Alpha"}, "B": {"industry": "Beta"}}
+    assert len(_sector_cap(cands, info, 1)) == 2
+
+    same = {"A": {"industry": "Alpha"}, "B": {"industry": "Alpha"}}
+    assert len(_sector_cap(cands, same, 1)) == 1
