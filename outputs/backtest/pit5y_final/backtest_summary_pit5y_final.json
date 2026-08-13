@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-08-13T07:07:55.992100Z",
+  "created_at": "2026-08-13T07:58:31.489039Z",
   "input_mode": "live",
   "bundle_id": null,
   "bundle_composite_sha256": null,
@@ -33,6 +33,13 @@
   "zero_pick_days": 888,
   "zero_pick_days_pct": 0.7339,
   "avg_picks_per_active_day": 1.91,
+  "picks_emitted": 641,
+  "picks_filled": 616,
+  "picks_skipped": 25,
+  "picks_skipped_by_reason": {
+    "entry_skipped_no_chase": 25
+  },
+  "portfolio_input_set": "picks_filled \u2014 rows with entry_status='filled' and a usable pnl_pct",
   "total_picks": 616,
   "entry_skipped_no_chase": 25,
   "target_hits": 149,
@@ -53,17 +60,17 @@
     "day_4_stops": 47,
     "day_5_stops": 34
   },
-  "max_drawdown_pct": 78.05,
+  "per_trade_compounded_dd_pct": 78.05,
   "cumulative_pnl_pct": 138.63,
   "final_equity_multiple": 2.39,
-  "total_time_min": 3.8,
+  "total_time_min": 4.3,
   "breadth_suppressed_days": 0,
   "acceptance_mode_counts": {
     "regime_filtered": 887,
     "selective": 12,
     "full": 311
   },
-  "price_data_fingerprint": "efc2241cd62f79e1108c425d072f2464ab759e9dc4ddc995516194b34493dd7e",
+  "price_data_fingerprint": "44bc2d4b3465e8403f5e9cbad84d67cebe4dfdcfdd98b8a8d5f22debfd2b0989",
   "price_snapshot_mode": "read_write",
   "price_snapshot_dir": "outputs/backtest/pit5y_final/snapshots",
   "download_bad_tickers": [],

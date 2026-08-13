@@ -100,3 +100,25 @@ def test_no_tracked_python_file_posts_to_tushare_over_cleartext():
             offenders.append(str(path.relative_to(REPO_ROOT)))
 
     assert not offenders, f"cleartext Tushare endpoint in: {offenders}"
+
+
+def test_runner_never_emits_a_bare_max_drawdown_field():
+    """The runner's drawdown is not a portfolio drawdown and must not read as one.
+
+    It compounds mean per-signal-date trade P&L with no overlapping positions,
+    cash constraint or concurrency. Under the name max_drawdown_pct it printed
+    78-83% next to a ledger drawdown of 33.4% and was quoted as portfolio risk.
+    """
+    src = (REPO_ROOT / "scripts" / "backtest_1yr.py").read_text(encoding="utf-8")
+
+    assert '"max_drawdown_pct"' not in src, "ambiguous field name reintroduced"
+    assert '"per_trade_compounded_dd_pct"' in src
+
+
+def test_backtest_summary_accounts_for_every_emitted_pick():
+    """picks_emitted must decompose; a single total_picks hid 25 no-chase skips."""
+    src = (REPO_ROOT / "scripts" / "backtest_1yr.py").read_text(encoding="utf-8")
+
+    for field in ("picks_emitted", "picks_filled", "picks_skipped",
+                  "picks_skipped_by_reason", "portfolio_input_set"):
+        assert f'"{field}"' in src, f"summary no longer reports {field}"

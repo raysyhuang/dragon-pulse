@@ -1,8 +1,8 @@
 {
   "artifact": "DP_REPLAY_BUNDLE_PIT5Y_FINAL",
-  "status": "SUPERSEDED_INVALID_FOR_VERIFICATION",
+  "status": "RESEARCH_ONLY_NON_BINDING",
   "ratified": false,
-  "recomputable": false,
+  "recomputable": true,
   "claim_boundary": [
     "Corrected-but-unattested diagnostic measurement.",
     "Supports only: the live 30-session drought has historical precedent.",
@@ -12,8 +12,8 @@
   "command": "python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_final --out-dir outputs/backtest/pit5y_final --price-snapshot-dir outputs/backtest/pit5y_final/snapshots --dump-picks outputs/backtest/pit5y_final/picks.json",
   "sim_command": "python scripts/portfolio_sim_v2.py outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv --position-pct 20 --max-concurrent 5",
   "code": {
-    "git_base": "43de8192191e52b634f7e394730a8e72d6e3e5f5",
-    "runner_sha256": "63634ef3f1d9a1825d7350d9810645a6d24c71eda96b7aba7727d0f0fe37ef29",
+    "git_base": "3511498a3ae761b1fb53e7aa130d2f8224ac48e0",
+    "runner_sha256": "d29c14e9a7269a7c8abbcce5074bc98394efde5539c7c8f8fc44add07d1cfc70",
     "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
     "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
   },
@@ -57,22 +57,12 @@
     "costs": "NOT modelled in this simulator \u2014 returns are gross"
   },
   "outputs": {
-    "backtest_daily_pit5y_final.csv": "07a7dbb73ff1d9e4d93adb5674eaa97f0f951147e2fcb90db8af4f0cafba02f7",
+    "backtest_daily_pit5y_final.csv": "81b76a55a175274445e1789bd98bade520a88d7b0c86f73bd53b35066245c90a",
     "backtest_detail_pit5y_final.csv": "a5116edbf79b2381e4d59a206bfea23ad3b0f31464000ed7c5aedfc2f71404a9",
-    "backtest_summary_pit5y_final.json": "c6ea36f75edb03f538ba50cb8cbb6b4e4fb0afe82f9aca3108d847480eb22399",
+    "backtest_summary_pit5y_final.json": "ace33939bce7484fa68c3f427213c9919434ab88bcf3968d44a91f057071a825",
     "picks.json": "73a8348e4faf7877ce11d953582730678ebc27fb222392be295ab4f5b2393754",
     "backtest_detail_pit5y_final__equity_curve_20.0pct.csv": "7333dede1508ae52c80510aaa65509d75db0d1466aa98ff6fbb038c7174de366",
-    "portfolio_sim_v2_summary.json": "21c92587756356d7b447d8f51ce4051125af2cb578de2a42ca0919c4d8d3431b"
+    "portfolio_sim_v2_summary.json": "319e6afb2dbcc9d0571eead46ba080493aefa9bc76974f3953417c7234f15d07"
   },
-  "bundle_composite_sha256": "f1d133ec8e4af1037bb9a1c572b5a4144e20becbaa67c5c4f7ffbd6d21660b44",
-  "superseded_reason": [
-    "Output artifacts were generated BEFORE the max_drawdown_pct -> per_trade_compounded_dd_pct rename, so the committed summary does not match its own generator.",
-    "get_cn_trading_days required a live provider, breaking sealed offline bundle replay.",
-    "Pick counts were reported as 641 without reconciling the summary's 616 (filled) \u2014 641 emitted = 616 filled + 25 skipped."
-  ],
-  "superseded_scope": "output hashes and bundle_composite_sha256 are INVALID for verification",
-  "still_valid": {
-    "snapshot_cache_archive_sha256": "3b4bc3d67733547fda2115d2ffc98571130cbb5dd891f6dc605ac345d7f22b76",
-    "note": "the release asset is inputs-only and unaffected; it will be re-referenced by the rebuilt bundle"
-  }
+  "bundle_composite_sha256": "e0dbc26d89fbf7ddc4fb75406a4225ee16b42da6384a91216471d422a34f520c"
 }

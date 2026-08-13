@@ -285,7 +285,13 @@ def apply_score_floor(
 
 
 def get_cn_trading_days(start: date, end: date, bundle_dir: str | Path | None = None) -> list[date]:
-    """Fetch and validate real SSE open sessions from TuShare's trade calendar."""
+    """Real SSE open sessions, fetched and validated — never a weekday guess.
+
+    Fails closed. An approximate calendar is what produced trades on days the
+    exchange was shut, and it looked like ordinary output the whole time. In
+    bundle mode the calendar comes from the sealed bundle's own receipt, so an
+    offline replay never reaches a provider.
+    """
 
     # Sealed bundle: the calendar is already inside it. The CSI300 price file is
     # manifest-listed and SHA-256 verified by validate_input_bundle, so its date
@@ -1578,6 +1584,18 @@ def main():
         "zero_pick_days": zero_pick_days,
         "zero_pick_days_pct": round(zero_pick_days_pct, 4),
         "avg_picks_per_active_day": round(avg_picks_per_active_day, 2),
+        # total_picks counts FILLED rows only, which read as the pick count and got
+        # quoted as one: a run emitting 641 picks reported total_picks 616. Both
+        # numbers are now named so neither has to be explained in prose.
+        "picks_emitted": int(len(df)),
+        "picks_filled": int((df["entry_status"] == "filled").sum()),
+        "picks_skipped": int((df["entry_status"] == "skipped").sum()),
+        "picks_skipped_by_reason": {
+            str(k): int(v) for k, v in
+            df.loc[df["entry_status"] == "skipped", "exit_reason"]
+              .value_counts().sort_index().items()
+        },
+        "portfolio_input_set": "picks_filled — rows with entry_status='filled' and a usable pnl_pct",
         "total_picks": total,
         "entry_skipped_no_chase": entry_skipped_no_chase,
         "target_hits": target_hits,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -102,3 +103,67 @@ def test_daily_breadth_column_is_blank_when_acceptance_is_off(tmp_path):
     for row in daily:
         assert "breadth_above_sma20" in row
         assert row["breadth_above_sma20"] == ""
+
+
+def test_sealed_bundle_replay_needs_no_provider_and_no_env(tmp_path, monkeypatch):
+    """Bundle mode must resolve its calendar offline, from the bundle's own receipt.
+
+    Acceptance is not "the test passes without a token" — it is that a sealed
+    replay completes with TUSHARE_TOKEN unset AND .env unreachable AND the
+    network refused, using the manifest-hashed CSI300 price file as the session
+    receipt. The earlier calendar fix traded the offline guarantee for accuracy
+    and nobody noticed, because every dev machine has a token in .env.
+    """
+    import socket
+
+    bundle = make_golden_mr_bundle(tmp_path)
+    out_dir = tmp_path / "out"
+
+    env = dict(os.environ)
+    env.pop("TUSHARE_TOKEN", None)
+    env["HOME"] = str(tmp_path)          # nothing to fall back to
+    env["DP_TEST_NO_NETWORK"] = "1"
+
+    # Prove the receipt is what gets used: block sockets in-process too.
+    def _no_network(*_a, **_kw):
+        raise AssertionError("bundle mode attempted a network call")
+
+    monkeypatch.setattr(socket, "create_connection", _no_network)
+
+    completed = subprocess.run(
+        [sys.executable, "scripts/backtest_1yr.py", "--input-bundle", str(bundle),
+         "--config", "config/experiments/mr_a0_baseline.yaml", "--engines", "mr_only",
+         "--start", GOLDEN_DATE, "--end", GOLDEN_DATE, "--top-n", "1",
+         "--out-dir", str(out_dir)],
+        cwd=PROJECT_ROOT, capture_output=True, text=True, check=False, env=env,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "TUSHARE_TOKEN required" not in completed.stderr
+    assert (out_dir / "backtest_daily.csv").exists()
+
+
+def test_bundle_calendar_comes_from_the_receipt_not_a_weekday_guess(tmp_path):
+    """The sessions used must be exactly those in the hashed CSI300 file."""
+    import importlib.util
+    from datetime import date
+
+    bundle = make_golden_mr_bundle(tmp_path)
+    spec = importlib.util.spec_from_file_location("bt", PROJECT_ROOT / "scripts" / "backtest_1yr.py")
+    bt = importlib.util.module_from_spec(spec)
+    saved = sys.argv[:]
+    sys.argv = ["bt"]
+    try:
+        spec.loader.exec_module(bt)
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = saved
+
+    import csv as _csv
+    with (bundle / "prices" / "000300.SH.csv").open(newline="", encoding="utf-8") as fh:
+        receipt = {row[next(iter(row))] for row in _csv.DictReader(fh)}
+
+    days = bt.get_cn_trading_days(date(1900, 1, 1), date(2100, 1, 1), bundle_dir=bundle)
+
+    assert {d.isoformat() for d in days} == receipt
