@@ -2,7 +2,7 @@
   "artifact": "DP_REPLAY_BUNDLE_PIT5Y_FINAL",
   "status": "RESEARCH_ONLY_NON_BINDING",
   "ratified": false,
-  "recomputable": "VERIFY_ARTIFACT_ONLY_NOT_RECOMPUTABLE",
+  "recomputable": true,
   "claim_boundary": [
     "Corrected-but-unattested diagnostic measurement.",
     "Supports only: the live 30-session drought has historical precedent.",
@@ -12,7 +12,7 @@
   "command": "python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_final --out-dir outputs/backtest/pit5y_final --price-snapshot-dir outputs/backtest/pit5y_final/snapshots --dump-picks outputs/backtest/pit5y_final/picks.json",
   "sim_command": "python scripts/portfolio_sim_v2.py outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv --position-pct 20 --max-concurrent 5",
   "code": {
-    "git_base": "368f4dab44e53dea4d5f8088be37834e1132474c",
+    "git_base": "43de8192191e52b634f7e394730a8e72d6e3e5f5",
     "runner_sha256": "63634ef3f1d9a1825d7350d9810645a6d24c71eda96b7aba7727d0f0fe37ef29",
     "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
     "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
@@ -42,7 +42,7 @@
         "Volume"
       ],
       "composite_sha256": "80268494f1eff96283199bcf57a30b2008329ff86cc5894328dc4800be96d2c2",
-      "download_url": null,
+      "download_url": "https://github.com/raysyhuang/dragon-pulse/releases/download/pit5y-replay-cache-v1/dp-pit5y-final-snapshots.tgz",
       "note": "Per-file manifest is in snapshot_manifest.json. Re-downloading from the provider will NOT reproduce these hashes byte-for-byte; only the archived cache will."
     }
   },
