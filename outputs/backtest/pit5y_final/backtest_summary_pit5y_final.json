@@ -1,0 +1,102 @@
+{
+  "created_at": "2026-08-13T07:07:55.992100Z",
+  "input_mode": "live",
+  "bundle_id": null,
+  "bundle_composite_sha256": null,
+  "pit_grade": null,
+  "config_path": "config/default.yaml",
+  "label": "pit5y_final",
+  "start": "2021-08-12",
+  "end": "2026-08-11",
+  "period": "2021-08-12 to 2026-08-11",
+  "exit_mode": "target_stop",
+  "entry_mode": "no_chase_next_open",
+  "mr_target_mode": "sma5",
+  "engines": "alpha",
+  "gap_filter_disabled": false,
+  "sniper_trailing_disabled": false,
+  "acceptance_mode": "live_equivalent",
+  "universe_source": "market_cap",
+  "outputs_root": null,
+  "allowed_regimes": [],
+  "excluded_regimes": [
+    "bear",
+    "choppy"
+  ],
+  "min_score_floor": null,
+  "pick_rank_mode": "score",
+  "ticker_cooldown_days": 0,
+  "post_stop_cooldown_days": 0,
+  "trading_days_scanned": 1210,
+  "regime_filtered_days": 887,
+  "days_with_picks": 322,
+  "zero_pick_days": 888,
+  "zero_pick_days_pct": 0.7339,
+  "avg_picks_per_active_day": 1.91,
+  "total_picks": 616,
+  "entry_skipped_no_chase": 25,
+  "target_hits": 149,
+  "stop_hits": 286,
+  "hold_expired": 181,
+  "pnl_win_rate": 0.4156,
+  "target_hit_rate": 0.2419,
+  "avg_win_pct": 7.29,
+  "avg_loss_pct": -4.52,
+  "true_expectancy_pct": 0.39,
+  "weighted_expectancy_pct": 0.39,
+  "hold_expired_positive_pct": 0.5912,
+  "day1_stop_count": 0,
+  "profitable_days_pct": 0.4937,
+  "exit_day_distribution": {
+    "day_2_stops": 93,
+    "day_3_stops": 63,
+    "day_4_stops": 47,
+    "day_5_stops": 34
+  },
+  "max_drawdown_pct": 78.05,
+  "cumulative_pnl_pct": 138.63,
+  "final_equity_multiple": 2.39,
+  "total_time_min": 3.8,
+  "breadth_suppressed_days": 0,
+  "acceptance_mode_counts": {
+    "regime_filtered": 887,
+    "selective": 12,
+    "full": 311
+  },
+  "price_data_fingerprint": "efc2241cd62f79e1108c425d072f2464ab759e9dc4ddc995516194b34493dd7e",
+  "price_snapshot_mode": "read_write",
+  "price_snapshot_dir": "outputs/backtest/pit5y_final/snapshots",
+  "download_bad_tickers": [],
+  "download_bad_ticker_count": 0,
+  "per_engine": {
+    "alpha_rs_pullback": {
+      "total": 616,
+      "pnl_wins": 256,
+      "pnl_win_rate": 0.4156,
+      "target_hit_rate": 0.2419,
+      "avg_win_pct": 7.29,
+      "avg_loss_pct": -4.52,
+      "true_expectancy_pct": 0.39,
+      "day1_stop_count": 0,
+      "hold_expired_positive_pct": 0.5912
+    }
+  },
+  "per_regime": {
+    "bull": {
+      "total": 616,
+      "pnl_wins": 256,
+      "pnl_win_rate": 0.4156,
+      "true_expectancy_pct": 0.39,
+      "day1_stop_count": 0
+    }
+  },
+  "per_subtype": {
+    "rs_pullback_alpha": {
+      "total": 616,
+      "pnl_wins": 256,
+      "pnl_win_rate": 0.4156,
+      "true_expectancy_pct": 0.39,
+      "day1_stop_count": 0
+    }
+  }
+}

@@ -1,0 +1,27 @@
+window 2021-08-12 .. 2026-08-11   1210 sessions
+
+regime by year (all-choppy years = starved index history, not a calm market)
+regime  bull  choppy  bear
+yr                        
+2021      13      28    54
+2022      33      33   176
+2023      41      29   172
+2024      70      62   110
+2025     110      62    71
+2026      56      29    61 
+
+  year   sessions  active  active%   picks  picks/active
+  2021        95      13    13.7%      26    2.00
+  2022       242      33    13.6%      66    2.00
+  2023       242      41    16.9%      82    2.00
+  2024       242      69    28.5%     135    1.96
+  2025       243     110    45.3%     220    2.00
+  2026       146      56    38.4%     112    2.00
+  TOTAL   1210     322    26.6%     641
+
+dry spells: 47   median 4   75th 24   90th 54   max 129
+  >=10 sessions: 16   >=20: 12   >=30: 10   >=60: 5
+  note: sample ends mid-spell (29 sessions) — counted, but right-censored
+
+  live drought of 30 sessions sits at the 79th percentile (10 of 47 historical spells were at least this long)
+  -> long but precedented

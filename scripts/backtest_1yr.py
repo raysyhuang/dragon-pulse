@@ -284,8 +284,31 @@ def apply_score_floor(
     return [candidate for candidate in candidates if candidate[1].score >= score_floor]
 
 
-def get_cn_trading_days(start: date, end: date) -> list[date]:
+def get_cn_trading_days(start: date, end: date, bundle_dir: str | Path | None = None) -> list[date]:
     """Fetch and validate real SSE open sessions from TuShare's trade calendar."""
+
+    # Sealed bundle: the calendar is already inside it. The CSI300 price file is
+    # manifest-listed and SHA-256 verified by validate_input_bundle, so its date
+    # column IS the session receipt — real sessions, hash-bound, no provider.
+    # Reaching for the network here would break the offline guarantee that is the
+    # whole point of bundle mode.
+    if bundle_dir:
+        index_csv = Path(bundle_dir) / "prices" / "000300.SH.csv"
+        if not index_csv.is_file():
+            raise RuntimeError(
+                f"sealed bundle has no CSI300 session receipt at {index_csv}; "
+                "refusing to fetch a calendar in bundle mode"
+            )
+        stamps = pd.read_csv(index_csv)
+        col = "Date" if "Date" in stamps.columns else stamps.columns[0]
+        days = sorted({d.date() for d in pd.to_datetime(stamps[col])
+                       if start <= d.date() <= end})
+        if not days:
+            raise RuntimeError(
+                f"sealed bundle CSI300 receipt covers no sessions in {start}..{end}"
+            )
+        return days
+
     token = os.environ.get("TUSHARE_TOKEN", "").strip()
     if not token:
         raise RuntimeError("TUSHARE_TOKEN is required to obtain authoritative SSE trading sessions")
@@ -717,7 +740,7 @@ def main():
     config_excluded_regimes = parse_regime_set((config.get("acceptance") or {}).get("excluded_regimes", []))
     excluded_regimes |= config_excluded_regimes
 
-    trading_days = get_cn_trading_days(start_date, end_date)
+    trading_days = get_cn_trading_days(start_date, end_date, bundle_dir=args.input_bundle or None)
     if args.max_days > 0:
         trading_days = trading_days[:args.max_days]
 
@@ -1377,7 +1400,7 @@ def main():
             "day1_stop_count": 0,
             "profitable_days_pct": 0.0,
             "exit_day_distribution": {},
-            "max_drawdown_pct": 0.0,
+            "per_trade_compounded_dd_pct": 0.0,
             "cumulative_pnl_pct": 0.0,
             "final_equity_multiple": 1.0,
             "total_time_min": round(total_time / 60, 1),
@@ -1570,7 +1593,10 @@ def main():
         "day1_stop_count": day1_stops,
         "profitable_days_pct": round(profitable_days_pct, 4),
         "exit_day_distribution": exit_day_dist,
-        "max_drawdown_pct": round(max_dd, 2),
+        # NOT a portfolio drawdown: this compounds mean per-signal-date trade P&L with
+        # no overlapping positions, cash constraint or concurrency. Renamed because it
+        # printed 83.33% on a run whose ledger drawdown was 33.4%, and got quoted.
+        "per_trade_compounded_dd_pct": round(max_dd, 2),
         "cumulative_pnl_pct": round(cumulative_pnl_pct, 2),
         "final_equity_multiple": round(float(equity.iloc[-1]), 2),
         "total_time_min": round(total_time / 60, 1),
@@ -1600,7 +1626,7 @@ def main():
                 hold_expired_positive_pct * 100)
     logger.info("Profitable days: %.1f%% | Zero-pick days: %d (%.1f%%) | Avg picks/active day: %.1f",
                 profitable_days_pct * 100, zero_pick_days, zero_pick_days_pct * 100, avg_picks_per_active_day)
-    logger.info("Max drawdown: %.2f%% | Cumulative PnL: %.2f%% | Equity: %.2fx", max_dd, cumulative_pnl_pct, float(equity.iloc[-1]))
+    logger.info("Per-trade compounded DD (NOT portfolio DD): %.2f%% | Cumulative PnL: %.2f%% | Equity: %.2fx", max_dd, cumulative_pnl_pct, float(equity.iloc[-1]))
     if exit_day_dist:
         logger.info("Stop exit-day dist: %s", exit_day_dist)
     logger.info("")

@@ -1,0 +1,30 @@
+{
+  "created_at": "2026-08-13T07:34:57.659140Z",
+  "max_concurrent": 5,
+  "files": {
+    "outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv": {
+      "20.0%": {
+        "detail_csv": "outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv",
+        "position_pct": 20.0,
+        "max_concurrent": 5,
+        "initial_capital": 100000.0,
+        "trades_in_file": 616,
+        "trades_executed": 546,
+        "skipped_capacity": 70,
+        "skipped_cash": 0,
+        "sim_days": 1150,
+        "final_equity": 160440.69,
+        "equity_multiple": 1.604,
+        "total_return_pct": 60.44,
+        "annualized_return_pct": 10.92,
+        "max_drawdown_pct": 33.35,
+        "max_drawdown_date": "2025-06-25",
+        "sharpe_ratio": 0.684,
+        "avg_positions_when_active": 3.4,
+        "max_concurrent_observed": 5,
+        "utilization_pct": 35.6,
+        "equity_curve_csv": "backtest_detail_pit5y_final__equity_curve_20.0pct.csv"
+      }
+    }
+  }
+}

@@ -267,6 +267,10 @@ def simulate(
         "avg_positions_when_active": round(float(np.mean(active_days)), 1) if active_days else 0.0,
         "max_concurrent_observed": max(positions_series) if positions_series else 0,
         "utilization_pct": round(len(active_days) / max(len(sim_days), 1) * 100, 1),
+        # Returned so a reviewer can recompute drawdown and Sharpe rather than
+        # trust the two scalars. Sharpe here is mean/std of DAILY equity returns
+        # annualised by sqrt(252); drawdown is peak-to-trough on this same curve.
+        "equity_curve": equity_curve,
     }
 
 
@@ -318,6 +322,16 @@ def main():
                            initial_capital=args.capital)
             rows[f"{pct}%"] = res
         summary["files"][f] = rows
+
+    # Curves go to CSV; keeping them in the summary would bloat it past readability.
+    for fname, rows in summary["files"].items():
+        for alloc, res in rows.items():
+            curve = res.pop("equity_curve", None)
+            if curve:
+                dest = Path(fname).with_name(
+                    Path(fname).stem + f"__equity_curve_{str(alloc).replace('%','pct')}.csv")
+                pd.DataFrame(curve).to_csv(dest, index=False)
+                res["equity_curve_csv"] = dest.name
 
     out = Path(args.files[0]).with_name("portfolio_sim_v2_summary.json")
     out.write_text(json.dumps(summary, indent=2, default=str))

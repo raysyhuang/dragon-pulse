@@ -1,0 +1,68 @@
+{
+  "artifact": "DP_REPLAY_BUNDLE_PIT5Y_FINAL",
+  "status": "RESEARCH_ONLY_NON_BINDING",
+  "ratified": false,
+  "recomputable": "VERIFY_ARTIFACT_ONLY_NOT_RECOMPUTABLE",
+  "claim_boundary": [
+    "Corrected-but-unattested diagnostic measurement.",
+    "Supports only: the live 30-session drought has historical precedent.",
+    "Does NOT update the playbook, endorse the annualised return, alter the selector, or reopen the PR #16 breadth conclusion."
+  ],
+  "hash_algorithm": "sha256 over file bytes; a composite is sha256 over the newline-joined 'name:sha256' pairs of its members, sorted by name",
+  "command": "python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_final --out-dir outputs/backtest/pit5y_final --price-snapshot-dir outputs/backtest/pit5y_final/snapshots --dump-picks outputs/backtest/pit5y_final/picks.json",
+  "sim_command": "python scripts/portfolio_sim_v2.py outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv --position-pct 20 --max-concurrent 5",
+  "code": {
+    "git_base": "368f4dab44e53dea4d5f8088be37834e1132474c",
+    "runner_sha256": "63634ef3f1d9a1825d7350d9810645a6d24c71eda96b7aba7727d0f0fe37ef29",
+    "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
+    "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
+  },
+  "environment": {
+    "python": "3.11.0",
+    "pandas": "2.3.3",
+    "platform": "macOS-26.6-arm64-arm-64bit"
+  },
+  "calendar": {
+    "source": "tushare trade_cal exchange=SSE is_open=1 over the run window",
+    "sessions": 1210,
+    "first": "2021-08-12",
+    "last": "2026-08-11",
+    "session_list_sha256": "e4344076142edacbeafb48c4f52385b384eb8093a3960fcdae08b1d0575de5e1",
+    "receipt_file": "trade_cal_receipt.json"
+  },
+  "inputs": {
+    "snapshot_cache": {
+      "count": 1897,
+      "schema": [
+        "Date",
+        "Open",
+        "High",
+        "Low",
+        "Close",
+        "Volume"
+      ],
+      "composite_sha256": "80268494f1eff96283199bcf57a30b2008329ff86cc5894328dc4800be96d2c2",
+      "download_url": null,
+      "note": "Per-file manifest is in snapshot_manifest.json. Re-downloading from the provider will NOT reproduce these hashes byte-for-byte; only the archived cache will."
+    }
+  },
+  "accounting_semantics": {
+    "sizing": "20% of equity per position",
+    "max_concurrent": 5,
+    "cash_constraint": "allocation capped at available cash; otherwise skipped_cash",
+    "marking": "daily mark-to-market on close; halted names carry last_value",
+    "exit": "row exit_price at exit_date (target/stop/hold-expiry from the runner)",
+    "sharpe": "mean/std of daily equity returns, annualised by sqrt(252)",
+    "drawdown": "peak-to-trough on the marked-to-market equity curve",
+    "costs": "NOT modelled in this simulator \u2014 returns are gross"
+  },
+  "outputs": {
+    "backtest_daily_pit5y_final.csv": "07a7dbb73ff1d9e4d93adb5674eaa97f0f951147e2fcb90db8af4f0cafba02f7",
+    "backtest_detail_pit5y_final.csv": "a5116edbf79b2381e4d59a206bfea23ad3b0f31464000ed7c5aedfc2f71404a9",
+    "backtest_summary_pit5y_final.json": "c6ea36f75edb03f538ba50cb8cbb6b4e4fb0afe82f9aca3108d847480eb22399",
+    "picks.json": "73a8348e4faf7877ce11d953582730678ebc27fb222392be295ab4f5b2393754",
+    "backtest_detail_pit5y_final__equity_curve_20.0pct.csv": "7333dede1508ae52c80510aaa65509d75db0d1466aa98ff6fbb038c7174de366",
+    "portfolio_sim_v2_summary.json": "21c92587756356d7b447d8f51ce4051125af2cb578de2a42ca0919c4d8d3431b"
+  },
+  "bundle_composite_sha256": "f1d133ec8e4af1037bb9a1c572b5a4144e20becbaa67c5c4f7ffbd6d21660b44"
+}
