@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-08-13T07:58:31.489039Z",
+  "created_at": "2026-08-13T08:41:27.176229Z",
   "input_mode": "live",
   "bundle_id": null,
   "bundle_composite_sha256": null,
@@ -63,7 +63,7 @@
   "per_trade_compounded_dd_pct": 78.05,
   "cumulative_pnl_pct": 138.63,
   "final_equity_multiple": 2.39,
-  "total_time_min": 4.3,
+  "total_time_min": 5.4,
   "breadth_suppressed_days": 0,
   "acceptance_mode_counts": {
     "regime_filtered": 887,

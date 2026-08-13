@@ -12,8 +12,8 @@
   "command": "python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_final --out-dir outputs/backtest/pit5y_final --price-snapshot-dir outputs/backtest/pit5y_final/snapshots --dump-picks outputs/backtest/pit5y_final/picks.json",
   "sim_command": "python scripts/portfolio_sim_v2.py outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv --position-pct 20 --max-concurrent 5",
   "code": {
-    "git_base": "3511498a3ae761b1fb53e7aa130d2f8224ac48e0",
-    "runner_sha256": "d29c14e9a7269a7c8abbcce5074bc98394efde5539c7c8f8fc44add07d1cfc70",
+    "git_base": "2d9872349fb0cea8850f66b54f0bbf401f2e2039",
+    "runner_sha256": "0e2e07c68e326cbc4838144396ddefd4e634af996529bf6a8597d6768a5291f3",
     "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
     "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
   },
@@ -59,10 +59,10 @@
   "outputs": {
     "backtest_daily_pit5y_final.csv": "81b76a55a175274445e1789bd98bade520a88d7b0c86f73bd53b35066245c90a",
     "backtest_detail_pit5y_final.csv": "a5116edbf79b2381e4d59a206bfea23ad3b0f31464000ed7c5aedfc2f71404a9",
-    "backtest_summary_pit5y_final.json": "ace33939bce7484fa68c3f427213c9919434ab88bcf3968d44a91f057071a825",
+    "backtest_summary_pit5y_final.json": "b3533f6960896a56d78f134cdee70a5e07c868345f33fec785ab57927359526b",
     "picks.json": "73a8348e4faf7877ce11d953582730678ebc27fb222392be295ab4f5b2393754",
     "backtest_detail_pit5y_final__equity_curve_20.0pct.csv": "7333dede1508ae52c80510aaa65509d75db0d1466aa98ff6fbb038c7174de366",
-    "portfolio_sim_v2_summary.json": "319e6afb2dbcc9d0571eead46ba080493aefa9bc76974f3953417c7234f15d07"
+    "portfolio_sim_v2_summary.json": "c9fc2bb0ad21f5e314e63dcd7de806ddd5391acc2ef5eacd14cd004abec8ecb3"
   },
-  "bundle_composite_sha256": "e0dbc26d89fbf7ddc4fb75406a4225ee16b42da6384a91216471d422a34f520c"
+  "bundle_composite_sha256": "1921a50db7c36d12c3257cb6d7d8ee4af6d624e1015619db541dc322ba413cba"
 }
