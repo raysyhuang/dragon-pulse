@@ -405,6 +405,13 @@
     "market_cap": null,
     "name_cn": "粤电力A"
   },
+  "000540.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "*ST中天(退)"
+  },
   "000543.SZ": {
     "exchange": "SZ",
     "industry": "火力发电",
@@ -552,6 +559,13 @@
     "market_cap": null,
     "name_cn": "长安汽车"
   },
+  "000627.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "*ST天茂(退)"
+  },
   "000628.SZ": {
     "exchange": "SZ",
     "industry": "建筑工程",
@@ -607,6 +621,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "长春高新"
+  },
+  "000671.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "ST阳光城(退)"
   },
   "000672.SZ": {
     "exchange": "SZ",
@@ -1119,6 +1140,13 @@
     "market_cap": null,
     "name_cn": "锡业股份"
   },
+  "000961.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "ST中南(退)"
+  },
   "000962.SZ": {
     "exchange": "SZ",
     "industry": "小金属",
@@ -1511,6 +1539,13 @@
     "market_cap": null,
     "name_cn": "新和成"
   },
+  "002002.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "ST鸿达(退)"
+  },
   "002003.SZ": {
     "exchange": "SZ",
     "industry": "服饰",
@@ -1552,6 +1587,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "盾安环境"
+  },
+  "002013.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "中航机电(退)"
   },
   "002015.SZ": {
     "exchange": "SZ",
@@ -2274,6 +2316,13 @@
     "market_cap": null,
     "name_cn": "万马股份"
   },
+  "002280.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "ST联络(退)"
+  },
   "002281.SZ": {
     "exchange": "SZ",
     "industry": "通信设备",
@@ -2575,6 +2624,13 @@
     "market_cap": null,
     "name_cn": "广联达"
   },
+  "002411.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "必康退(退)"
+  },
   "002414.SZ": {
     "exchange": "SZ",
     "industry": "电器仪表",
@@ -2791,6 +2847,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "山西证券"
+  },
+  "002505.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "鹏都农牧(退)"
   },
   "002506.SZ": {
     "exchange": "SZ",
@@ -3022,6 +3085,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "江苏国信"
+  },
+  "002610.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "ST爱康(退)"
   },
   "002611.SZ": {
     "exchange": "SZ",
@@ -3912,6 +3982,13 @@
     "market_cap": null,
     "name_cn": "乾照光电"
   },
+  "300114.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "not found in stock_basic",
+    "metadata_unavailable": true,
+    "name_cn": ""
+  },
   "300115.SZ": {
     "exchange": "SZ",
     "industry": "元器件",
@@ -4352,6 +4429,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "赢时胜"
+  },
+  "300379.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "东通退"
   },
   "300382.SZ": {
     "exchange": "SZ",
@@ -4794,6 +4878,13 @@
     "market_cap": null,
     "name_cn": "亿联网络"
   },
+  "300630.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "普利退(退)"
+  },
   "300633.SZ": {
     "exchange": "SZ",
     "industry": "医疗保健",
@@ -5164,6 +5255,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "三只松鼠"
+  },
+  "300799.SZ": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "左江退(退)"
   },
   "300803.SZ": {
     "exchange": "SZ",
@@ -6257,6 +6355,13 @@
     "market_cap": null,
     "name_cn": "宇通客车"
   },
+  "600068.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "葛洲坝(退)"
+  },
   "600072.SH": {
     "exchange": "SH",
     "industry": "电气设备",
@@ -6635,6 +6740,13 @@
     "market_cap": null,
     "name_cn": "海航控股"
   },
+  "600225.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "退卓朗(退)"
+  },
   "600226.SH": {
     "exchange": "SH",
     "industry": "供气供热",
@@ -6726,6 +6838,13 @@
     "market_cap": null,
     "name_cn": "恒瑞医药"
   },
+  "600277.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "ST亿利(退)"
+  },
   "600282.SH": {
     "exchange": "SH",
     "industry": "普钢",
@@ -6753,6 +6872,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "鄂尔多斯"
+  },
+  "600297.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "广汇汽车(退)"
   },
   "600298.SH": {
     "exchange": "SH",
@@ -7874,6 +8000,13 @@
     "market_cap": null,
     "name_cn": "物产中大"
   },
+  "600705.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "中航产融(退)"
+  },
   "600707.SH": {
     "exchange": "SH",
     "industry": "元器件",
@@ -8174,6 +8307,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "上海机电"
+  },
+  "600837.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "海通证券(退)"
   },
   "600839.SH": {
     "exchange": "SH",
@@ -8693,6 +8833,13 @@
     "market_cap": null,
     "name_cn": "宁波远洋"
   },
+  "601028.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "玉龙股份(退)"
+  },
   "601033.SH": {
     "exchange": "SH",
     "industry": "环境保护",
@@ -9070,6 +9217,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "广汽集团"
+  },
+  "601258.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "*ST庞大(退)"
   },
   "601288.SH": {
     "exchange": "SH",
@@ -9799,6 +9953,13 @@
     "market_cap": null,
     "name_cn": "中国银行"
   },
+  "601989.SH": {
+    "industry": null,
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": true,
+    "name_cn": "中国重工(退)"
+  },
   "601990.SH": {
     "exchange": "SH",
     "industry": "证券",
@@ -9924,6 +10085,13 @@
     "is_st": false,
     "market_cap": null,
     "name_cn": "中策橡胶"
+  },
+  "603056.SH": {
+    "industry": "仓储物流",
+    "is_st": false,
+    "metadata_source": "tushare stock_basic (incl. delisted)",
+    "metadata_unavailable": false,
+    "name_cn": "德邦股份"
   },
   "603061.SH": {
     "exchange": "SH",

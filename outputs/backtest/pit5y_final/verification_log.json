@@ -1,10 +1,11 @@
 {
   "verifier": "DP_REPLAY_BUNDLE_VERIFIER",
-  "verified_at_utc": "2026-08-13T14:49:16.575678+00:00",
-  "commit_under_test": "4a11cdebdf3929d25af6d782f2a4d20980db1df6",
+  "verified_at_utc": "2026-08-14T04:51:22.556012+00:00",
+  "commit_under_test": "6df8641c2a7645fe7fd9014400b93c6722e3afb7",
+  "replay_code_commit_in_bundle": "6df8641c2a7645fe7fd9014400b93c6722e3afb7",
   "bundle_artifact": "DP_REPLAY_BUNDLE_PIT5Y_FINAL",
   "bundle_composite_sha256": "1921a50db7c36d12c3257cb6d7d8ee4af6d624e1015619db541dc322ba413cba",
-  "replay_executed": false,
+  "replay_executed": true,
   "result": "PASS",
   "checks": [
     {
@@ -23,6 +24,11 @@
       "detail": ""
     },
     {
+      "check": "basic_info sha256 matches bundle",
+      "ok": true,
+      "detail": ""
+    },
+    {
       "check": "schedule declares TRUSTED_HISTORICAL_ASSUMPTION",
       "ok": true,
       "detail": "membership is provider-current, not attested as-of"
@@ -31,6 +37,46 @@
       "check": "every price file matches snapshot_manifest",
       "ok": true,
       "detail": "1897 files, 0 mismatched"
+    },
+    {
+      "check": "replay ran with no network",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "replay ran with no token",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "replay exited cleanly",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "check": "picks_emitted reproduces",
+      "ok": true,
+      "detail": "published 641 vs replayed 641"
+    },
+    {
+      "check": "picks_filled reproduces",
+      "ok": true,
+      "detail": "published 616 vs replayed 616"
+    },
+    {
+      "check": "picks_skipped reproduces",
+      "ok": true,
+      "detail": "published 25 vs replayed 25"
+    },
+    {
+      "check": "pick decomposition closes",
+      "ok": true,
+      "detail": "641 = 616 + 25"
+    },
+    {
+      "check": "ledger closes",
+      "ok": true,
+      "detail": "616 = 546 + 70 + 0"
     }
   ],
   "boundary": "Verifies the published artifacts reproduce. Does NOT ratify the strategy numbers, and does not upgrade membership beyond TRUSTED_HISTORICAL_ASSUMPTION."

@@ -23,7 +23,7 @@
   "code": {
     "identity_note": "replay_code_commit is the commit whose code produced this replay. It is NOT the PR head and cannot be: committing this file advances head. Verify against the *_sha256 fields.",
     "authoritative_identity": "runner_sha256 + simulator_sha256 + config_sha256",
-    "replay_code_commit": "0356d895b8b9478ee04319035b79ac754963c535",
+    "replay_code_commit": "6df8641c2a7645fe7fd9014400b93c6722e3afb7",
     "runner_sha256": "b8e58dad895cfe166c6517f166af1602a826c0131b0be74ac0325d805a061ca4",
     "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
     "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
@@ -51,7 +51,7 @@
     },
     "basic_info": {
       "file": "basic_info.json",
-      "sha256": "c3db7de0ae10bb0e4202cdf3de6bb43e0ba8b771dca6d376a144bb6750be5bc8",
+      "sha256": "a1d9fe39c0a836431b229f47868e9efc508d10131e03d49198a003f1c2906107",
       "note": "Industry metadata drives the per-sector cap and therefore how many picks a day yields. Omitting it made an offline replay return 322 picks against a published 641, silently and with exit 0.",
       "consume_with": "--basic-info-in"
     },
