@@ -7,8 +7,10 @@ can exist at all. get_top_n_cn_by_market_cap_asof answers a historical query wit
 what the provider believes today, so a clean-checkout replay could silently
 produce a different universe and therefore different picks.
 
-These tests pin the three frozen inputs that make signal generation reproducible:
-membership schedule, trade_cal receipt, price cache.
+These tests pin the FOUR frozen inputs that make signal generation reproducible:
+membership schedule, trade_cal receipt, price cache, and industry metadata.
+The fourth was omitted originally, and its absence halved a five-year replay
+from 641 picks to 322 while exiting cleanly.
 """
 
 import csv
@@ -151,7 +153,7 @@ def _run_offline(tmp_path, *, schedule, calendar, snapshots, start, end, label,
 
 
 def test_fixture_offline_replay_rebuilds_signals_with_no_provider(tmp_path):
-    """THE GATE. Frozen schedule + calendar + mini cache, no token, no network.
+    """THE GATE. Frozen schedule + calendar + basic_info + mini cache, offline.
 
     Unconditional: it must not skip because the 39MB release archive is absent,
     since a skipped acceptance gate reads exactly like a passing one.

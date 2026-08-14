@@ -39,7 +39,7 @@ def _ohlcv(closes: pd.Series) -> pd.DataFrame:
 
 
 def make_offline_replay_fixture(tmp_path: Path) -> dict[str, Path]:
-    """Build snapshots + frozen schedule + frozen calendar for an offline replay.
+    """Build snapshots + frozen schedule + calendar + basic_info for an offline replay.
 
     The price path mirrors the golden MR fixture: a long uptrend above SMA200 with
     three modest down days, so RSI(2), streak and 5-day-low all fire exactly once

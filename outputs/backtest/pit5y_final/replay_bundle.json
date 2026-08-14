@@ -5,7 +5,8 @@
   "recomputable": true,
   "claim_boundary": [
     "Corrected-but-unattested diagnostic measurement.",
-    "Signal generation IS now offline-reproducible from the frozen schedule, calendar receipt and price cache; membership correctness remains a TRUSTED_HISTORICAL_ASSUMPTION, not an attested fact.",
+    "Signal generation is offline-reproducible from FOUR frozen inputs: price cache, trade_cal receipt, PIT membership schedule AND industry metadata (basic_info). All four are required \u2014 omitting basic_info silently halves the picks, because the sector cap collapses every candidate into one 'unknown' bucket and exits 0.",
+    "Membership correctness remains a TRUSTED_HISTORICAL_ASSUMPTION, not an attested fact, and 23 of 1,895 members have no obtainable industry.",
     "Supports only: the live 30-session drought has historical precedent.",
     "Does NOT update the playbook, endorse the annualised return, alter the selector, or reopen the PR #16 breadth conclusion."
   ],
@@ -23,7 +24,7 @@
   "code": {
     "identity_note": "replay_code_commit is the commit whose code produced this replay. It is NOT the PR head and cannot be: committing this file advances head. Verify against the *_sha256 fields.",
     "authoritative_identity": "runner_sha256 + simulator_sha256 + config_sha256",
-    "replay_code_commit": "6df8641c2a7645fe7fd9014400b93c6722e3afb7",
+    "replay_code_commit": "76971316266fb40446615bcdf5ad8578248dd5a8",
     "runner_sha256": "b8e58dad895cfe166c6517f166af1602a826c0131b0be74ac0325d805a061ca4",
     "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
     "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
@@ -41,6 +42,12 @@
     "session_list_sha256": "e4344076142edacbeafb48c4f52385b384eb8093a3960fcdae08b1d0575de5e1",
     "receipt_file": "trade_cal_receipt.json"
   },
+  "required_inputs_for_offline_replay": [
+    "snapshot_cache (prices)",
+    "trade_cal_receipt (calendar)",
+    "pit_membership_schedule (universe)",
+    "basic_info (industry -> sector cap)"
+  ],
   "inputs": {
     "pit_membership_schedule": {
       "file": "pit_membership_schedule.json",

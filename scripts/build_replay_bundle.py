@@ -101,9 +101,12 @@ def main() -> int:
         "recomputable": bool(args.cache_url) or "VERIFY_ARTIFACT_ONLY_NOT_RECOMPUTABLE",
         "claim_boundary": [
             "Corrected-but-unattested diagnostic measurement.",
-            "Signal generation IS now offline-reproducible from the frozen schedule, "
-            "calendar receipt and price cache; membership correctness remains a "
-            "TRUSTED_HISTORICAL_ASSUMPTION, not an attested fact.",
+            "Signal generation is offline-reproducible from FOUR frozen inputs: "
+            "price cache, trade_cal receipt, PIT membership schedule AND industry metadata (basic_info). All four are required — omitting basic_info silently halves "
+            "the picks, because the sector cap collapses every candidate into one "
+            "'unknown' bucket and exits 0.",
+            "Membership correctness remains a TRUSTED_HISTORICAL_ASSUMPTION, not an "
+            "attested fact, and 23 of 1,895 members have no obtainable industry.",
             "Supports only: the live 30-session drought has historical precedent.",
             "Does NOT update the playbook, endorse the annualised return, alter the "
             "selector, or reopen the PR #16 breadth conclusion.",
@@ -162,7 +165,11 @@ def main() -> int:
             "session_list_sha256": hashlib.sha256("\n".join(sessions).encode()).hexdigest(),
             "receipt_file": "trade_cal_receipt.json",
         },
-        "inputs": {
+        "required_inputs_for_offline_replay": [
+                "snapshot_cache (prices)", "trade_cal_receipt (calendar)",
+                "pit_membership_schedule (universe)", "basic_info (industry -> sector cap)",
+            ],
+            "inputs": {
             "pit_membership_schedule": {
                 "file": "pit_membership_schedule.json",
                 "sha256": sha256_file(run / "pit_membership_schedule.json")
