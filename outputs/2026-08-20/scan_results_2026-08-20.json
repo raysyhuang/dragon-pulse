@@ -1,0 +1,19 @@
+{
+  "date": "2026-08-20",
+  "generated_utc": "2026-08-19T23:57:23.778966",
+  "regime": "bear",
+  "regime_detail": {
+    "csi300_last": 4588.7,
+    "csi300_sma_short": 4648.88,
+    "csi300_sma_long": 4756.26,
+    "market_breadth_pct_above_sma20": 0.4313
+  },
+  "universe_size": 997,
+  "downloaded": 997,
+  "download_failed": 0,
+  "download_health": "ok",
+  "circuit_breaker": null,
+  "signals_total": 0,
+  "picks": [],
+  "errors": []
+}
