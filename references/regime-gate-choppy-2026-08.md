@@ -89,3 +89,34 @@ negative. Not adopted.
 - Evidence was produced with the PIT replay harness on
   `fix/backtest-real-trading-calendar` (`--pit-schedule-in`, `--basic-info-in`),
   which is not yet on main. `config/default.yaml` is identical across both branches.
+
+## Follow-up: participation dials are already optimal (2026-08-22)
+
+`book_size.{regime}.max_picks` is **dead config** while `acceptance.enabled: true` —
+`src/pipelines/funnel.py:474-477` only consults it in the `else` branch when
+acceptance is off. The dials that actually bind are `acceptance.max_full` /
+`max_selective` (2) and `book_size.max_per_sector` (1).
+
+Tested on top of the adopted bull+choppy gate, same 5y PIT replay:
+
+| variant | active | filled | pk/day | gross | net @0.15% | equity | maxDD% |
+|---|---|---|---|---|---|---|---|
+| 2 picks / sector 1 (adopted) | 559 | 1071 | 1.92 | +0.49 | +0.34 | 6.87x | 57.7 |
+| 3 picks / sector 1 | 559 | 1612 | 2.88 | +0.33 | +0.18 | 3.34x | 61.0 |
+| 4 picks / sector 1 | 559 | 2140 | 3.83 | +0.28 | +0.13 | 2.83x | 72.3 |
+| 2 picks / sector 2 | 559 | 1073 | 1.92 | +0.46 | +0.31 | 6.67x | 58.6 |
+
+Marginal-trade test — do the ADDED trades pay for themselves?
+
+| change | n extra | gross | net @0.15% | win% |
+|---|---|---|---|---|
+| 2 -> 3 picks | 541 | +0.00% | -0.15% | 40.9 |
+| 2 -> 4 picks | 1069 | +0.08% | -0.07% | 41.1 |
+| sector 1 -> 2 | 27 | -0.49% | -0.64% | 33.3 |
+
+Every widening is flat-to-negative gross and negative net. Keep `max_full: 2`,
+`max_selective: 2`, `max_per_sector: 1`.
+
+Read positively: picks #3 and #4 are materially worse than #1 and #2, which is
+evidence the composite score genuinely ranks rather than shuffles. The only
+participation gain available was the choppy regime itself.
