@@ -1,0 +1,10 @@
+{
+  "date": "2026-08-28",
+  "sleeve": "top1_paper",
+  "paper_only": true,
+  "status": "PAPER_TRACK_ONLY",
+  "note": "top-1/day concentration A/B vs live top-2 + CSI300",
+  "regime": "bear",
+  "top1": null,
+  "top2": []
+}
