@@ -610,19 +610,25 @@ def main():
                     if scan_results_path.exists():
                         regime_detail = scan_data.get("regime_detail", {})
                     acceptance_mode = regime_detail.get("acceptance_mode", "")
+                    selection_error = regime_detail.get("selection_error")
                     breadth = regime_detail.get("market_breadth_pct_above_sma20")
 
-                    if acceptance_mode == "breadth_suppressed" and breadth is not None:
+                    if selection_error:
+                        lines.append("⚠️ <b>选股中止</b> — 行业元数据不完整，未生成可执行候选")
+                        priority = "high"
+                    elif acceptance_mode == "breadth_suppressed" and breadth is not None:
                         lines.append("今日无选股 — 市场宽度受限")
                         lines.append(RULE)
                         lines.append(f"<i>宽度 {breadth:.1%} · {signals} 个信号已被过滤</i>")
+                        priority = "low"
                     else:
                         lines.append("今日无选股 — 无信号通过筛选")
-                    streak, since = count_abstention_streak(date_str, current_picks=0)
-                    note = abstention_note(streak, since)
-                    if note:
-                        lines.append(note)
-                    priority = "low"
+                        priority = "low"
+                    if not selection_error:
+                        streak, since = count_abstention_streak(date_str, current_picks=0)
+                        note = abstention_note(streak, since)
+                        if note:
+                            lines.append(note)
 
                 mgr = AlertManager(alert_config)
                 mgr.send_alert(
