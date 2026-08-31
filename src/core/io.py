@@ -136,10 +136,10 @@ def count_abstention_streak(
 ) -> tuple[int, Optional[str]]:
     """Count consecutive scanned sessions ending at ``asof_date`` that emitted no picks.
 
-    A correctly-abstaining scanner and a broken one send byte-identical "no
-    picks" alerts, so the run length is the only thing that distinguishes them
-    from a phone. Returns ``(streak, first_date)`` where ``first_date`` is the
-    oldest session in the run, or ``(0, None)`` when the latest session picked.
+    Selection-refusal artifacts are skipped: they record an operational/data
+    failure, not a valid strategy abstention. Returns ``(streak, first_date)``
+    where ``first_date`` is the oldest valid session in the run, or ``(0, None)``
+    when the latest valid session picked.
 
     Dates with no readable ``scan_results_<date>.json`` are skipped rather than
     treated as a break: the archive only holds days the scanner actually ran, so
@@ -172,6 +172,9 @@ def count_abstention_streak(
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
+                continue
+            regime_detail = data.get("regime_detail")
+            if isinstance(regime_detail, dict) and regime_detail.get("selection_error"):
                 continue
             picks_list = data.get("picks")
             if not isinstance(picks_list, list):
