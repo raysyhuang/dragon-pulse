@@ -14,8 +14,12 @@ import argparse
 import hashlib
 import json
 import logging
+import os
+import ssl
 import sys
 import time
+import urllib.error
+import urllib.request
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
@@ -110,6 +114,35 @@ def _stable_price_fingerprint(data_map: dict[str, pd.DataFrame]) -> str:
 def _snapshot_path(snapshot_dir: Path, ticker: str) -> Path:
     safe = ticker.replace("/", "_").replace("\\", "_").replace(":", "_")
     return snapshot_dir / f"{safe}.csv"
+
+
+def _snapshot_covers_range(df: pd.DataFrame, start: date, end: date) -> bool:
+    """Return whether a cached frame spans both requested calendar endpoints."""
+    if df.empty:
+        return False
+    index = pd.to_datetime(df.index, errors="coerce")
+    if index.isna().any():
+        return False
+    return index.min().date() <= start and index.max().date() >= end
+
+
+def _assert_csi_regime_coverage(csi300_df: pd.DataFrame, trading_days: list[date], sma_long: int) -> None:
+    """Fail before replay when CSI300 cannot form a regime on every scan day."""
+    if not trading_days:
+        raise ValueError("CSI300 regime coverage inadequate: no requested trading days")
+    if csi300_df.empty:
+        raise ValueError("CSI300 regime coverage inadequate: no CSI300 data")
+    index = pd.to_datetime(csi300_df.index, errors="coerce")
+    if index.isna().any() or len(csi300_df) < sma_long + 1:
+        raise ValueError("CSI300 regime coverage inadequate: insufficient rows or invalid dates")
+    first_required = trading_days[0]
+    available_before_first = int((index.date <= first_required).sum())
+    if available_before_first < sma_long + 1 or index.max().date() < trading_days[-1]:
+        raise ValueError(
+            "CSI300 regime coverage inadequate: "
+            f"need >= {sma_long + 1} rows through {first_required} and data through {trading_days[-1]}; "
+            f"got {available_before_first} rows and last={index.max().date()}"
+        )
 
 
 def _read_price_snapshot(snapshot_dir: Path, ticker: str) -> pd.DataFrame:
@@ -251,15 +284,125 @@ def apply_score_floor(
     return [candidate for candidate in candidates if candidate[1].score >= score_floor]
 
 
-def get_cn_trading_days(start: date, end: date) -> list[date]:
-    """Generate weekdays between start and end (approximate CN trading calendar)."""
-    days = []
-    current = start
-    while current <= end:
-        if current.weekday() < 5:
-            days.append(current)
-        current += timedelta(days=1)
-    return days
+PIT_SCHEDULE_PROVENANCE = "TRUSTED_HISTORICAL_ASSUMPTION"
+
+
+def dump_pit_schedule(schedule, path, *, universe_n: int, rebalance_months: int) -> str:
+    """Freeze the membership schedule and return its sha256.
+
+    Labelled TRUSTED_HISTORICAL_ASSUMPTION deliberately. The provider answers a
+    historical market-cap query with what it believes today; it does not attest
+    to what it would have said on the rebalance date. Freezing makes the replay
+    reproducible, which is a different and weaker claim than making it correct,
+    and the label keeps those apart.
+    """
+    payload = {
+        "artifact": "DP_PIT_MEMBERSHIP_SCHEDULE",
+        "provenance": PIT_SCHEDULE_PROVENANCE,
+        "provenance_note": (
+            "Membership is provider-CURRENT as-of resolution, not provider-as-of. "
+            "No source receipt attests to the ranking on the rebalance date."
+        ),
+        "universe_n": universe_n,
+        "rebalance_months": rebalance_months,
+        "rebalances": [
+            {"date": d.isoformat(), "members": sorted(members)} for d, members in schedule
+        ],
+    }
+    blob = json.dumps(payload, indent=2, sort_keys=False)
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(blob, encoding="utf-8")
+    return hashlib.sha256(blob.encode()).hexdigest()
+
+
+def load_pit_schedule(path):
+    """Read a frozen schedule. Fails closed on a shape it cannot trust."""
+    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    if data.get("artifact") != "DP_PIT_MEMBERSHIP_SCHEDULE":
+        raise RuntimeError(f"{path} is not a PIT membership schedule")
+    rebalances = data.get("rebalances")
+    if not isinstance(rebalances, list) or not rebalances:
+        raise RuntimeError(f"{path} contains no rebalances")
+    out = []
+    for r in rebalances:
+        members = r.get("members")
+        if not isinstance(members, list) or not members:
+            raise RuntimeError(f"{path} has a rebalance with no members: {r.get('date')}")
+        out.append((datetime.strptime(r["date"], "%Y-%m-%d").date(), set(members)))
+    return sorted(out, key=lambda x: x[0])
+
+
+def get_cn_trading_days(start: date, end: date, bundle_dir: str | Path | None = None,
+                        calendar_receipt: str | Path | None = None) -> list[date]:
+    """Real SSE open sessions, fetched and validated — never a weekday guess.
+
+    Fails closed. An approximate calendar is what produced trades on days the
+    exchange was shut, and it looked like ordinary output the whole time. In
+    bundle mode the calendar comes from the sealed bundle's own receipt, so an
+    offline replay never reaches a provider.
+    """
+
+    # Sealed bundle: the calendar is already inside it. The CSI300 price file is
+    # manifest-listed and SHA-256 verified by validate_input_bundle, so its date
+    # column IS the session receipt — real sessions, hash-bound, no provider.
+    # Reaching for the network here would break the offline guarantee that is the
+    # whole point of bundle mode.
+    # A frozen trade_cal receipt makes the calendar replayable without a provider.
+    # Without this, an offline PIT replay still needed the network for its session
+    # list, so freezing only the membership schedule would not have closed the gap.
+    if calendar_receipt:
+        payload = json.loads(Path(calendar_receipt).read_text(encoding="utf-8"))
+        data = payload.get("data", {})
+        if data.get("fields") != ["cal_date", "is_open"]:
+            raise RuntimeError(f"frozen calendar receipt has unexpected schema: {data.get('fields')}")
+        days = sorted(
+            datetime.strptime(str(row[0]), "%Y%m%d").date()
+            for row in data.get("items", []) if int(row[1]) == 1
+        )
+        days = [d for d in days if start <= d <= end]
+        if not days:
+            raise RuntimeError(f"frozen calendar receipt covers no sessions in {start}..{end}")
+        return days
+
+    if bundle_dir:
+        index_csv = Path(bundle_dir) / "prices" / "000300.SH.csv"
+        if not index_csv.is_file():
+            raise RuntimeError(
+                f"sealed bundle has no CSI300 session receipt at {index_csv}; "
+                "refusing to fetch a calendar in bundle mode"
+            )
+        stamps = pd.read_csv(index_csv)
+        col = "Date" if "Date" in stamps.columns else stamps.columns[0]
+        days = sorted({d.date() for d in pd.to_datetime(stamps[col])
+                       if start <= d.date() <= end})
+        if not days:
+            raise RuntimeError(
+                f"sealed bundle CSI300 receipt covers no sessions in {start}..{end}"
+            )
+        return days
+
+    token = os.environ.get("TUSHARE_TOKEN", "").strip()
+    if not token:
+        raise RuntimeError("TUSHARE_TOKEN is required to obtain authoritative SSE trading sessions")
+    params = {"exchange": "SSE", "start_date": start.strftime("%Y%m%d"), "end_date": end.strftime("%Y%m%d"), "is_open": "1"}
+    body = json.dumps({"api_name": "trade_cal", "token": token, "params": params, "fields": "cal_date,is_open"}, separators=(",", ":")).encode("utf-8")
+    try:
+        request = urllib.request.Request("https://api.tushare.pro", data=body, headers={"Content-Type": "application/json"})
+        payload = json.loads(urllib.request.urlopen(request, timeout=45, context=ssl.create_default_context()).read())
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"unable to fetch authoritative SSE trading calendar: {exc}") from exc
+    if payload.get("code") != 0:
+        raise RuntimeError(f"TuShare trade_cal rejected request: {payload.get('msg', '')}")
+    data = payload.get("data", {})
+    if data.get("fields") != ["cal_date", "is_open"]:
+        raise RuntimeError(f"unexpected trade_cal schema: {data.get('fields')}")
+    try:
+        sessions = sorted(datetime.strptime(str(row[0]), "%Y%m%d").date() for row in data.get("items", []) if int(row[1]) == 1)
+    except (IndexError, TypeError, ValueError) as exc:
+        raise RuntimeError("malformed trade_cal rows") from exc
+    if not sessions or sessions[0] < start or sessions[-1] > end or any(day < start or day > end for day in sessions):
+        raise RuntimeError("trade_cal returned invalid session bounds")
+    return sessions
 
 
 def evaluate_pick(
@@ -606,6 +749,16 @@ def main():
                              "point_in_time = top-N by market cap as of each rebalance (unbiased)")
     parser.add_argument("--universe-n", type=int, default=1000,
                         help="Universe size (top-N by market cap)")
+    parser.add_argument("--basic-info-in", default="",
+                        help="Replay from frozen basic_info (industry/ST); skips the provider.")
+    parser.add_argument("--basic-info-out", default="",
+                        help="Freeze the basic_info map to this path.")
+    parser.add_argument("--calendar-in", default="",
+                        help="Replay from a frozen trade_cal receipt; skips the provider entirely.")
+    parser.add_argument("--pit-schedule-out", default="",
+                        help="Freeze the point-in-time membership schedule to this path.")
+    parser.add_argument("--pit-schedule-in", default="",
+                        help="Replay from a frozen membership schedule; skips the provider entirely.")
     parser.add_argument("--universe-rebalance-months", type=int, default=1,
                         help="Point-in-time universe rebalance cadence in months")
     parser.add_argument("--outputs-root", default="outputs",
@@ -669,7 +822,8 @@ def main():
     config_excluded_regimes = parse_regime_set((config.get("acceptance") or {}).get("excluded_regimes", []))
     excluded_regimes |= config_excluded_regimes
 
-    trading_days = get_cn_trading_days(start_date, end_date)
+    trading_days = get_cn_trading_days(start_date, end_date, bundle_dir=args.input_bundle or None,
+                                       calendar_receipt=args.calendar_in or None)
     if args.max_days > 0:
         trading_days = trading_days[:args.max_days]
 
@@ -715,10 +869,26 @@ def main():
                 logger.error("No execution watchlist tickers found under %s for %s to %s", args.outputs_root, args.start, args.end)
                 return 1
         elif args.universe_mode == "point_in_time":
-            pit_schedule = build_pit_universe_schedule(start_date, end_date, n=args.universe_n, rebalance_months=args.universe_rebalance_months, provider_config=provider_config)
+            # The membership schedule decides which signals can exist at all, so a
+            # replay that rebuilds it from a live provider is not reproducible:
+            # get_top_n_cn_by_market_cap_asof returns the provider's CURRENT answer
+            # for a historical date, which drifts with restatements and delistings.
+            # A frozen schedule makes signal generation replayable offline; without
+            # one, only the results and the ledger were ever verifiable.
+            if args.pit_schedule_in:
+                pit_schedule = load_pit_schedule(args.pit_schedule_in)
+                logger.info("PIT schedule loaded from %s (%d rebalances) — no provider call",
+                            args.pit_schedule_in, len(pit_schedule))
+            else:
+                pit_schedule = build_pit_universe_schedule(start_date, end_date, n=args.universe_n, rebalance_months=args.universe_rebalance_months, provider_config=provider_config)
             if not pit_schedule:
                 logger.error("Point-in-time universe build returned no members.")
                 return 1
+            if args.pit_schedule_out:
+                dump_pit_schedule(pit_schedule, args.pit_schedule_out,
+                                  universe_n=args.universe_n,
+                                  rebalance_months=args.universe_rebalance_months)
+                logger.info("PIT schedule frozen to %s", args.pit_schedule_out)
             universe = sorted({ticker for _, members in pit_schedule for ticker in members})
         else:
             universe = get_top_n_cn_by_market_cap(n=args.universe_n, provider_config=provider_config)
@@ -729,10 +899,15 @@ def main():
         snapshot_dir = Path(args.price_snapshot_dir) if args.price_snapshot_dir else None
         price_snapshot_mode = "read_write" if snapshot_dir else "off"
         csi300_full = _read_price_snapshot(snapshot_dir, csi_symbol) if snapshot_dir else pd.DataFrame()
-        if csi300_full.empty:
+        if csi300_full.empty or not _snapshot_covers_range(csi300_full, start_date - timedelta(days=LOOKBACK_DAYS), end_date):
             csi300_data, _ = download_daily_range_fn(tickers=[csi_symbol], start=dl_start_str, end=dl_end_str, provider_config=provider_config)
             csi300_full = csi300_data.get(csi_symbol, pd.DataFrame())
-            if snapshot_dir and not csi300_full.empty:
+            if not _snapshot_covers_range(csi300_full, start_date - timedelta(days=LOOKBACK_DAYS), end_date):
+                raise ValueError(
+                    f"CSI300 snapshot/download lacks requested coverage {dl_start_str} through {end_date}; "
+                    "refusing a regime-starved replay"
+                )
+            if snapshot_dir:
                 _write_price_snapshot(snapshot_dir, csi_symbol, csi300_full)
 
         snapshot_data, snapshot_missing = ({}, list(universe))
@@ -753,8 +928,22 @@ def main():
 
         info_map: dict[str, dict] = {}
         if args.acceptance_mode == "live_equivalent":
-            from src.core.cn_data import get_cn_basic_info
-            info_map = get_cn_basic_info(universe, provider_config=provider_config)
+            if args.basic_info_in:
+                # Industry metadata decides the sector cap and therefore how many
+                # picks a day yields. Freezing prices, calendar and membership but
+                # not this left signal generation provider-dependent.
+                info_map = json.loads(Path(args.basic_info_in).read_text(encoding="utf-8"))
+                logger.info("basic_info loaded from %s (%d tickers) — no provider call",
+                            args.basic_info_in, len(info_map))
+            else:
+                from src.core.cn_data import get_cn_basic_info
+                info_map = get_cn_basic_info(universe, provider_config=provider_config)
+            if args.basic_info_out:
+                Path(args.basic_info_out).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.basic_info_out).write_text(
+                    json.dumps(info_map, indent=2, sort_keys=True, ensure_ascii=False),
+                    encoding="utf-8")
+                logger.info("basic_info frozen to %s", args.basic_info_out)
 
     csi300_full = csi300_full.rename(columns={column: column.lower() for column in csi300_full.columns if column in ("Open", "High", "Low", "Close", "Volume")})
 
@@ -769,6 +958,7 @@ def main():
         return name in alpha_engines and bool((alpha_config.get(name) or {}).get("enabled", False))
     sma_short = int(get_config_value(config, "mean_reversion", "regime", "sma_short", default=20))
     sma_long = int(get_config_value(config, "mean_reversion", "regime", "sma_long", default=50))
+    _assert_csi_regime_coverage(csi300_full, trading_days, sma_long)
 
     # --- Precompute features and date indices for all tickers (avoids repeated slicing) ---
     logger.info("Precomputing technical features for %d tickers...", len(data_map))
@@ -1323,7 +1513,7 @@ def main():
             "day1_stop_count": 0,
             "profitable_days_pct": 0.0,
             "exit_day_distribution": {},
-            "max_drawdown_pct": 0.0,
+            "per_trade_compounded_dd_pct": 0.0,
             "cumulative_pnl_pct": 0.0,
             "final_equity_multiple": 1.0,
             "total_time_min": round(total_time / 60, 1),
@@ -1501,6 +1691,18 @@ def main():
         "zero_pick_days": zero_pick_days,
         "zero_pick_days_pct": round(zero_pick_days_pct, 4),
         "avg_picks_per_active_day": round(avg_picks_per_active_day, 2),
+        # total_picks counts FILLED rows only, which read as the pick count and got
+        # quoted as one: a run emitting 641 picks reported total_picks 616. Both
+        # numbers are now named so neither has to be explained in prose.
+        "picks_emitted": int(len(df)),
+        "picks_filled": int((df["entry_status"] == "filled").sum()),
+        "picks_skipped": int((df["entry_status"] == "skipped").sum()),
+        "picks_skipped_by_reason": {
+            str(k): int(v) for k, v in
+            df.loc[df["entry_status"] == "skipped", "exit_reason"]
+              .value_counts().sort_index().items()
+        },
+        "portfolio_input_set": "picks_filled — rows with entry_status='filled' and a usable pnl_pct",
         "total_picks": total,
         "entry_skipped_no_chase": entry_skipped_no_chase,
         "target_hits": target_hits,
@@ -1516,7 +1718,10 @@ def main():
         "day1_stop_count": day1_stops,
         "profitable_days_pct": round(profitable_days_pct, 4),
         "exit_day_distribution": exit_day_dist,
-        "max_drawdown_pct": round(max_dd, 2),
+        # NOT a portfolio drawdown: this compounds mean per-signal-date trade P&L with
+        # no overlapping positions, cash constraint or concurrency. Renamed because it
+        # printed 83.33% on a run whose ledger drawdown was 33.4%, and got quoted.
+        "per_trade_compounded_dd_pct": round(max_dd, 2),
         "cumulative_pnl_pct": round(cumulative_pnl_pct, 2),
         "final_equity_multiple": round(float(equity.iloc[-1]), 2),
         "total_time_min": round(total_time / 60, 1),
@@ -1546,7 +1751,7 @@ def main():
                 hold_expired_positive_pct * 100)
     logger.info("Profitable days: %.1f%% | Zero-pick days: %d (%.1f%%) | Avg picks/active day: %.1f",
                 profitable_days_pct * 100, zero_pick_days, zero_pick_days_pct * 100, avg_picks_per_active_day)
-    logger.info("Max drawdown: %.2f%% | Cumulative PnL: %.2f%% | Equity: %.2fx", max_dd, cumulative_pnl_pct, float(equity.iloc[-1]))
+    logger.info("Per-trade compounded DD (NOT portfolio DD): %.2f%% | Cumulative PnL: %.2f%% | Equity: %.2fx", max_dd, cumulative_pnl_pct, float(equity.iloc[-1]))
     if exit_day_dist:
         logger.info("Stop exit-day dist: %s", exit_day_dist)
     logger.info("")

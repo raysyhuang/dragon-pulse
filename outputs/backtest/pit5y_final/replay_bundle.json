@@ -1,0 +1,104 @@
+{
+  "artifact": "DP_REPLAY_BUNDLE_PIT5Y_FINAL",
+  "status": "RESEARCH_ONLY_NON_BINDING",
+  "ratified": false,
+  "recomputable": true,
+  "claim_boundary": [
+    "Corrected-but-unattested diagnostic measurement.",
+    "Signal generation is offline-reproducible from FOUR frozen inputs: price cache, trade_cal receipt, PIT membership schedule AND industry metadata (basic_info). All four are required \u2014 omitting basic_info silently halves the picks, because the sector cap collapses every candidate into one 'unknown' bucket and exits 0.",
+    "Membership correctness remains a TRUSTED_HISTORICAL_ASSUMPTION, not an attested fact, and 23 of 1,895 members have no obtainable industry.",
+    "Supports only: the live 30-session drought has historical precedent.",
+    "Does NOT update the playbook, endorse the annualised return, alter the selector, or reopen the PR #16 breadth conclusion."
+  ],
+  "hash_algorithm": "sha256 over file bytes; a composite is sha256 over the newline-joined 'name:sha256' pairs of its members, sorted by name",
+  "command": "python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_final --out-dir <OUT> --price-snapshot-dir <EXTRACTED>/snapshots --pit-schedule-in <BUNDLE>/pit_membership_schedule.json --calendar-in <BUNDLE>/trade_cal_receipt.json --basic-info-in <BUNDLE>/basic_info.json --dump-picks <OUT>/picks.json",
+  "clean_machine_reproduction": [
+    "git clone <repo> && git checkout <replay_code_commit>",
+    "curl -L -o snapshots.tgz https://github.com/raysyhuang/dragon-pulse/releases/download/pit5y-replay-cache-v1/dp-pit5y-final-snapshots.tgz",
+    "shasum -a 256 snapshots.tgz   # must equal snapshot_archive.sha256",
+    "tar -xzf snapshots.tgz -C <EXTRACTED>",
+    "python scripts/verify_replay_bundle.py --run-dir <BUNDLE>   # hashes + offline replay",
+    "# or run the command above directly with TUSHARE_TOKEN unset and no network"
+  ],
+  "sim_command": "python scripts/portfolio_sim_v2.py outputs/backtest/pit5y_final/backtest_detail_pit5y_final.csv --position-pct 20 --max-concurrent 5",
+  "code": {
+    "identity_note": "replay_code_commit is the commit whose code produced this replay. It is NOT the PR head and cannot be: committing this file advances head. Verify against the *_sha256 fields.",
+    "authoritative_identity": "runner_sha256 + simulator_sha256 + config_sha256",
+    "replay_code_commit": "76971316266fb40446615bcdf5ad8578248dd5a8",
+    "runner_sha256": "b8e58dad895cfe166c6517f166af1602a826c0131b0be74ac0325d805a061ca4",
+    "simulator_sha256": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
+    "config_sha256": "0c10dfe45457286f5258671346f6e8b3b636b2ed4e940355d33e9a222a69dec4"
+  },
+  "environment": {
+    "python": "3.11.0",
+    "pandas": "2.3.3",
+    "platform": "macOS-26.6-arm64-arm-64bit"
+  },
+  "calendar": {
+    "source": "tushare trade_cal exchange=SSE is_open=1 over the run window",
+    "sessions": 1210,
+    "first": "2021-08-12",
+    "last": "2026-08-11",
+    "session_list_sha256": "e4344076142edacbeafb48c4f52385b384eb8093a3960fcdae08b1d0575de5e1",
+    "receipt_file": "trade_cal_receipt.json"
+  },
+  "required_inputs_for_offline_replay": [
+    "snapshot_cache (prices)",
+    "trade_cal_receipt (calendar)",
+    "pit_membership_schedule (universe)",
+    "basic_info (industry -> sector cap)"
+  ],
+  "inputs": {
+    "pit_membership_schedule": {
+      "file": "pit_membership_schedule.json",
+      "sha256": "0f23617a5688d180e8e205d3856d56bbbb14ab6c1751dd1919de5ea1c98f53b7",
+      "provenance": "TRUSTED_HISTORICAL_ASSUMPTION",
+      "note": "Membership is provider-CURRENT as-of resolution, not provider-as-of; no receipt attests to the ranking on the rebalance date. Freezing makes signal generation reproducible, which is weaker than making it correct.",
+      "consume_with": "--pit-schedule-in"
+    },
+    "basic_info": {
+      "file": "basic_info.json",
+      "sha256": "a1d9fe39c0a836431b229f47868e9efc508d10131e03d49198a003f1c2906107",
+      "note": "Industry metadata drives the per-sector cap and therefore how many picks a day yields. Omitting it made an offline replay return 322 picks against a published 641, silently and with exit 0.",
+      "consume_with": "--basic-info-in"
+    },
+    "trade_cal_receipt": {
+      "file": "trade_cal_receipt.json",
+      "sha256": "7b9c9dbc2cb2f2d98e51c66a14920ceb204328d186fe9909ab5a0a1f8cc461c2",
+      "consume_with": "--calendar-in"
+    },
+    "snapshot_cache": {
+      "count": 1897,
+      "schema": [
+        "Date",
+        "Open",
+        "High",
+        "Low",
+        "Close",
+        "Volume"
+      ],
+      "composite_sha256": "80268494f1eff96283199bcf57a30b2008329ff86cc5894328dc4800be96d2c2",
+      "download_url": "https://github.com/raysyhuang/dragon-pulse/releases/download/pit5y-replay-cache-v1/dp-pit5y-final-snapshots.tgz",
+      "note": "Per-file manifest is in snapshot_manifest.json. Re-downloading from the provider will NOT reproduce these hashes byte-for-byte; only the archived cache will."
+    }
+  },
+  "accounting_semantics": {
+    "sizing": "20% of equity per position",
+    "max_concurrent": 5,
+    "cash_constraint": "allocation capped at available cash; otherwise skipped_cash",
+    "marking": "daily mark-to-market on close; halted names carry last_value",
+    "exit": "row exit_price at exit_date (target/stop/hold-expiry from the runner)",
+    "sharpe": "mean/std of daily equity returns, annualised by sqrt(252)",
+    "drawdown": "peak-to-trough on the marked-to-market equity curve",
+    "costs": "NOT modelled in this simulator \u2014 returns are gross"
+  },
+  "outputs": {
+    "backtest_daily_pit5y_final.csv": "81b76a55a175274445e1789bd98bade520a88d7b0c86f73bd53b35066245c90a",
+    "backtest_detail_pit5y_final.csv": "a5116edbf79b2381e4d59a206bfea23ad3b0f31464000ed7c5aedfc2f71404a9",
+    "backtest_summary_pit5y_final.json": "b3533f6960896a56d78f134cdee70a5e07c868345f33fec785ab57927359526b",
+    "picks.json": "73a8348e4faf7877ce11d953582730678ebc27fb222392be295ab4f5b2393754",
+    "backtest_detail_pit5y_final__equity_curve_20.0pct.csv": "7333dede1508ae52c80510aaa65509d75db0d1466aa98ff6fbb038c7174de366",
+    "portfolio_sim_v2_summary.json": "c9fc2bb0ad21f5e314e63dcd7de806ddd5391acc2ef5eacd14cd004abec8ecb3"
+  },
+  "bundle_composite_sha256": "1921a50db7c36d12c3257cb6d7d8ee4af6d624e1015619db541dc322ba413cba"
+}

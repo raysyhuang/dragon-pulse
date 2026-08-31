@@ -15,11 +15,16 @@ from src.core.io import count_abstention_streak
 from src.core.message_format import abstention_note
 
 
-def _write_scan(root: Path, date: str, picks: int) -> None:
+def _write_scan(root: Path, date: str, picks: int, *, selection_error: str | None = None) -> None:
     day = root / date
     day.mkdir(parents=True, exist_ok=True)
+    regime_detail = {"selection_error": selection_error} if selection_error else {}
     (day / f"scan_results_{date}.json").write_text(
-        json.dumps({"date": date, "picks": [{"ticker": f"{i}"} for i in range(picks)]}),
+        json.dumps({
+            "date": date,
+            "picks": [{"ticker": f"{i}"} for i in range(picks)],
+            "regime_detail": regime_detail,
+        }),
         encoding="utf-8",
     )
 
@@ -64,6 +69,21 @@ def test_missing_and_unreadable_artifacts_are_skipped_not_breaks(tmp_path):
 
     assert streak == 2
     assert since == "2026-07-01"
+
+
+def test_selection_refusal_artifact_is_excluded_from_streak(tmp_path):
+    _write_scan(tmp_path, "2026-07-01", picks=0)
+    _write_scan(
+        tmp_path,
+        "2026-07-02",
+        picks=0,
+        selection_error="sector cap cannot be applied: industry metadata missing",
+    )
+    _write_scan(tmp_path, "2026-07-03", picks=0)
+
+    assert count_abstention_streak(
+        "2026-07-03", root_dir=str(tmp_path)
+    ) == (2, "2026-07-01")
 
 
 def test_future_dates_and_non_date_dirs_are_ignored(tmp_path):
@@ -145,3 +165,42 @@ def test_scan_alert_carries_the_streak_line(tmp_path, monkeypatch):
     message = send_alert.call_args.kwargs["message"]
     assert "今日无选股" in message
     assert "连续第 3 个交易日无选股" in message
+
+
+def test_scan_alert_surfaces_selection_refusal_without_counting_streak(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+
+    scan_cmd = importlib.import_module("src.commands.scan")
+    refused_result = {
+        "date": "2026-08-12",
+        "regime": "bull",
+        "regime_detail": {
+            "selection_error": "sector cap cannot be applied: industry metadata missing",
+            "market_breadth_pct_above_sma20": 0.715,
+        },
+        "universe_size": 998,
+        "downloaded": 998,
+        "download_failed": 0,
+        "download_health": "ok",
+        "circuit_breaker": None,
+        "signals_total": 2,
+        "picks": [],
+        "errors": ["Selection funnel refused: sector cap cannot be applied"],
+    }
+
+    with patch(
+        "src.core.alerts.AlertManager.send_alert", return_value={"telegram": True}
+    ) as send_alert, patch(
+        "src.core.io.count_abstention_streak", return_value=(99, "2026-01-01")
+    ) as count_streak:
+        scan_cmd._send_scan_alert(refused_result)
+
+    message = send_alert.call_args.kwargs["message"]
+    assert send_alert.call_args.kwargs["priority"] == "high"
+    assert "选股中止" in message
+    assert "行业元数据" in message
+    assert "无信号通过筛选" not in message
+    assert "连续第" not in message
+    count_streak.assert_not_called()

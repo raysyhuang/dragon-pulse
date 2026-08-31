@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -102,3 +103,101 @@ def test_daily_breadth_column_is_blank_when_acceptance_is_off(tmp_path):
     for row in daily:
         assert "breadth_above_sma20" in row
         assert row["breadth_above_sma20"] == ""
+
+
+def _no_network_env(tmp_path):
+    """Env for a child interpreter that cannot open a socket.
+
+    A monkeypatch in the pytest process does NOT cross subprocess.run — the
+    child is a fresh interpreter and inherits none of it. Demonstrated: with the
+    parent patched, the child still reached the internet. sitecustomize is
+    imported by the child at startup, before the runner, so the block is real.
+    """
+    site = tmp_path / "nonet"
+    site.mkdir(exist_ok=True)
+    # Block connecting, not the socket type. Replacing socket.socket breaks
+    # `class SSLSocket(socket)` in ssl.py at import time, which fails the run for
+    # the wrong reason and would read as "attempted network".
+    (site / "sitecustomize.py").write_text(
+        "import socket\n"
+        "def _blocked(*a, **k):\n"
+        "    raise RuntimeError('NETWORK_BLOCKED_BY_TEST')\n"
+        "socket.create_connection = _blocked\n"
+        "socket.socket.connect = _blocked\n"
+        "socket.socket.connect_ex = _blocked\n",
+        encoding="utf-8",
+    )
+    env = dict(os.environ)
+    env.pop("TUSHARE_TOKEN", None)
+    env["HOME"] = str(tmp_path)                 # .env fallback unreachable
+    env["PYTHONPATH"] = str(site)
+    return env
+
+
+def test_the_network_blocker_actually_blocks(tmp_path):
+    """Positive control. Without it, a sitecustomize that failed to load would
+    make the offline test pass for the wrong reason — which is the exact class
+    of false green this suite keeps catching."""
+    env = _no_network_env(tmp_path)
+
+    probe = subprocess.run(
+        [sys.executable, "-c",
+         "import socket; socket.create_connection(('example.com', 80), timeout=2)"],
+        capture_output=True, text=True, env=env, timeout=60,
+    )
+
+    assert probe.returncode != 0, "network blocker is not in effect"
+    assert "NETWORK_BLOCKED_BY_TEST" in probe.stderr
+
+
+def test_sealed_bundle_replay_needs_no_provider_and_no_env(tmp_path):
+    """A sealed replay must complete offline, from the bundle's own receipt.
+
+    Acceptance is not "passes without a token" — it is that the run finishes
+    with TUSHARE_TOKEN unset, .env unreachable, and every socket call raising
+    inside the child process. The earlier calendar fix traded the offline
+    guarantee for accuracy and went unnoticed, because dev machines always have
+    a token in .env.
+    """
+    bundle = make_golden_mr_bundle(tmp_path)
+    out_dir = tmp_path / "out"
+    env = _no_network_env(tmp_path)
+
+    completed = subprocess.run(
+        [sys.executable, "scripts/backtest_1yr.py", "--input-bundle", str(bundle),
+         "--config", "config/experiments/mr_a0_baseline.yaml", "--engines", "mr_only",
+         "--start", GOLDEN_DATE, "--end", GOLDEN_DATE, "--top-n", "1",
+         "--out-dir", str(out_dir)],
+        cwd=PROJECT_ROOT, capture_output=True, text=True, check=False, env=env,
+    )
+
+    assert "NETWORK_BLOCKED_BY_TEST" not in completed.stderr, "bundle mode attempted a network call"
+    assert "TUSHARE_TOKEN required" not in completed.stderr
+    assert completed.returncode == 0, completed.stderr
+    assert (out_dir / "backtest_daily.csv").exists()
+
+
+def test_bundle_calendar_comes_from_the_receipt_not_a_weekday_guess(tmp_path):
+    """The sessions used must be exactly those in the hashed CSI300 file."""
+    import importlib.util
+    from datetime import date
+
+    bundle = make_golden_mr_bundle(tmp_path)
+    spec = importlib.util.spec_from_file_location("bt", PROJECT_ROOT / "scripts" / "backtest_1yr.py")
+    bt = importlib.util.module_from_spec(spec)
+    saved = sys.argv[:]
+    sys.argv = ["bt"]
+    try:
+        spec.loader.exec_module(bt)
+    except SystemExit:
+        pass
+    finally:
+        sys.argv = saved
+
+    import csv as _csv
+    with (bundle / "prices" / "000300.SH.csv").open(newline="", encoding="utf-8") as fh:
+        receipt = {row[next(iter(row))] for row in _csv.DictReader(fh)}
+
+    days = bt.get_cn_trading_days(date(1900, 1, 1), date(2100, 1, 1), bundle_dir=bundle)
+
+    assert {d.isoformat() for d in days} == receipt

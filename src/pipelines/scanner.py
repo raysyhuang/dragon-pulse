@@ -22,6 +22,7 @@ from src.features.technical import (
     latest_features,
 )
 from src.pipelines.funnel import (
+    StageResult,
     build_engine_candidates,
     build_regime_detail,
     compute_breadth,
@@ -29,6 +30,42 @@ from src.pipelines.funnel import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def run_funnel_guarded(
+    sorted_picks,
+    regime: str,
+    breadth_pct: float,
+    config: dict,
+    *,
+    universe_size: int,
+    data_map: dict,
+    info_map: dict,
+    errors: list,
+    regime_detail: dict,
+):
+    """Run the selection funnel, converting a refusal into zero picks.
+
+    The funnel refuses rather than guesses when required metadata is absent
+    (see funnel._sector_cap). Live must surface that refusal, not die on it:
+    an unhandled raise writes no artifact and sends no Telegram alert, which
+    is indistinguishable from a quiet no-pick day — the exact ambiguity the
+    refusal exists to remove. The refusal is preserved (no picks are emitted);
+    only its delivery changes.
+    """
+    try:
+        return run_selection_funnel(
+            sorted_picks, regime, breadth_pct, config,
+            universe_size=universe_size,
+            data_map=data_map,
+            info_map=info_map,
+            acceptance_mode="live_equivalent",
+        )
+    except ValueError as e:
+        logger.error("Selection funnel refused: %s", e)
+        errors.append(f"selection_funnel: {e}")
+        regime_detail["selection_error"] = str(e)
+        return StageResult(final_picks=[], breadth_pct=breadth_pct, regime=regime)
 
 
 def _compute_adv_cny(raw_df: pd.DataFrame) -> float:
@@ -176,12 +213,13 @@ def run_scan(config: dict, asof_date: Optional[str] = None) -> dict:
     regime_detail["market_breadth_pct_above_sma20"] = round(breadth_pct, 4)
 
     # --- Selection funnel ---
-    stage = run_selection_funnel(
+    stage = run_funnel_guarded(
         sorted_picks, regime, breadth_pct, config,
         universe_size=len(universe),
         data_map=data_map,
         info_map=info_map,
-        acceptance_mode="live_equivalent",
+        errors=errors,
+        regime_detail=regime_detail,
     )
 
     # --- Populate regime_detail from stage result ---

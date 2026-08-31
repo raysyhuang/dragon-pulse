@@ -91,6 +91,7 @@ def _send_scan_alert(result: dict) -> None:
 
         emoji = _regime_emoji(regime)
         rd = result.get("regime_detail", {})
+        selection_error = rd.get("selection_error")
         acc_mode = rd.get("acceptance_mode", "—")
         dq_score = rd.get("day_quality_score", 0)
         eligible = rd.get("acceptance_eligible_count", 0)
@@ -126,16 +127,19 @@ def _send_scan_alert(result: dict) -> None:
         ]
 
         if not picks:
-            if acc_mode == "breadth_suppressed":
+            if selection_error:
+                lines.append("⚠️ <b>选股中止</b> — 行业元数据不完整，未生成可执行候选")
+            elif acc_mode == "breadth_suppressed":
                 lines.append("今日无选股 — 市场宽度受限")
             elif acc_mode == "abstain":
                 lines.append("今日无选股 — 日质量过低，主动放弃")
             else:
                 lines.append("今日无选股 — 无信号通过筛选")
-            streak, since = count_abstention_streak(scan_date, current_picks=0)
-            note = abstention_note(streak, since)
-            if note:
-                lines.append(note)
+            if not selection_error:
+                streak, since = count_abstention_streak(scan_date, current_picks=0)
+                note = abstention_note(streak, since)
+                if note:
+                    lines.append(note)
         else:
             for i, p in enumerate(picks, 1):
                 reason = _translate_reason_summary(p.get("reason_summary", ""))
@@ -170,7 +174,7 @@ def _send_scan_alert(result: dict) -> None:
             title=alert_title,
             message="\n".join(lines),
             data={"asof": scan_date},
-            priority="high" if picks else "low",
+            priority="high" if picks or selection_error else "low",
         )
         logger.info("Telegram alert sent")
     except Exception as e:

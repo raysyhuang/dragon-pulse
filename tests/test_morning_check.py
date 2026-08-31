@@ -351,3 +351,65 @@ def test_main_returns_zero_when_open_prices_are_missing(tmp_path, monkeypatch):
 
     assert rc == 0
     send_pending.assert_called_once()
+
+
+def test_no_picks_morning_alert_surfaces_selection_refusal(tmp_path, monkeypatch):
+    module = load_morning_check_module()
+    date_str = "2026-08-12"
+    out_dir = tmp_path / "outputs" / date_str
+    out_dir.mkdir(parents=True)
+    (out_dir / f"execution_watchlist_{date_str}.json").write_text(json.dumps({
+        "date": date_str,
+        "regime": "bull",
+        "universe_size": 998,
+        "picks": [],
+    }), encoding="utf-8")
+    (out_dir / f"scan_results_{date_str}.json").write_text(json.dumps({
+        "date": date_str,
+        "regime": "bull",
+        "regime_detail": {
+            "selection_error": "sector cap cannot be applied: industry metadata missing",
+            "market_breadth_pct_above_sma20": 0.60,
+        },
+        "universe_size": 998,
+        "downloaded": 998,
+        "download_failed": 0,
+        "download_health": "ok",
+        "circuit_breaker": None,
+        "signals_total": 2,
+        "picks": [],
+        "errors": ["Selection funnel refused: sector cap cannot be applied"],
+    }), encoding="utf-8")
+
+    class _FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            value = datetime(2026, 8, 12, 9, 35, tzinfo=ZoneInfo("Asia/Shanghai"))
+            return value if tz is None else value.astimezone(tz)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "token")
+    monkeypatch.setenv("TELEGRAM_CHAT_ID", "chat")
+    monkeypatch.setattr(module, "datetime", _FixedDateTime)
+
+    with patch.object(module.argparse.ArgumentParser, "parse_args", return_value=argparse.Namespace(
+        date=date_str,
+        picks_file=None,
+        max_gap_up=3.0,
+        max_gap_down=5.0,
+        dry_run=False,
+    )), patch(
+        "src.core.alerts.AlertManager.send_alert", return_value={"telegram": True}
+    ) as send_alert, patch(
+        "src.core.io.count_abstention_streak", return_value=(99, "2026-01-01")
+    ) as count_streak:
+        rc = module.main()
+
+    assert rc == 0
+    kwargs = send_alert.call_args.kwargs
+    assert kwargs["priority"] == "high"
+    assert "选股中止" in kwargs["message"]
+    assert "行业元数据" in kwargs["message"]
+    assert "无信号通过筛选" not in kwargs["message"]
+    assert "连续第" not in kwargs["message"]
+    count_streak.assert_not_called()
