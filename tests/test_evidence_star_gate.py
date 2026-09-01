@@ -21,5 +21,8 @@ def test_evidence_verifier_detects_six_digit_star_market_symbols():
     verifier = _load_verifier()
 
     assert verifier._star_market_tickers(
-        ["688006.SH", "600688.SH", "300688.SZ", "688009.SH"]
-    ) == ["688006.SH", "688009.SH"]
+        [
+            "688006.SH", "689009.SH", "600688.SH", "300688.SZ",
+            "600689.SH", "300689.SZ", "688009.SH",
+        ]
+    ) == ["688006.SH", "689009.SH", "688009.SH"]

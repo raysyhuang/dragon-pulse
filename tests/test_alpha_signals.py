@@ -117,6 +117,29 @@ def test_rs_pullback_alpha_refuses_star_market_ticker():
 
     assert signal is None
 
+    cdr_signal = score_rs_pullback_alpha(
+        ticker="689009.SH",
+        df=_trend_df(),
+        regime="choppy",
+        csi300_df=_flat_csi(),
+        regimes=("bull", "choppy"),
+        score_floor=0,
+    )
+
+    assert cdr_signal is None
+
+
+def test_rs_pullback_alpha_default_regimes_fail_closed_in_bear():
+    signal = score_rs_pullback_alpha(
+        ticker="600118.SH",
+        df=_trend_df(),
+        regime="bear",
+        csi300_df=_flat_csi(),
+        score_floor=0,
+    )
+
+    assert signal is None
+
 
 def test_build_engine_candidates_refuses_star_market_for_every_engine():
     candidates = build_engine_candidates(

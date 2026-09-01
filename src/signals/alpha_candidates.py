@@ -16,6 +16,8 @@ import pandas as pd
 from src.core.cn_limits import get_daily_limit
 from src.core.universe import is_star_market_ticker
 
+DEFAULT_RS_PULLBACK_REGIMES = ("bull",)
+
 
 def _valid(x) -> bool:
     if x is None:
@@ -107,7 +109,7 @@ def score_rs_pullback_alpha(
     csi300_df: pd.DataFrame | None = None,
     *,
     is_st: bool = False,
-    regimes: tuple[str, ...] = ("bull", "bear"),
+    regimes: tuple[str, ...] = DEFAULT_RS_PULLBACK_REGIMES,
     score_floor: float = 80.0,
     max_entry_pct: float = 0.02,
     min_adv_cny: float = 80_000_000,

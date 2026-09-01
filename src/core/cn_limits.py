@@ -3,7 +3,7 @@
 Official exchange rules:
   - SSE/SZSE main board: 10%
   - ST / risk-warning shares: 5%
-  - SSE STAR Market (688xxx): 20%
+  - SSE STAR Market ordinary shares/CDRs (688xxx, 689xxx): 20%
   - SZSE ChiNext (300xxx, 301xxx): 20%
   - BSE (4xxxxx, 8xxxxx, 92xxxx): 30%
 
@@ -40,18 +40,18 @@ def get_daily_limit(ticker: str, is_st: bool = False) -> float:
         logger.debug("Cannot determine board for %s — using 10%% default", ticker)
         return 0.10
 
-    # SSE STAR Market: 688xxx
-    if code.startswith("688"):
+    # SSE STAR Market ordinary shares/CDRs: 688xxx, 689xxx
+    if code.startswith(("688", "689")):
         return 0.20
 
     # SZSE ChiNext: 300xxx, 301xxx
     if code.startswith(("300", "301")):
         return 0.20
 
-    # BSE: 4xxxxx, 8xxxxx (not 688), 92xxxx
+    # BSE: 4xxxxx, 8xxxxx (not STAR), 92xxxx
     if code.startswith("4") or code.startswith("92"):
         return 0.30
-    if code.startswith("8") and not code.startswith("688"):
+    if code.startswith("8") and not code.startswith(("688", "689")):
         return 0.30
 
     # SSE/SZSE main board: 600xxx, 601xxx, 603xxx, 000xxx, 001xxx, 002xxx

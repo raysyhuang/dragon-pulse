@@ -19,13 +19,13 @@ def sha256(path: Path) -> str:
 
 
 def _star_market_tickers(tickers) -> list[str]:
-    """Return 688xxx symbols; do not confuse embedded 688 with the code prefix."""
-    return [
-        str(ticker)
-        for ticker in tickers
-        if str(ticker).strip().upper().split(".", 1)[0].startswith("688")
-        and len(str(ticker).strip().upper().split(".", 1)[0]) == 6
-    ]
+    """Return STAR ordinary shares/CDRs without matching embedded digits."""
+    found = []
+    for ticker in tickers:
+        code = str(ticker).strip().upper().split(".", 1)[0]
+        if len(code) == 6 and code[:3] in {"688", "689"} and code.isdigit():
+            found.append(str(ticker))
+    return found
 
 
 def _csv_tickers(path: Path) -> list[str]:
