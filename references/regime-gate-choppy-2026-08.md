@@ -85,6 +85,9 @@ negative. Not adopted.
   separately. Deliberate (avoids fitting) but means +0.72% is unoptimised.
 - Frozen membership is reproducible but remains a `TRUSTED_HISTORICAL_ASSUMPTION`, not
   provider-attested point-in-time truth.
+- The producer enum `input_mode: live` means only "not `--input-bundle` mode." This
+  replay did **not** acquire live data: it used the frozen snapshot, membership schedule,
+  calendar and basic-info inputs with credentials unset and socket connections blocked.
 
 ## Machine-readable evidence
 

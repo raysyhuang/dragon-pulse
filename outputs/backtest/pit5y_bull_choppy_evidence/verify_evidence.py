@@ -34,6 +34,11 @@ def _csv_tickers(path: Path) -> list[str]:
         return [row["ticker"] for row in csv.DictReader(fh)]
 
 
+def _csv_column_values(path: Path, column: str) -> set[str]:
+    with path.open(newline="", encoding="utf-8") as fh:
+        return {str(row[column]) for row in csv.DictReader(fh)}
+
+
 def _git_replay_code_unchanged(root: Path, commit: str, relpaths) -> bool:
     """Require this checkout's replay code to match the pinned replay commit."""
     try:
@@ -88,6 +93,11 @@ def main() -> int:
     summary = json.loads((run / "backtest_summary_pit5y_bull_choppy.json").read_text())
     portfolio = json.loads((run / "portfolio_sim_v2_summary.json").read_text())
     p = portfolio["result"]
+    check(summary["input_mode"] == "live",
+          "documented non-bundle producer enum in summary")
+    for name in ("picks.csv", "backtest_detail_pit5y_bull_choppy.csv"):
+        check(_csv_column_values(run / name, "input_mode") == {"live"},
+              f"documented non-bundle producer enum in {name}")
     check(summary["picks_emitted"] == summary["picks_filled"] + summary["picks_skipped"],
           "pick decomposition closes")
     check(sum(row["total"] for row in summary["per_regime"].values()) == summary["picks_filled"],

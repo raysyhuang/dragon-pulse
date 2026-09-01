@@ -9,9 +9,10 @@
     "Portfolio results are gross; commissions, stamp duty and slippage are not modelled.",
     "STAR Market 688xxx ordinary shares and 689xxx CDRs are excluded from the live scanner and this replay.",
     "Entry gaps below the planned stop obey T+1 and exit at the next-session open; same-bar flat exits are forbidden.",
+    "The producer enum input_mode: live means non-bundle producer mode (--input-bundle not used); this replay used frozen snapshot/schedule/calendar/basic-info inputs with credentials unset and sockets blocked, not live acquisition.",
     "No bull-only portfolio comparator is claimed because the frozen baseline predates the same STAR-board exclusion."
   ],
-  "created_at_utc": "2026-09-01T08:07:18.465582+00:00",
+  "created_at_utc": "2026-09-01T08:44:11.187733+00:00",
   "replay_code_commit": "a935221a5e40d8a314e851691c12eb56b198175a",
   "replay_window": {
     "first": "2021-08-12",
@@ -50,7 +51,7 @@
     "portfolio_equity_curve.csv": "a73d325facf09809a9690f5644a81e14f3eafa2f5a943a0b4671bd5be813291b",
     "portfolio_sim_v2_summary.json": "9d01f9f4ac790c71cb1ee351d8c0982bbd8bbbac6e41e4bb5cdc81099e64077a",
     "reproduce_portfolio.py": "dfb5dcbffe3df49b20e6d07f1a6cb8553568a54cfb2a78960052a24495251384",
-    "verify_evidence.py": "86aa7c43fbafbbe08d937fe6c2e920c9c4ee32cdb0099780659a3eafe9c49bec"
+    "verify_evidence.py": "084eb3753525ac096fe8667a1e352252ee36dc7b00c9c27830bce78469813eba"
   },
   "replay_command": "env -u TUSHARE_TOKEN HOME=<EMPTY_HOME> PYTHONPATH=<NETWORK_BLOCK_SITE> python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --config config/default.yaml --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_bull_choppy --out-dir outputs/backtest/pit5y_bull_choppy_evidence --price-snapshot-dir <EXTRACTED>/snapshots --pit-schedule-in outputs/backtest/pit5y_final/pit_membership_schedule.json --calendar-in outputs/backtest/pit5y_final/trade_cal_receipt.json --basic-info-in outputs/backtest/pit5y_final/basic_info.json --dump-picks outputs/backtest/pit5y_bull_choppy_evidence/picks.csv",
   "portfolio_command": "python outputs/backtest/pit5y_bull_choppy_evidence/reproduce_portfolio.py --detail outputs/backtest/pit5y_bull_choppy_evidence/backtest_detail_pit5y_bull_choppy.csv --snapshot-dir <EXTRACTED>/snapshots --calendar outputs/backtest/pit5y_final/trade_cal_receipt.json --out-dir outputs/backtest/pit5y_bull_choppy_evidence --position-pct 20 --max-concurrent 5",
