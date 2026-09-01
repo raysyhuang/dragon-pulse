@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import subprocess
 from datetime import date, timedelta
 from pathlib import Path
@@ -89,6 +90,18 @@ def test_code_identity_allows_dirty_files_outside_executable_scope(tmp_path):
     (repo / "docs" / "notes.md").write_text("dirty but allowed\n", encoding="utf-8")
 
     assert _code_identity(repo)["code_sha"] == _git(repo, "rev-parse", "HEAD")
+
+
+def test_code_identity_refuses_ignored_untracked_symlink_directory_without_following_it(tmp_path):
+    repo = _code_repo(tmp_path)
+    external = tmp_path / "external"
+    external.mkdir()
+    (external / "hidden.py").write_text("raise AssertionError('must not be read')\n", encoding="utf-8")
+    (repo / ".gitignore").write_text("src/plugins\n", encoding="utf-8")
+    (repo / "src" / "plugins").symlink_to(external, target_is_directory=True)
+
+    with pytest.raises(DiagnosticError, match="symlinked directory"):
+        _code_identity(repo)
 
 
 def _sha256(path: Path) -> str:
@@ -244,6 +257,24 @@ def test_malformed_csv_is_refused_even_when_lenient_parser_would_accept_numbers(
     _invoke_invalid(tmp_path, malformed)
 
 
+@pytest.mark.parametrize(
+    "cell",
+    [" 0.1", "0.1 ", "1_0e-3", "1,23"],
+    ids=["leading_whitespace", "trailing_whitespace", "underscore", "locale_comma"],
+)
+def test_return_cells_require_strict_decimal_or_scientific_grammar(tmp_path, cell):
+    matrix, manifest_path = _packet(tmp_path)
+    rows = _matrix_rows(matrix)
+    rows[1][1] = cell
+    _write_matrix(matrix, rows)
+    manifest = _load_manifest(manifest_path)
+    manifest["matrix_sha256"] = _sha256(matrix)
+    _write_manifest(manifest_path, manifest)
+
+    with pytest.raises(DiagnosticError, match="missing/non-numeric return"):
+        diagnostic._load_packet(matrix.read_bytes(), manifest_path.read_bytes(), 4, 20)
+
+
 def test_matrix_change_before_publication_is_refused_without_output(tmp_path, monkeypatch):
     matrix, manifest = _packet(tmp_path)
     output = tmp_path / "must_not_exist"
@@ -305,6 +336,17 @@ def test_manifest_rejects_unknown_promotion_looking_field(tmp_path):
     _invoke_invalid(tmp_path, _mutate_manifest("promotion_approved", True))
 
 
+@pytest.mark.parametrize("n_trials", [10**17, 10**400], ids=["large", "astronomical"])
+def test_n_trials_total_above_bound_is_a_clear_diagnostic_error(tmp_path, n_trials):
+    matrix, manifest_path = _packet(tmp_path)
+    manifest = _load_manifest(manifest_path)
+    manifest["n_trials_total"] = n_trials
+    _write_manifest(manifest_path, manifest)
+
+    with pytest.raises(DiagnosticError, match="n_trials_total .* maximum 1000000000"):
+        diagnostic._load_packet(matrix.read_bytes(), manifest_path.read_bytes(), 4, 20)
+
+
 def test_requires_at_least_two_variants(tmp_path):
     matrix, manifest_path = _packet(tmp_path, variants=1)
     output = tmp_path / "must_not_exist"
@@ -321,6 +363,17 @@ def test_rejects_too_few_observations_for_requested_blocks(tmp_path):
     assert not output.exists()
 
 
+def test_rejects_excessive_cscv_split_count_before_combinations(tmp_path, monkeypatch):
+    matrix, manifest_path = _packet(tmp_path, rows=36)
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("combinations must not be constructed")
+
+    monkeypatch.setattr(diagnostic.itertools, "combinations", forbidden)
+    with pytest.raises(DiagnosticError, match="CSCV split count .* exceeds maximum 10000"):
+        diagnostic._load_packet(matrix.read_bytes(), manifest_path.read_bytes(), 18, 2)
+
+
 def test_no_overwrite_preserves_existing_directory(tmp_path):
     matrix, manifest_path = _packet(tmp_path)
     output = tmp_path / "evidence"
@@ -335,7 +388,35 @@ def test_no_overwrite_preserves_existing_directory(tmp_path):
     assert {path.name for path in output.iterdir()} == {"keep.txt"}
 
 
-def test_outputs_are_deterministic_and_each_file_is_provenance_stamped(tmp_path):
+def test_keyboard_interrupt_during_generation_removes_temporary_evidence(tmp_path, monkeypatch):
+    matrix, manifest_path = _packet(tmp_path)
+    output = tmp_path / "must_not_exist"
+    identity = {
+        "code_sha": "a" * 40,
+        "code_bundle_sha256": "b" * 64,
+        "code_bundle_rule": "test identity",
+    }
+    monkeypatch.setattr(diagnostic, "_code_identity", lambda _root: identity)
+    monkeypatch.setattr(
+        diagnostic,
+        "_sha256",
+        lambda _path: (_ for _ in ()).throw(KeyboardInterrupt()),
+    )
+
+    with pytest.raises(KeyboardInterrupt):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+
+    assert not output.exists()
+    assert not list(tmp_path.glob(".must_not_exist.tmp-*"))
+
+
+def test_outputs_are_deterministic_and_each_file_is_provenance_stamped(tmp_path, monkeypatch):
+    identity = {
+        "code_sha": "a" * 40,
+        "code_bundle_sha256": "b" * 64,
+        "code_bundle_rule": "test identity",
+    }
+    monkeypatch.setattr(diagnostic, "_code_identity", lambda _root: identity)
     matrix, manifest_path = _packet(tmp_path)
     outputs = [tmp_path / "evidence_a", tmp_path / "evidence_b"]
     for output in outputs:
@@ -353,11 +434,39 @@ def test_outputs_are_deterministic_and_each_file_is_provenance_stamped(tmp_path)
     for field in (
         "status", "code_sha", "matrix_sha256", "input_bundle_sha256",
         "experiment_config_sha256", "execution_contract_hash", "date_start", "date_end",
-        "n_trials_total", "selected_variant", "assumptions", "thresholds",
+        "periods_per_year", "n_blocks", "min_block_observations", "variant_ids",
+        "matrix_variant_count", "n_trials_total", "selected_variant",
+        "all_tested_and_abandoned_variants_counted", "assumptions", "thresholds",
     ):
         assert field in summary
         assert field in first_manifest
         assert field in split
+    assert summary["variant_ids"] == ["variant_0", "variant_1", "variant_2", "variant_3"]
+    assert json.loads(split["variant_ids"]) == summary["variant_ids"]
+    assert summary["matrix_variant_count"] == 4
+    assert split["matrix_variant_count"] == "4"
+    assert any(
+        "dispersion is estimated only from supplied matrix columns" in assumption
+        and "cannot be reconstructed" in assumption
+        for assumption in summary["assumptions"]
+    )
+
+
+@pytest.mark.parametrize(
+    "daily_sharpes",
+    [np.array([0.1, 0.1, 0.1, 0.1]), np.array([0.1, 0.1 + 1e-15, 0.1, 0.1 - 1e-15])],
+    ids=["exact", "near"],
+)
+def test_deflated_sharpe_refuses_zero_or_near_zero_cross_trial_dispersion(daily_sharpes):
+    with pytest.raises(DiagnosticError, match="cross-trial Sharpe dispersion is zero or nearly zero"):
+        diagnostic._expected_max_daily_sharpe(daily_sharpes, 4)
+
+
+def test_one_sided_normal_tail_remains_finite_and_nonzero_at_high_z():
+    tail = diagnostic._one_sided_normal_tail(9.0)
+
+    assert math.isfinite(tail)
+    assert 0.0 < tail < 1e-18
 
 
 def test_synthetic_noise_is_vetoed_while_stable_edge_clears_secondary_gate(tmp_path):
@@ -478,6 +587,33 @@ def test_cli_runs_offline_and_invalid_input_returns_nonzero_without_output(tmp_p
     )
     assert research_overfit_diagnostic.main() != 0
     assert not bad_output.exists()
+
+
+@pytest.mark.parametrize("n_trials", [10**17, 10**400], ids=["large", "enormous"])
+def test_cli_refuses_excessive_trial_count_without_traceback_or_output(
+    tmp_path, monkeypatch, capsys, n_trials
+):
+    from scripts import research_overfit_diagnostic
+
+    matrix, manifest_path = _packet(tmp_path)
+    manifest = _load_manifest(manifest_path)
+    manifest["n_trials_total"] = n_trials
+    _write_manifest(manifest_path, manifest)
+    output = tmp_path / "must_not_exist"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "research_overfit_diagnostic.py", "--matrix", str(matrix), "--manifest",
+            str(manifest_path), "--output", str(output), "--blocks", "4",
+            "--min-block-observations", "20",
+        ],
+    )
+
+    assert research_overfit_diagnostic.main() == 2
+    captured = capsys.readouterr()
+    assert "exceeds maximum 1000000000" in captured.err
+    assert "Traceback" not in captured.err
+    assert not output.exists()
 
 
 def test_threshold_policy_may_only_be_tightened(tmp_path):

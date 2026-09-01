@@ -43,12 +43,15 @@ Schema 1 requires this manifest shape (digests are lowercase SHA-256):
 not retained as matrix columns. If optional `complete_historical_variant_count`
 is supplied, it must equal `n_trials_total`. The boolean attestation is an
 explicit operator assertion, not independent proof of search-history
-completeness. No other manifest keys are allowed under schema 1.
+completeness. Schema 1 refuses trial counts above `1,000,000,000`, where the
+normal-quantile calculation would no longer be numerically reliable. No other manifest keys are allowed under schema 1.
 
 ## Exact usage
 
 The defaults require eight equal contiguous blocks with at least 20 observations
 per block, so the row count must be divisible by eight and at least 160.
+The command also refuses CSCV requests requiring more than 10,000 half-block
+splits before constructing any combinations.
 
 ```bash
 python scripts/research_overfit_diagnostic.py \
@@ -72,6 +75,11 @@ The output path must not exist. Publication uses Linux `renameat2(...,
 RENAME_NOREPLACE)` after all files are complete in a sibling temporary directory.
 On any validation, computation, or publication error the command exits nonzero,
 preserves an existing destination, and removes its temporary directory.
+Temporary directories are also removed for Python interruptions such as
+`KeyboardInterrupt` and `SystemExit`; abrupt process termination (`SIGKILL`) is
+outside this guarantee. Parent directories explicitly requested by the caller
+may remain. Publication is namespace-atomic but does not claim crash durability:
+artifact files and directories are not `fsync`ed.
 
 ## Diagnostics and assumptions
 
@@ -108,12 +116,18 @@ A successful no-overwrite directory contains:
   composite `SHA256(sorted "<relative_path>  <sha256>\n" UTF-8 lines)`.
 
 Every file stamps the research-only status, code SHA, packet identities, date
-range, total trial count, selected variant, assumptions, and thresholds.
+range, annualization, CSCV block policy, ordered matrix variants and count, total
+trial count, complete-trial attestation, selected variant, assumptions, and
+thresholds. The DSR-style dispersion estimate uses only supplied matrix columns;
+omitted declared trials affect the trial-count adjustment but their dispersion
+cannot be reconstructed. Zero or numerically near-zero supplied cross-trial
+Sharpe dispersion is refused rather than treated as zero deflation.
 
 The code bundle is accepted only when the actual filesystem `src/**/*.py` and
 `scripts/**/*.py` set exactly matches HEAD, the index has no scoped delta, and
 every file's type, executable mode, and bytes match its HEAD object. Ignored and
 staged Python additions are therefore refused; dirty non-Python documentation is
-outside this identity boundary. Its digest is SHA-256 over concatenated,
+outside this identity boundary. Symlinked directories anywhere under `src/` or
+`scripts/` are refused rather than followed. Its digest is SHA-256 over concatenated,
 raw-path-sorted records of
 `<raw_path>\0<HEAD_mode> <HEAD_type>\0<byte_length>\0<exact_HEAD_blob_bytes>`.

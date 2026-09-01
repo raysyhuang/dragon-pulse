@@ -10,6 +10,7 @@ import itertools
 import json
 import math
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -29,6 +30,7 @@ ASSUMPTIONS = [
     "Returns and trials are treated as supplied; this diagnostic does not prove point-in-time provenance.",
     "Sharpe-style normal approximations can be unreliable under serial correlation, skew, and fat tails.",
     "CSCV uses contiguous blocks but does not remove dependence from overlapping holding-period returns.",
+    "DSR cross-trial Sharpe dispersion is estimated only from supplied matrix columns; omitted declared trials affect the n_trials_total adjustment but their dispersion cannot be reconstructed.",
     "No result is untouched out-of-sample evidence or authorization for promotion, alerts, or orders.",
 ]
 DEFAULT_THRESHOLDS = {
@@ -37,6 +39,9 @@ DEFAULT_THRESHOLDS = {
     "max_pbo": 0.20,
     "max_bonferroni_p_value": 0.05,
 }
+MAX_CSCV_SPLITS = 10_000
+MAX_N_TRIALS_TOTAL = 1_000_000_000
+RETURN_PATTERN = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\Z")
 
 
 class DiagnosticError(ValueError):
@@ -111,6 +116,10 @@ def _load_packet(matrix_bytes: bytes, manifest_bytes: bytes, n_blocks: int, min_
     n_trials = manifest["n_trials_total"]
     if isinstance(n_trials, bool) or not isinstance(n_trials, int) or n_trials < len(variant_ids):
         raise DiagnosticError("n_trials_total must be an integer at least as large as matrix variants")
+    if n_trials > MAX_N_TRIALS_TOTAL:
+        raise DiagnosticError(
+            f"n_trials_total {n_trials} exceeds maximum {MAX_N_TRIALS_TOTAL}"
+        )
     if manifest["all_tested_and_abandoned_variants_counted"] is not True:
         raise DiagnosticError("all tested and abandoned variants must be counted")
     if "complete_historical_variant_count" in manifest:
@@ -136,6 +145,11 @@ def _load_packet(matrix_bytes: bytes, manifest_bytes: bytes, n_blocks: int, min_
         )
     if isinstance(n_blocks, bool) or not isinstance(n_blocks, int) or n_blocks < 2 or n_blocks % 2:
         raise DiagnosticError("n_blocks must be an even integer of at least two")
+    split_count = math.comb(n_blocks, n_blocks // 2)
+    if split_count > MAX_CSCV_SPLITS:
+        raise DiagnosticError(
+            f"CSCV split count {split_count} exceeds maximum {MAX_CSCV_SPLITS}"
+        )
     if (
         isinstance(min_block_observations, bool)
         or not isinstance(min_block_observations, int)
@@ -165,6 +179,8 @@ def _load_packet(matrix_bytes: bytes, manifest_bytes: bytes, n_blocks: int, min_
         dates.append(_iso_date(row[0], f"matrix row {row_number} date"))
         parsed_row: list[float] = []
         for cell in row[1:]:
+            if RETURN_PATTERN.fullmatch(cell) is None:
+                raise DiagnosticError(f"matrix row {row_number} has a missing/non-numeric return")
             try:
                 number = float(cell)
             except ValueError as exc:
@@ -261,6 +277,13 @@ def _code_identity(project_root: Path) -> dict[str, str]:
         if not os.path.isdir(scope_path):
             continue
         for directory, directories, filenames in os.walk(scope_path, followlinks=False):
+            for name in directories:
+                path = os.path.join(directory, name)
+                if stat.S_ISLNK(os.lstat(path).st_mode):
+                    relative = os.path.relpath(path, root)
+                    raise DiagnosticError(
+                        f"symlinked directory in executable project scope: {os.fsdecode(relative)}"
+                    )
             for name in [*directories, *filenames]:
                 path = os.path.join(directory, name)
                 relative = os.path.relpath(path, root)
@@ -321,6 +344,10 @@ def _sharpe(returns: np.ndarray, periods_per_year: int) -> float:
     return float(np.mean(returns) / std * math.sqrt(periods_per_year))
 
 
+def _one_sided_normal_tail(z_score: float) -> float:
+    return 0.5 * math.erfc(z_score / math.sqrt(2.0))
+
+
 def _probabilistic_sharpe(returns: np.ndarray, benchmark_daily_sharpe: float) -> float:
     n = len(returns)
     daily_sr = float(np.mean(returns) / np.std(returns, ddof=1))
@@ -339,8 +366,9 @@ def _expected_max_daily_sharpe(daily_sharpes: np.ndarray, n_trials: int) -> floa
     if n_trials <= 1:
         return 0.0
     trial_std = float(np.std(daily_sharpes, ddof=1))
-    if trial_std == 0.0:
-        return 0.0
+    scale = max(1.0, float(np.max(np.abs(daily_sharpes))))
+    if trial_std <= 1e-12 * scale:
+        raise DiagnosticError("DSR cross-trial Sharpe dispersion is zero or nearly zero")
     normal = NormalDist()
     gamma = 0.5772156649015329
     return trial_std * (
@@ -395,7 +423,6 @@ def _pbo_splits(
             "logit": logit,
             "is_overfit": logit <= 0.0,
             "block_size": block_size,
-            "min_block_observations": min_block_observations,
         })
     return float(np.mean([row["is_overfit"] for row in rows])), rows
 
@@ -461,7 +488,7 @@ def run_diagnostic(
     expected_max = _expected_max_daily_sharpe(daily_sharpes, manifest["n_trials_total"])
     dsr = _probabilistic_sharpe(selected, expected_max)
     z_score = float(np.mean(selected) / (np.std(selected, ddof=1) / math.sqrt(len(selected))))
-    one_sided_p = 1.0 - NormalDist().cdf(z_score)
+    one_sided_p = _one_sided_normal_tail(z_score)
     bonferroni_p = min(1.0, one_sided_p * manifest["n_trials_total"])
     pbo, splits = _pbo_splits(matrix, variant_ids, n_blocks, min_block_observations)
     checks = {
@@ -481,8 +508,16 @@ def run_diagnostic(
         "execution_contract_hash": manifest["execution_contract_hash"],
         "date_start": dates[0],
         "date_end": dates[-1],
+        "periods_per_year": periods,
+        "n_blocks": n_blocks,
+        "min_block_observations": min_block_observations,
+        "variant_ids": variant_ids,
+        "matrix_variant_count": len(variant_ids),
         "n_trials_total": manifest["n_trials_total"],
         "selected_variant": manifest["selected_variant"],
+        "all_tested_and_abandoned_variants_counted": manifest[
+            "all_tested_and_abandoned_variants_counted"
+        ],
         "assumptions": ASSUMPTIONS,
         "thresholds": effective_thresholds,
     }
@@ -515,6 +550,7 @@ def run_diagnostic(
                 writer.writerow({
                     **split,
                     **provenance,
+                    "variant_ids": json.dumps(variant_ids, separators=(",", ":")),
                     "assumptions": json.dumps(ASSUMPTIONS, separators=(",", ":")),
                     "thresholds": json.dumps(effective_thresholds, sort_keys=True, separators=(",", ":")),
                 })
@@ -539,7 +575,6 @@ def run_diagnostic(
             })
 
         _publish_no_replace(temp, output, pre_publish_check)
-    except Exception:
+    finally:
         shutil.rmtree(temp, ignore_errors=True)
-        raise
     return summary
