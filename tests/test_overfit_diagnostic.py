@@ -5,16 +5,43 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import subprocess
 from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
 import pytest
 
-from src.research.overfit_diagnostic import DiagnosticError, run_diagnostic
+import src.research.overfit_diagnostic as diagnostic
+from src.research.overfit_diagnostic import DiagnosticError, _code_identity, run_diagnostic
 
 
 STATUS = "RESEARCH_ONLY_NON_BINDING"
+
+
+def _git(root: Path, *args: str) -> str:
+    return subprocess.check_output(["git", *args], cwd=root, text=True).strip()
+
+
+def test_code_identity_binds_clean_head_bytes_and_refuses_dirty_executable(tmp_path):
+    repo = tmp_path / "repo"
+    (repo / "src").mkdir(parents=True)
+    (repo / "scripts").mkdir()
+    (repo / "src" / "engine.py").write_text("VALUE = 1\n", encoding="utf-8")
+    (repo / "scripts" / "run.py").write_text("print('ok')\n", encoding="utf-8")
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "test@example.com")
+    _git(repo, "config", "user.name", "Test")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-qm", "fixture")
+
+    identity = _code_identity(repo)
+
+    assert identity["code_sha"] == _git(repo, "rev-parse", "HEAD")
+    assert len(identity["code_bundle_sha256"]) == 64
+    (repo / "src" / "engine.py").write_text("VALUE = 2\n", encoding="utf-8")
+    with pytest.raises(DiagnosticError, match="executable project file differs from HEAD"):
+        _code_identity(repo)
 
 
 def _sha256(path: Path) -> str:
@@ -156,6 +183,41 @@ def test_invalid_packets_fail_closed_without_artifacts(tmp_path, mutate):
     _invoke_invalid(tmp_path, mutate)
 
 
+def test_matrix_change_before_publication_is_refused_without_output(tmp_path, monkeypatch):
+    matrix, manifest = _packet(tmp_path)
+    output = tmp_path / "must_not_exist"
+    original = diagnostic._revalidate_inputs
+
+    def replace_then_revalidate(expected):
+        matrix.write_bytes(matrix.read_bytes() + b"\n")
+        return original(expected)
+
+    monkeypatch.setattr(diagnostic, "_revalidate_inputs", replace_then_revalidate)
+    with pytest.raises(DiagnosticError, match="matrix changed during execution"):
+        run_diagnostic(matrix, manifest, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+
+
+def test_manifest_change_before_publication_is_refused_without_output(tmp_path, monkeypatch):
+    matrix, manifest = _packet(tmp_path)
+    output = tmp_path / "must_not_exist"
+    original = diagnostic._revalidate_inputs
+
+    def replace_then_revalidate(expected):
+        manifest.write_bytes(manifest.read_bytes() + b"\n")
+        return original(expected)
+
+    monkeypatch.setattr(diagnostic, "_revalidate_inputs", replace_then_revalidate)
+    with pytest.raises(DiagnosticError, match="manifest changed during execution"):
+        run_diagnostic(matrix, manifest, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("value", [True, 1.0], ids=["boolean", "float"])
+def test_schema_version_requires_exact_integer_without_artifacts(tmp_path, value):
+    _invoke_invalid(tmp_path, _mutate_manifest("schema_version", value))
+
+
 def test_requires_at_least_two_variants(tmp_path):
     matrix, manifest_path = _packet(tmp_path, variants=1)
     output = tmp_path / "must_not_exist"
@@ -225,6 +287,38 @@ def test_synthetic_noise_is_vetoed_while_stable_edge_clears_secondary_gate(tmp_p
     assert edge["diagnostics"]["deflated_sharpe_probability"] > noise["diagnostics"]["deflated_sharpe_probability"]
     forbidden = {"PASS", "APPROVE", "CANDIDATE"}
     assert not forbidden.intersection(json.dumps(edge).upper().replace('"', "").split())
+
+
+def test_cscv_refuses_exact_zero_variance_split_without_artifacts(tmp_path):
+    matrix, manifest_path = _packet(tmp_path)
+    rows = _matrix_rows(matrix)
+    for row in rows[1:81]:
+        row[1] = "0.001"
+    _write_matrix(matrix, rows)
+    manifest = _load_manifest(manifest_path)
+    manifest["matrix_sha256"] = _sha256(matrix)
+    _write_manifest(manifest_path, manifest)
+    output = tmp_path / "must_not_exist"
+
+    with pytest.raises(DiagnosticError, match="CSCV split .* unevaluable"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+
+
+def test_cscv_refuses_decimal_near_constant_split_without_artifacts(tmp_path):
+    matrix, manifest_path = _packet(tmp_path)
+    rows = _matrix_rows(matrix)
+    for index, row in enumerate(rows[1:81]):
+        row[1] = "0.0010000000001" if index % 2 else "0.0010000000002"
+    _write_matrix(matrix, rows)
+    manifest = _load_manifest(manifest_path)
+    manifest["matrix_sha256"] = _sha256(matrix)
+    _write_manifest(manifest_path, manifest)
+    output = tmp_path / "must_not_exist"
+
+    with pytest.raises(DiagnosticError, match="CSCV split .* unevaluable"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
 
 
 def test_rejects_unequal_cscv_blocks_instead_of_dropping_observations(tmp_path):

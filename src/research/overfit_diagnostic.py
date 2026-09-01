@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import ctypes
 import hashlib
+import io
 import itertools
 import json
 import math
@@ -40,7 +41,7 @@ class DiagnosticError(ValueError):
     """The immutable packet or requested diagnostic cannot be evaluated safely."""
 
 
-def _strict_json(path: Path) -> dict:
+def _strict_json(data: bytes) -> dict:
     def pairs(items):
         result = {}
         for key, value in items:
@@ -51,13 +52,13 @@ def _strict_json(path: Path) -> dict:
 
     try:
         value = json.loads(
-            path.read_text(encoding="utf-8"),
+            data,
             object_pairs_hook=pairs,
             parse_constant=lambda token: (_ for _ in ()).throw(
                 DiagnosticError(f"non-finite JSON value: {token}")
             ),
         )
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except (UnicodeError, json.JSONDecodeError) as exc:
         raise DiagnosticError(f"unparseable manifest: {exc}") from exc
     if not isinstance(value, dict):
         raise DiagnosticError("manifest must be a JSON object")
@@ -76,8 +77,8 @@ def _iso_date(value: object, field: str) -> str:
     return value
 
 
-def _load_packet(matrix_path: Path, manifest_path: Path, n_blocks: int, min_block_observations: int):
-    manifest = _strict_json(manifest_path)
+def _load_packet(matrix_bytes: bytes, manifest_bytes: bytes, n_blocks: int, min_block_observations: int):
+    manifest = _strict_json(manifest_bytes)
     required = {
         "schema_version", "status", "selected_variant", "variant_ids", "n_trials_total",
         "date_start", "date_end", "periods_per_year", "input_bundle_sha256",
@@ -87,7 +88,7 @@ def _load_packet(matrix_path: Path, manifest_path: Path, n_blocks: int, min_bloc
     missing = required - set(manifest)
     if missing:
         raise DiagnosticError(f"manifest missing required fields: {', '.join(sorted(missing))}")
-    if manifest["schema_version"] != 1:
+    if type(manifest["schema_version"]) is not int or manifest["schema_version"] != 1:
         raise DiagnosticError("unsupported schema_version")
     if manifest["status"] != STATUS:
         raise DiagnosticError(f"unsupported status; required {STATUS}")
@@ -123,7 +124,7 @@ def _load_packet(matrix_path: Path, manifest_path: Path, n_blocks: int, min_bloc
         value = manifest[field]
         if not isinstance(value, str) or len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
             raise DiagnosticError(f"{field} must be a lowercase SHA-256 digest")
-    actual_hash = _sha256(matrix_path)
+    actual_hash = hashlib.sha256(matrix_bytes).hexdigest()
     if actual_hash != manifest["matrix_sha256"]:
         raise DiagnosticError(
             f"matrix hash mismatch: expected {manifest['matrix_sha256']}, actual {actual_hash}"
@@ -137,9 +138,8 @@ def _load_packet(matrix_path: Path, manifest_path: Path, n_blocks: int, min_bloc
     ):
         raise DiagnosticError("min_block_observations must be an integer of at least two")
     try:
-        with matrix_path.open("r", encoding="utf-8", newline="") as handle:
-            rows = list(csv.reader(handle))
-    except (OSError, UnicodeError, csv.Error) as exc:
+        rows = list(csv.reader(io.StringIO(matrix_bytes.decode("utf-8"), newline="")))
+    except (UnicodeError, csv.Error) as exc:
         raise DiagnosticError(f"unparseable matrix CSV: {exc}") from exc
     if not rows:
         raise DiagnosticError("matrix CSV is empty")
@@ -182,15 +182,71 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _read_input(path: Path, label: str) -> tuple[bytes, str]:
+    try:
+        data = path.read_bytes()
+    except OSError as exc:
+        raise DiagnosticError(f"cannot read {label}: {exc}") from exc
+    return data, hashlib.sha256(data).hexdigest()
+
+
+def _revalidate_inputs(expected: dict[str, tuple[Path, str]]) -> None:
+    for label, (path, digest) in expected.items():
+        try:
+            actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise DiagnosticError(f"{label} changed during execution: {exc}") from exc
+        if actual != digest:
+            raise DiagnosticError(f"{label} changed during execution")
+
+
 def _composite(files: dict[str, str]) -> str:
     lines = "".join(f"{name}  {digest}\n" for name, digest in sorted(files.items()))
     return hashlib.sha256(lines.encode("utf-8")).hexdigest()
 
 
-def _code_sha(project_root: Path) -> str:
-    return subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=project_root, text=True
-    ).strip()
+def _code_identity(project_root: Path) -> dict[str, str]:
+    try:
+        code_sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=project_root, text=True
+        ).strip()
+        listed = subprocess.check_output(
+            ["git", "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "src", "scripts"],
+            cwd=project_root,
+        )
+        untracked = subprocess.check_output(
+            ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", "src", "scripts"],
+            cwd=project_root,
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise DiagnosticError(f"cannot establish code identity: {exc}") from exc
+    paths = sorted(
+        path.decode("utf-8") for path in listed.split(b"\0") if path and path.endswith(b".py")
+    )
+    untracked_python = sorted(
+        path.decode("utf-8") for path in untracked.split(b"\0") if path and path.endswith(b".py")
+    )
+    if untracked_python:
+        raise DiagnosticError(f"untracked executable project file: {untracked_python[0]}")
+    if not paths:
+        raise DiagnosticError("cannot establish code identity: no tracked project Python files")
+    files: dict[str, str] = {}
+    for relative in paths:
+        try:
+            actual = (project_root / relative).read_bytes()
+            committed = subprocess.check_output(
+                ["git", "show", f"HEAD:{relative}"], cwd=project_root
+            )
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise DiagnosticError(f"cannot verify executable project file {relative}: {exc}") from exc
+        if actual != committed:
+            raise DiagnosticError(f"executable project file differs from HEAD: {relative}")
+        files[relative] = hashlib.sha256(actual).hexdigest()
+    return {
+        "code_sha": code_sha,
+        "code_bundle_sha256": _composite(files),
+        "code_bundle_rule": "SHA256 of sorted '<relative_path>  <sha256>\\n' UTF-8 lines for tracked src/**/*.py and scripts/**/*.py",
+    }
 
 
 def _sharpe(returns: np.ndarray, periods_per_year: int) -> float:
@@ -226,6 +282,17 @@ def _expected_max_daily_sharpe(daily_sharpes: np.ndarray, n_trials: int) -> floa
     )
 
 
+def _cscv_scores(values: np.ndarray, split_index: int, side: str) -> np.ndarray:
+    spread = np.ptp(values, axis=0)
+    scale = np.maximum(1.0, np.max(np.abs(values), axis=0))
+    if np.any(spread <= 1e-12 * scale):
+        raise DiagnosticError(f"CSCV split {split_index} {side} scores are unevaluable")
+    scores = np.mean(values, axis=0) / np.std(values, axis=0, ddof=1)
+    if not np.all(np.isfinite(scores)):
+        raise DiagnosticError(f"CSCV split {split_index} {side} scores are unevaluable")
+    return scores
+
+
 def _pbo_splits(
     matrix: np.ndarray,
     variant_ids: list[str],
@@ -241,9 +308,9 @@ def _pbo_splits(
         test_blocks = tuple(index for index in range(n_blocks) if index not in train_set)
         train = np.concatenate([blocks[index] for index in train_blocks])
         test = np.concatenate([blocks[index] for index in test_blocks])
-        train_scores = np.mean(train, axis=0) / np.std(train, axis=0, ddof=1)
+        train_scores = _cscv_scores(train, split_index, "train")
         winner = int(np.argmax(train_scores))
-        test_scores = np.mean(test, axis=0) / np.std(test, axis=0, ddof=1)
+        test_scores = _cscv_scores(test, split_index, "test")
         order = np.argsort(test_scores)
         rank = int(np.where(order == winner)[0][0]) + 1
         percentile = (rank - 0.5) / len(variant_ids)
@@ -289,8 +356,12 @@ def run_diagnostic(
     matrix_path = Path(matrix_path).resolve()
     manifest_path = Path(manifest_path).resolve()
     output = Path(output_dir).resolve()
+    project_root = Path(__file__).resolve().parents[2]
+    code_identity = _code_identity(project_root)
+    matrix_bytes, matrix_digest = _read_input(matrix_path, "matrix")
+    manifest_bytes, manifest_digest = _read_input(manifest_path, "manifest")
     manifest, dates, variant_ids, matrix = _load_packet(
-        matrix_path, manifest_path, n_blocks, min_block_observations
+        matrix_bytes, manifest_bytes, n_blocks, min_block_observations
     )
     effective_thresholds = dict(DEFAULT_THRESHOLDS if thresholds is None else thresholds)
     if set(effective_thresholds) != set(DEFAULT_THRESHOLDS):
@@ -331,9 +402,9 @@ def run_diagnostic(
     verdict = "NO_VETO_RESEARCH_ONLY_NOT_PROMOTION" if all(checks.values()) else "VETO_FURTHER_PROMOTION"
     provenance = {
         "status": STATUS,
-        "code_sha": _code_sha(Path(__file__).resolve().parents[2]),
-        "experiment_manifest_sha256": _sha256(manifest_path),
-        "matrix_sha256": _sha256(matrix_path),
+        **code_identity,
+        "experiment_manifest_sha256": manifest_digest,
+        "matrix_sha256": matrix_digest,
         "input_bundle_sha256": manifest["input_bundle_sha256"],
         "experiment_config_sha256": manifest["experiment_config_sha256"],
         "execution_contract_hash": manifest["execution_contract_hash"],
@@ -388,6 +459,12 @@ def run_diagnostic(
             json.dumps(artifact_manifest, sort_keys=True, indent=2, allow_nan=False) + "\n",
             encoding="utf-8",
         )
+        _revalidate_inputs({
+            "matrix": (matrix_path, matrix_digest),
+            "manifest": (manifest_path, manifest_digest),
+        })
+        if _code_identity(project_root) != code_identity:
+            raise DiagnosticError("executable project files changed during execution")
         _publish_no_replace(temp, output)
     except Exception:
         shutil.rmtree(temp, ignore_errors=True)
