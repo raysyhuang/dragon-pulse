@@ -73,6 +73,8 @@ python scripts/research_overfit_diagnostic.py \
 
 The output path must not exist. Publication uses Linux `renameat2(...,
 RENAME_NOREPLACE)` after all files are complete in a sibling temporary directory.
+The final output component is kept lexical rather than symlink-resolved, so an
+existing dangling or non-dangling symlink is refused as an existing destination.
 On any validation, computation, or publication error the command exits nonzero,
 preserves an existing destination, and removes its temporary directory.
 Temporary directories are also removed for Python interruptions such as

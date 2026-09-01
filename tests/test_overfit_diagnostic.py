@@ -6,6 +6,7 @@ import csv
 import hashlib
 import json
 import math
+import os
 import subprocess
 from datetime import date, timedelta
 from pathlib import Path
@@ -386,6 +387,36 @@ def test_no_overwrite_preserves_existing_directory(tmp_path):
 
     assert sentinel.read_text(encoding="utf-8") == "do not mutate"
     assert {path.name for path in output.iterdir()} == {"keep.txt"}
+
+
+@pytest.mark.parametrize("target_exists", [False, True], ids=["dangling", "non_dangling"])
+def test_no_overwrite_refuses_existing_output_symlink(
+    tmp_path, monkeypatch, target_exists
+):
+    matrix, manifest_path = _packet(tmp_path)
+    identity = {
+        "code_sha": "a" * 40,
+        "code_bundle_sha256": "b" * 64,
+        "code_bundle_rule": "test identity",
+    }
+    monkeypatch.setattr(diagnostic, "_code_identity", lambda _root: identity)
+    target = tmp_path / "target"
+    if target_exists:
+        target.mkdir()
+        (target / "keep.txt").write_text("preserve", encoding="utf-8")
+    output = tmp_path / "evidence"
+    output.symlink_to(target, target_is_directory=True)
+
+    with pytest.raises(DiagnosticError, match="overwrite"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+
+    assert os.path.lexists(output)
+    assert output.is_symlink()
+    if target_exists:
+        assert {path.name for path in target.iterdir()} == {"keep.txt"}
+    else:
+        assert not target.exists()
+    assert not list(tmp_path.glob(".evidence.tmp-*"))
 
 
 def test_keyboard_interrupt_during_generation_removes_temporary_evidence(tmp_path, monkeypatch):

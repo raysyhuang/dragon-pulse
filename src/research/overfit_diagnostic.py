@@ -453,7 +453,10 @@ def run_diagnostic(
     """Validate, evaluate, and atomically publish a non-promoting evidence directory."""
     matrix_path = Path(matrix_path).resolve()
     manifest_path = Path(manifest_path).resolve()
-    output = Path(output_dir).resolve()
+    # Keep the caller's final path component lexical. Resolving it would follow a
+    # pre-existing dangling symlink and publish at its target, bypassing
+    # RENAME_NOREPLACE on the path the caller actually supplied.
+    output = Path(os.path.abspath(os.fspath(output_dir)))
     project_root = Path(__file__).resolve().parents[2]
     code_identity = _code_identity(project_root)
     matrix_bytes, matrix_digest = _read_input(matrix_path, "matrix")
