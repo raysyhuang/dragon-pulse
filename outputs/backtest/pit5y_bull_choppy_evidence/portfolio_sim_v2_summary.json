@@ -3,10 +3,10 @@
   "position_pct": 20.0,
   "max_concurrent": 5,
   "detail_file": "backtest_detail_pit5y_bull_choppy.csv",
-  "detail_sha256": "4043c61b400307c517b51ece0135446232f22dba32654922cb1553e996ee2b50",
+  "detail_sha256": "3951d61841633fdd3eaa3a359e07ec8c48f27c7118000a74f898f8233aa240d3",
   "calendar_file": "trade_cal_receipt.json",
   "calendar_sha256": "7b9c9dbc2cb2f2d98e51c66a14920ceb204328d186fe9909ab5a0a1f8cc461c2",
-  "snapshot_count_loaded": 538,
+  "snapshot_count_loaded": 537,
   "result": {
     "detail_csv": "backtest_detail_pit5y_bull_choppy.csv",
     "position_pct": 20.0,
@@ -17,17 +17,17 @@
     "skipped_capacity": 145,
     "skipped_cash": 0,
     "sim_days": 1171,
-    "final_equity": 241486.6,
-    "equity_multiple": 2.415,
-    "total_return_pct": 141.49,
-    "annualized_return_pct": 20.89,
-    "max_drawdown_pct": 21.7,
+    "final_equity": 242802.77,
+    "equity_multiple": 2.428,
+    "total_return_pct": 142.8,
+    "annualized_return_pct": 21.03,
+    "max_drawdown_pct": 21.27,
     "max_drawdown_date": "2025-04-03",
-    "sharpe_ratio": 0.965,
+    "sharpe_ratio": 0.97,
     "avg_positions_when_active": 3.9,
     "max_concurrent_observed": 5,
     "utilization_pct": 53.6
   },
   "equity_curve_file": "portfolio_equity_curve.csv",
-  "equity_curve_sha256": "858eaf31ea695eb10017f02aca2f8a5f44a8ee35f2944642638015fe4495afca"
+  "equity_curve_sha256": "efd672c12e8922efd0f5c494e14b3717eb8a73ceaefc49f7eb4143f93de72225"
 }

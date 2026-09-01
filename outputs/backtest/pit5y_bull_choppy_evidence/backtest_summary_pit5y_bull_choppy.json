@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-09-01T06:25:20.688488Z",
+  "created_at": "2026-09-01T07:09:02.754508Z",
   "input_mode": "live",
   "bundle_id": null,
   "bundle_composite_sha256": null,
@@ -47,7 +47,7 @@
   "pnl_win_rate": 0.4324,
   "target_hit_rate": 0.2472,
   "avg_win_pct": 6.88,
-  "avg_loss_pct": -4.25,
+  "avg_loss_pct": -4.24,
   "true_expectancy_pct": 0.57,
   "weighted_expectancy_pct": 0.57,
   "hold_expired_positive_pct": 0.5882,
@@ -59,19 +59,19 @@
     "day_4_stops": 76,
     "day_5_stops": 65
   },
-  "per_trade_compounded_dd_pct": 57.25,
-  "cumulative_pnl_pct": 1000.96,
-  "final_equity_multiple": 11.01,
-  "total_time_min": 7.0,
+  "per_trade_compounded_dd_pct": 56.03,
+  "cumulative_pnl_pct": 1032.28,
+  "final_equity_multiple": 11.32,
+  "total_time_min": 6.9,
   "breadth_suppressed_days": 4,
   "acceptance_mode_counts": {
     "regime_filtered": 644,
     "full": 495,
     "selective": 67
   },
-  "price_data_fingerprint": "8039c6acb6b5db118dea13add7fa37e6f1a4e18ef68292b462b481e4203f75c2",
+  "price_data_fingerprint": "2cc9ddd2e56dee47e0c83aac9f505987ca076482ec9badfaec24a69c7d113b2b",
   "price_snapshot_mode": "read_write",
-  "price_snapshot_dir": "/home/agent/research/dragon-pulse/pit5y-cache/extracted/snapshots",
+  "price_snapshot_dir": "<EXTRACTED>/snapshots",
   "download_bad_tickers": [],
   "download_bad_ticker_count": 0,
   "per_engine": {
@@ -81,7 +81,7 @@
       "pnl_win_rate": 0.4324,
       "target_hit_rate": 0.2472,
       "avg_win_pct": 6.88,
-      "avg_loss_pct": -4.25,
+      "avg_loss_pct": -4.24,
       "true_expectancy_pct": 0.57,
       "day1_stop_count": 0,
       "hold_expired_positive_pct": 0.5882

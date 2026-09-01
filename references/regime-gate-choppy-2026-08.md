@@ -27,47 +27,35 @@ value, so the CLI flag alone cannot widen the gate.
 
 | gate | active days | filled | win% | exp% | portfolio equity | portfolio maxDD | Sharpe | capacity skipped |
 |---|---|---|---|---|---|---|---|---|
-| bull only (frozen baseline) | 322 | 616 | 41.6 | +0.39 | 1.604x | 33.35% | 0.684 | 70 |
-| **bull + choppy (paper candidate)** | **559** | **1071** | **42.6** | **+0.49** | **2.259x** | **22.90%** | **0.895** | **148** |
+| **bull + choppy (paper candidate)** | **560** | **1080** | **43.2** | **+0.57** | **2.428x** | **21.27%** | **0.970** | **145** |
 
 Portfolio figures use 20% of equity per position and max 5 concurrent positions. The
-bull+choppy ledger executes 923/1,071 filled replay trades; the remaining 148 are
+bull+choppy ledger executes 935/1,080 filled replay trades; the remaining 145 are
 mechanically skipped at the concurrency cap. Unlike per-trade compounding, these are
 daily marked-to-market portfolio figures.
+
+The prior frozen bull-only portfolio was not regenerated under the same STAR-board
+exclusion and is therefore **not a valid like-for-like comparator**. This report makes
+no portfolio delta claim versus that baseline; the adoption evidence is the absolute
+paper result and the separately positive choppy cohort.
 
 Per-regime expectancy, measured separately:
 
 | regime | n | win% | gross | net @0.15% | net @0.25% | net @0.40% |
 |---|---|---|---|---|---|---|
-| choppy | 455 | 44.0 | +0.62 | +0.47 | +0.37 | +0.22 |
-| bull | 616 | 41.6 | +0.39 | +0.24 | +0.14 | -0.01 |
+| choppy | 462 | 44.2 | +0.70 | +0.55 | +0.45 | +0.30 |
+| bull | 618 | 42.6 | +0.47 | +0.32 | +0.22 | +0.07 |
 
-Choppy improves the frozen bull-only baseline. Bear is not widened by this change and
+Choppy is positive within the committed replay. Bear is not widened by this change and
 stays excluded; the committed adoption replay intentionally tests only the proposed
 bull+choppy policy rather than manufacturing an all-regime comparator.
 
-## Robustness
+## Historical exploratory sweeps
 
-Stability across years and split-sample — choppy is the *more* robust of the two:
-
-| | years positive | split H1 | split H2 |
-|---|---|---|---|
-| choppy | 5/6 | +0.627% | +0.616% |
-| bull | 3/6 | -0.551% | +1.328% |
-
-Bull's entire edge sits in the recent half. Choppy's halves are near-identical.
-
-Score-floor sensitivity on the binding parameter (`rs_pullback.score_floor`):
-
-| floor | filled | gross | net @0.15% | equity | choppy-only |
-|---|---|---|---|---|---|
-| 85 | 1074 | +0.47 | +0.32 | 6.62x | +0.62% |
-| 90 (adopted) | 1071 | +0.49 | +0.34 | 6.87x | +0.62% |
-| 95 | 1043 | +0.48 | +0.33 | 6.14x | +0.55% |
-
-Flat across +/-5 points; every variant beats bull-only. `book_size.min_score` below
-90 is inert because the engine floor clamps first. With acceptance enabled, the binding
-participation caps are `acceptance.max_full/max_selective: 2`, not the regime book entry.
+Earlier split-sample, score-floor and participation sweeps predated the complete
+688xxx/689xxx STAR-board exclusion. They are quarantined as exploratory context and are
+not merge evidence or a valid comparator for the regenerated adoption replay. New
+sensitivity claims require regeneration under the exact current board filter.
 
 ## What this does NOT fix
 
@@ -90,7 +78,7 @@ negative. Not adopted.
 - `per_trade_compounded_dd_pct` compounds every trade at full size; it is a relative
   comparison between variants, not a portfolio drawdown.
 - Choppy inherited bull's `min_score` and `max_picks` rather than being tuned
-  separately. Deliberate (avoids fitting) but means +0.62% is unoptimised.
+  separately. Deliberate (avoids fitting) but means +0.70% is unoptimised.
 - Frozen membership is reproducible but remains a `TRUSTED_HISTORICAL_ASSUMPTION`, not
   provider-attested point-in-time truth.
 
@@ -101,34 +89,3 @@ fresh offline replay summary/detail/daily files, pinned picks, portfolio summary
 daily equity curve. `evidence_manifest.json` binds the exact code commit, config, four
 frozen input classes, output hashes and commands. The snapshot archive is published at
 the URL in the manifest rather than duplicated in git.
-
-## Follow-up: participation dials are already optimal (2026-08-22)
-
-`book_size.{regime}.max_picks` is **dead config** while `acceptance.enabled: true` —
-`src/pipelines/funnel.py:474-477` only consults it in the `else` branch when
-acceptance is off. The dials that actually bind are `acceptance.max_full` /
-`max_selective` (2) and `book_size.max_per_sector` (1).
-
-Tested on top of the adopted bull+choppy gate, same 5y PIT replay:
-
-| variant | active | filled | pk/day | gross | net @0.15% | equity | maxDD% |
-|---|---|---|---|---|---|---|---|
-| 2 picks / sector 1 (adopted) | 559 | 1071 | 1.92 | +0.49 | +0.34 | 6.87x | 57.7 |
-| 3 picks / sector 1 | 559 | 1612 | 2.88 | +0.33 | +0.18 | 3.34x | 61.0 |
-| 4 picks / sector 1 | 559 | 2140 | 3.83 | +0.28 | +0.13 | 2.83x | 72.3 |
-| 2 picks / sector 2 | 559 | 1073 | 1.92 | +0.46 | +0.31 | 6.67x | 58.6 |
-
-Marginal-trade test — do the ADDED trades pay for themselves?
-
-| change | n extra | gross | net @0.15% | win% |
-|---|---|---|---|---|
-| 2 -> 3 picks | 541 | +0.00% | -0.15% | 40.9 |
-| 2 -> 4 picks | 1069 | +0.08% | -0.07% | 41.1 |
-| sector 1 -> 2 | 27 | -0.49% | -0.64% | 33.3 |
-
-Every widening is flat-to-negative gross and negative net. Keep `max_full: 2`,
-`max_selective: 2`, `max_per_sector: 1`.
-
-Read positively: picks #3 and #4 are materially worse than #1 and #2, which is
-evidence the composite score genuinely ranks rather than shuffles. The only
-participation gain available was the choppy regime itself.

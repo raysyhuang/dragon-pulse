@@ -11,11 +11,11 @@ the full cycle including the 2021–22 bear.
 > ⚠️ **Survivorship bias is large — measured 2026-06-23.** The validation universe uses
 > *current* top-1000 market cap applied to history. 19% of backtest picks were not in the
 > top-1000 as of their own date. Removing them cuts 5Y return **+65% → +24%** (Sharpe
-> 0.82 → 0.42, DD 19% → 25%). **Use the survivorship-clean numbers as the realistic
-> expectation, and treat even those as an optimistic upper bound:**
+> 0.82 → 0.42, DD 19% → 25%). **Use the historical point-in-time audit as a
+> conservative reference, while retaining its membership-assumption limits:**
 >
-> **DEFINITIVE point-in-time numbers** (2026-06-23, scanner re-run on as-of-date top-1000
-> universe — the true unbiased edge; two methods agree). Use these as expectations:
+> **Earlier point-in-time audit estimates** (2026-06-23, scanner re-run on as-of-date
+> top-1000 schedules; separate from the current frozen adoption replay):
 >
 > | Window | PIT return | PIT ann. | Sharpe | **Max DD** |
 > |--------|-----------|----------|--------|-----------|
@@ -28,11 +28,13 @@ the full cycle including the 2021–22 bear.
 > honest full-cycle **drawdown is ~30%**. Edge is real but thin and recent-bull-flattered —
 > consistent with the soft live Apr–Jun 2026 result. **Size for a thin edge with deep DD.**
 
-> **Frozen 5Y gate replay (2026-09-01):** opening choppy increased the 20%-per-position,
-> max-5-concurrent gross portfolio from the prior bull-only 1.604x / 33.35% DD / 0.684
-> Sharpe to **2.259x / 22.90% DD / 0.895 Sharpe**. Of 1,071 filled replay trades,
-> 923 fit the portfolio and 148 were skipped by the concurrency cap. These figures are
-> gross, use a trusted historical PIT-membership assumption, and remain non-binding.
+> **Frozen 5Y gate replay (2026-09-01):** the current 20%-per-position,
+> max-5-concurrent gross paper portfolio produced **2.428x / 21.27% DD / 0.970
+> Sharpe**. Of 1,080 filled replay trades, 935 fit the portfolio and 145 were skipped
+> by the concurrency cap. Both 688xxx ordinary shares and 689xxx STAR CDRs are excluded.
+> These figures are gross, use a trusted historical PIT-membership assumption, and
+> remain non-binding. The older bull-only portfolio predates the same STAR exclusion,
+> so it is not a valid like-for-like comparator and no improvement delta is claimed.
 
 ---
 
@@ -46,6 +48,7 @@ ranked, deduped, sector-capped).
   regime.** If the watchlist is empty, that's the system working — do nothing.
 - Choppy picks stay paper-tracked until a separate promotion decision; do not route them
   to IBKR merely because they appear in the watchlist.
+- Exclude all STAR Market names, including 688xxx ordinary shares and 689xxx CDRs.
 
 **Selection (corrected on unbiased point-in-time data, 2026-06-23):**
 - Picks already require **score ≥ 90**, **ADV ≥ ¥80M**, **max 1 per sector**.
@@ -84,8 +87,8 @@ ranked, deduped, sector-capped).
 ## 2. Position sizing & risk
 
 Size from portfolio-level evidence, not per-trade compounding. The frozen bull+choppy
-paper replay produced 2.259x gross equity, 22.90% max drawdown and 0.895 Sharpe at
-20%/position with max 5 concurrent; 148/1,071 trades were capacity-skipped. Costs are
+paper replay produced 2.428x gross equity, 21.27% max drawdown and 0.970 Sharpe at
+20%/position with max 5 concurrent; 145/1,080 trades were capacity-skipped. Costs are
 not modelled and PIT membership is a trusted historical assumption, so treat this as an
 optimistic paper result rather than a live sizing promise.
 
