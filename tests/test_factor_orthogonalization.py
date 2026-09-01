@@ -48,12 +48,18 @@ def _packet(
         factor += np.asarray([1.2 if item == "tech" else -0.7 if item == "bank" else 0 for item in industries])
         if factor_mode == "zero_factor":
             factor[:] = 1.0
+        elif factor_mode == "near_factor":
+            factor = 1.0 + np.arange(per_date) % 2 * 1e-15
         elif factor_mode == "zero_control":
             values[:, 0] = 1.0
+        elif factor_mode == "near_control":
+            values[:, 0] = 1.0 + np.arange(per_date) % 2 * 1e-15
         elif factor_mode == "rank_deficient":
             values[:, 1] = values[:, 0]
         elif factor_mode == "zero_residual":
             factor = values[:, 0].copy()
+        elif factor_mode == "near_residual":
+            factor = values[:, 0] + (np.arange(per_date) % 2) * 1e-15
         for index in range(per_date):
             rows.append([
                 (start + timedelta(days=day_index)).isoformat(), f"S{index:04d}",
@@ -196,10 +202,18 @@ _DELETE = object()
 
 @pytest.mark.parametrize("field,value", [
     ("schema_version", True), ("schema_version", 2), ("status", "PASS"), ("factor_id", ""),
-    ("market", "CRYPTO"), ("row_count", True), ("date_count", 2.0), ("min_cross_section", 29),
-    ("winsor_lower", 0.02), ("winsor_upper", 0.98), ("max_condition_number", float("inf")),
+    ("market", "CRYPTO"), ("date_start", "2025/01/02"), ("date_end", "2025-1-3"),
+    ("row_count", True), ("date_count", 2.0), ("min_cross_section", 29),
+    ("industry_column", ""), ("continuous_controls", ["size", "liquidity", "beta"]),
+    ("continuous_controls", ["size", "liquidity", "beta", "size"]),
+    ("continuous_controls", ["size", "liquidity", "beta", ""]),
+    ("continuous_controls", ["size", "liquidity", "beta", "factor_value"]),
+    ("winsor_lower", 0.02), ("winsor_upper", 0.98), ("max_condition_number", True),
+    ("max_condition_number", float("inf")),
     ("max_condition_number", 1e9), ("max_abs_residual_exposure", 0.0),
     ("max_abs_residual_exposure", 1e-7), ("matrix_sha256", "ABC"),
+    ("input_bundle_sha256", "A" * 64), ("experiment_config_sha256", "x" * 64),
+    ("research_contract_sha256", "3" * 63),
     ("point_in_time_industry_attestation", False),
     ("controls_known_by_signal_cutoff_attestation", False),
     ("factor_known_by_signal_cutoff_attestation", False),
@@ -250,8 +264,10 @@ def test_matrix_contract_and_counts_fail_closed(tmp_path, monkeypatch, change):
 
 
 @pytest.mark.parametrize("mode,match", [
-    ("zero_factor", "factor.*dispersion"), ("zero_control", "control size.*dispersion"),
+    ("zero_factor", "factor.*dispersion"), ("near_factor", "factor.*dispersion"),
+    ("zero_control", "control size.*dispersion"), ("near_control", "control size.*dispersion"),
     ("rank_deficient", "rank deficient"), ("zero_residual", "residual.*dispersion"),
+    ("near_residual", "residual.*dispersion"),
 ])
 def test_numerically_unevaluable_designs_are_refused(tmp_path, monkeypatch, mode, match):
     monkeypatch.setattr(diagnostic, "_code_identity", lambda _root: IDENTITY)
