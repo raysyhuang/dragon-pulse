@@ -14,6 +14,7 @@ import pandas as pd
 
 from src.core.acceptance import run_acceptance, AcceptanceResult
 from src.core.cn_limits import get_daily_limit
+from src.core.universe import is_star_market_ticker
 from src.signals.mean_reversion import (
     resolve_mr_subtype_and_exit_params,
     score_mean_reversion,
@@ -144,9 +145,12 @@ def build_engine_candidates(
         return name in alpha_engines and bool((alpha_config.get(name) or {}).get("enabled", False))
 
     all_signals: list[tuple[str, object]] = []
+    exclude_star_market = bool((config.get("universe") or {}).get("exclude_star_market", False))
 
     for ticker, feat_df, feats in feat_items:
         if not feats:
+            continue
+        if exclude_star_market and is_star_market_ticker(ticker):
             continue
         try:
             is_st = info_map.get(ticker, {}).get("is_st", False)

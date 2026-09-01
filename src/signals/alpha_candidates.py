@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 
 from src.core.cn_limits import get_daily_limit
+from src.core.universe import is_star_market_ticker
 
 
 def _valid(x) -> bool:
@@ -118,6 +119,7 @@ def score_rs_pullback_alpha(
     """Strong-stock pullback: controlled first dip in a relative-strength leader."""
     if (
         is_st
+        or is_star_market_ticker(ticker)
         or regime not in regimes
         or df.empty
         or len(df) < 140

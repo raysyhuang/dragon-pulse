@@ -945,6 +945,21 @@ def main():
                     encoding="utf-8")
                 logger.info("basic_info frozen to %s", args.basic_info_out)
 
+    if config.get("universe", {}).get("exclude_star_market", False):
+        from src.core.universe import exclude_star_market_tickers
+
+        before = len(universe)
+        universe = exclude_star_market_tickers(universe)
+        allowed_tickers = set(universe)
+        data_map = {ticker: frame for ticker, frame in data_map.items() if ticker in allowed_tickers}
+        info_map = {ticker: info for ticker, info in info_map.items() if ticker in allowed_tickers}
+        if pit_schedule:
+            pit_schedule = [
+                (rebalance_date, set(exclude_star_market_tickers(members)))
+                for rebalance_date, members in pit_schedule
+            ]
+        logger.info("Excluded %d STAR Market stocks from replay universe", before - len(universe))
+
     csi300_full = csi300_full.rename(columns={column: column.lower() for column in csi300_full.columns if column in ("Open", "High", "Low", "Close", "Volume")})
 
     # --- Config ---

@@ -25,6 +25,7 @@ universe:
   cache_max_age_days: 7
   exclude_st: true
   exclude_delisting_warning: true
+  exclude_star_market: true  # Ray/IBKR cannot trade 688xxx.SH; fail closed in scan and replay
 
 # Required by config validator (legacy compat)
 liquidity:

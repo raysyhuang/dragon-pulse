@@ -105,6 +105,44 @@ def test_rs_pullback_alpha_refuses_when_benchmark_history_is_insufficient():
     assert signal is None
 
 
+def test_rs_pullback_alpha_refuses_star_market_ticker():
+    signal = score_rs_pullback_alpha(
+        ticker="688006.SH",
+        df=_trend_df(),
+        regime="choppy",
+        csi300_df=_flat_csi(),
+        regimes=("bull", "choppy"),
+        score_floor=0,
+    )
+
+    assert signal is None
+
+
+def test_build_engine_candidates_refuses_star_market_for_every_engine():
+    candidates = build_engine_candidates(
+        feat_items=[("688006.SH", _breakout_df(), {"rsi_2": 50})],
+        regime="bull",
+        config={
+            "universe": {"exclude_star_market": True},
+            "mean_reversion": {"enabled": False},
+            "sniper": {"enabled": False},
+            "alpha_candidates": {
+                "enabled": True,
+                "engines": ["sniper_breakout"],
+                "sniper_breakout": {
+                    "enabled": True,
+                    "regimes": ["bull"],
+                    "score_floor": 0,
+                    "min_adv_cny": 0,
+                },
+            },
+        },
+        csi300_df=_flat_csi(),
+    )
+
+    assert candidates == []
+
+
 def test_sniper_breakout_alpha_emits_research_signal_with_mas_style_ceiling():
     signal = score_sniper_breakout_alpha(
         ticker="601698.SH",

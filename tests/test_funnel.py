@@ -245,6 +245,7 @@ class TestLiveConfigBehavior:
         assert config["book_size"]["bull"] == {"max_picks": 2, "min_score": 90}
         assert config["book_size"]["choppy"] == {"max_picks": 2, "min_score": 90}
         assert config["book_size"]["bear"] == {"max_picks": 0, "min_score": 999}
+        assert config["universe"]["exclude_star_market"] is True
 
     def test_bear_is_hard_blocked_even_with_healthy_breadth(self):
         candidates = _make_candidates(("A", 95), ("B", 90))

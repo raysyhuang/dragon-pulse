@@ -16,6 +16,17 @@ from typing import Callable, Optional
 from io import StringIO
 
 
+def is_star_market_ticker(ticker: str) -> bool:
+    """Return whether *ticker* is a Shanghai STAR Market (688xxx) symbol."""
+    code = str(ticker).strip().upper().split(".", 1)[0]
+    return len(code) == 6 and code.startswith("688") and code.isdigit()
+
+
+def exclude_star_market_tickers(tickers) -> list[str]:
+    """Remove STAR Market symbols while preserving input order."""
+    return [str(ticker) for ticker in tickers if not is_star_market_ticker(ticker)]
+
+
 def normalize_ticker_for_yahoo(sym: str) -> str:
     """Normalize ticker symbol for Yahoo Finance (BRK.B -> BRK-B)."""
     return str(sym).strip().replace(".", "-")

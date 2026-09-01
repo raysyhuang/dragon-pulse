@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import hashlib
 import json
 import sys
@@ -15,6 +16,21 @@ def sha256(path: Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _star_market_tickers(tickers) -> list[str]:
+    """Return 688xxx symbols; do not confuse embedded 688 with the code prefix."""
+    return [
+        str(ticker)
+        for ticker in tickers
+        if str(ticker).strip().upper().split(".", 1)[0].startswith("688")
+        and len(str(ticker).strip().upper().split(".", 1)[0]) == 6
+    ]
+
+
+def _csv_tickers(path: Path) -> list[str]:
+    with path.open(newline="", encoding="utf-8") as fh:
+        return [row["ticker"] for row in csv.DictReader(fh)]
 
 
 def main() -> int:
@@ -55,6 +71,9 @@ def main() -> int:
           "portfolio detail binding")
     check(portfolio["equity_curve_sha256"] == manifest["outputs_sha256"][portfolio["equity_curve_file"]],
           "portfolio curve binding")
+    for name in ("picks.csv", "backtest_detail_pit5y_bull_choppy.csv"):
+        check(not _star_market_tickers(_csv_tickers(run / name)),
+              f"no STAR Market symbols in {name}")
 
     sys.path.insert(0, str(root))
     from src.core.config import load_config
