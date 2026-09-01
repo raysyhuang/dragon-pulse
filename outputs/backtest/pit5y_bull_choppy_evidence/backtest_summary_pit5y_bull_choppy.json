@@ -1,5 +1,5 @@
 {
-  "created_at": "2026-09-01T07:09:02.754508Z",
+  "created_at": "2026-09-01T08:04:47.161037Z",
   "input_mode": "live",
   "bundle_id": null,
   "bundle_composite_sha256": null,
@@ -44,25 +44,25 @@
   "target_hits": 267,
   "stop_hits": 473,
   "hold_expired": 340,
-  "pnl_win_rate": 0.4324,
+  "pnl_win_rate": 0.438,
   "target_hit_rate": 0.2472,
-  "avg_win_pct": 6.88,
-  "avg_loss_pct": -4.24,
-  "true_expectancy_pct": 0.57,
-  "weighted_expectancy_pct": 0.57,
+  "avg_win_pct": 6.83,
+  "avg_loss_pct": -4.28,
+  "true_expectancy_pct": 0.58,
+  "weighted_expectancy_pct": 0.58,
   "hold_expired_positive_pct": 0.5882,
-  "day1_stop_count": 0,
-  "profitable_days_pct": 0.5135,
+  "entry_gap_below_stop_count": 6,
+  "profitable_days_pct": 0.5153,
   "exit_day_distribution": {
     "day_2_stops": 151,
     "day_3_stops": 100,
     "day_4_stops": 76,
     "day_5_stops": 65
   },
-  "per_trade_compounded_dd_pct": 56.03,
-  "cumulative_pnl_pct": 1032.28,
-  "final_equity_multiple": 11.32,
-  "total_time_min": 6.9,
+  "per_trade_compounded_dd_pct": 55.67,
+  "cumulative_pnl_pct": 1123.59,
+  "final_equity_multiple": 12.24,
+  "total_time_min": 6.8,
   "breadth_suppressed_days": 4,
   "acceptance_mode_counts": {
     "regime_filtered": 644,
@@ -77,39 +77,39 @@
   "per_engine": {
     "alpha_rs_pullback": {
       "total": 1080,
-      "pnl_wins": 467,
-      "pnl_win_rate": 0.4324,
+      "pnl_wins": 473,
+      "pnl_win_rate": 0.438,
       "target_hit_rate": 0.2472,
-      "avg_win_pct": 6.88,
-      "avg_loss_pct": -4.24,
-      "true_expectancy_pct": 0.57,
-      "day1_stop_count": 0,
+      "avg_win_pct": 6.83,
+      "avg_loss_pct": -4.28,
+      "true_expectancy_pct": 0.58,
+      "entry_gap_below_stop_count": 6,
       "hold_expired_positive_pct": 0.5882
     }
   },
   "per_regime": {
     "choppy": {
       "total": 462,
-      "pnl_wins": 204,
-      "pnl_win_rate": 0.4416,
-      "true_expectancy_pct": 0.7,
-      "day1_stop_count": 0
+      "pnl_wins": 207,
+      "pnl_win_rate": 0.4481,
+      "true_expectancy_pct": 0.72,
+      "entry_gap_below_stop_count": 3
     },
     "bull": {
       "total": 618,
-      "pnl_wins": 263,
-      "pnl_win_rate": 0.4256,
-      "true_expectancy_pct": 0.47,
-      "day1_stop_count": 0
+      "pnl_wins": 266,
+      "pnl_win_rate": 0.4304,
+      "true_expectancy_pct": 0.48,
+      "entry_gap_below_stop_count": 3
     }
   },
   "per_subtype": {
     "rs_pullback_alpha": {
       "total": 1080,
-      "pnl_wins": 467,
-      "pnl_win_rate": 0.4324,
-      "true_expectancy_pct": 0.57,
-      "day1_stop_count": 0
+      "pnl_wins": 473,
+      "pnl_win_rate": 0.438,
+      "true_expectancy_pct": 0.58,
+      "entry_gap_below_stop_count": 6
     }
   }
 }

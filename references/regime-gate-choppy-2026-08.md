@@ -27,12 +27,16 @@ value, so the CLI flag alone cannot widen the gate.
 
 | gate | active days | filled | win% | exp% | portfolio equity | portfolio maxDD | Sharpe | capacity skipped |
 |---|---|---|---|---|---|---|---|---|
-| **bull + choppy (paper candidate)** | **560** | **1080** | **43.2** | **+0.57** | **2.428x** | **21.27%** | **0.970** | **145** |
+| **bull + choppy (paper candidate)** | **560** | **1080** | **43.8** | **+0.58** | **2.482x** | **21.01%** | **0.991** | **145** |
 
 Portfolio figures use 20% of equity per position and max 5 concurrent positions. The
 bull+choppy ledger executes 935/1,080 filled replay trades; the remaining 145 are
 mechanically skipped at the concurrency cap. Unlike per-trade compounding, these are
 daily marked-to-market portfolio figures.
+
+Six filled entries opened below their planned stop. The replay enforces A-share T+1 by
+holding through the entry session and exiting at the next-session open; it does not book
+those cases as same-bar 0.00% exits. Three occurred in BULL and three in CHOPPY.
 
 The prior frozen bull-only portfolio was not regenerated under the same STAR-board
 exclusion and is therefore **not a valid like-for-like comparator**. This report makes
@@ -43,8 +47,8 @@ Per-regime expectancy, measured separately:
 
 | regime | n | win% | gross | net @0.15% | net @0.25% | net @0.40% |
 |---|---|---|---|---|---|---|
-| choppy | 462 | 44.2 | +0.70 | +0.55 | +0.45 | +0.30 |
-| bull | 618 | 42.6 | +0.47 | +0.32 | +0.22 | +0.07 |
+| choppy | 462 | 44.8 | +0.72 | +0.57 | +0.47 | +0.32 |
+| bull | 618 | 43.0 | +0.48 | +0.33 | +0.23 | +0.08 |
 
 Choppy is positive within the committed replay. Bear is not widened by this change and
 stays excluded; the committed adoption replay intentionally tests only the proposed
@@ -78,7 +82,7 @@ negative. Not adopted.
 - `per_trade_compounded_dd_pct` compounds every trade at full size; it is a relative
   comparison between variants, not a portfolio drawdown.
 - Choppy inherited bull's `min_score` and `max_picks` rather than being tuned
-  separately. Deliberate (avoids fitting) but means +0.70% is unoptimised.
+  separately. Deliberate (avoids fitting) but means +0.72% is unoptimised.
 - Frozen membership is reproducible but remains a `TRUSTED_HISTORICAL_ASSUMPTION`, not
   provider-attested point-in-time truth.
 

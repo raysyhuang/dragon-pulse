@@ -29,9 +29,11 @@ the full cycle including the 2021–22 bear.
 > consistent with the soft live Apr–Jun 2026 result. **Size for a thin edge with deep DD.**
 
 > **Frozen 5Y gate replay (2026-09-01):** the current 20%-per-position,
-> max-5-concurrent gross paper portfolio produced **2.428x / 21.27% DD / 0.970
+> max-5-concurrent gross paper portfolio produced **2.482x / 21.01% DD / 0.991
 > Sharpe**. Of 1,080 filled replay trades, 935 fit the portfolio and 145 were skipped
 > by the concurrency cap. Both 688xxx ordinary shares and 689xxx STAR CDRs are excluded.
+> Six entries opened below their planned stop; A-share T+1 was enforced by exiting at
+> the next-session open rather than fabricating a same-bar stop fill.
 > These figures are gross, use a trusted historical PIT-membership assumption, and
 > remain non-binding. The older bull-only portfolio predates the same STAR exclusion,
 > so it is not a valid like-for-like comparator and no improvement delta is claimed.
@@ -78,6 +80,8 @@ ranked, deduped, sector-capped).
 - Whichever of stop / target / day-5 comes first. **No partial scale-outs** — taking
   winners off early was the worst-performing variant in every test.
 - T+1 constraint: no same-day exit after entry.
+- If the entry open is already below the planned stop, the replay holds through that
+  entry session and exits at the next-session open—the earliest T+1-legal exit.
 
 > The exit is the part a manual IBKR workflow struggles with (the day-5 timed close and
 > the intraday stop/target bracket). Automate this — it's the highest-value thing to bot.
@@ -87,7 +91,7 @@ ranked, deduped, sector-capped).
 ## 2. Position sizing & risk
 
 Size from portfolio-level evidence, not per-trade compounding. The frozen bull+choppy
-paper replay produced 2.428x gross equity, 21.27% max drawdown and 0.970 Sharpe at
+paper replay produced 2.482x gross equity, 21.01% max drawdown and 0.991 Sharpe at
 20%/position with max 5 concurrent; 145/1,080 trades were capacity-skipped. Costs are
 not modelled and PIT membership is a trusted historical assumption, so treat this as an
 optimistic paper result rather than a live sizing promise.

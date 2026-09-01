@@ -6,6 +6,7 @@ import argparse
 import csv
 import hashlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -33,6 +34,26 @@ def _csv_tickers(path: Path) -> list[str]:
         return [row["ticker"] for row in csv.DictReader(fh)]
 
 
+def _git_replay_code_unchanged(root: Path, commit: str, relpaths) -> bool:
+    """Require this checkout's replay code to match the pinned replay commit."""
+    try:
+        subprocess.run(
+            ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+            cwd=root,
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        result = subprocess.run(
+            ["git", "diff", "--quiet", commit, "--", *relpaths],
+            cwd=root,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-dir", default=str(Path(__file__).resolve().parent))
@@ -57,6 +78,12 @@ def main() -> int:
     for rel, expected in manifest["code_sha256"].items():
         path = root / rel
         check(path.exists() and sha256(path) == expected, f"code hash {rel}")
+    check(
+        _git_replay_code_unchanged(
+            root, manifest["replay_code_commit"], manifest["code_sha256"].keys()
+        ),
+        "checkout replay code matches pinned replay commit",
+    )
 
     summary = json.loads((run / "backtest_summary_pit5y_bull_choppy.json").read_text())
     portfolio = json.loads((run / "portfolio_sim_v2_summary.json").read_text())
