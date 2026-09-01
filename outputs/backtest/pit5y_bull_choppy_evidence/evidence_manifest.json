@@ -6,10 +6,11 @@
     "Supports adding choppy to the RS Pullback paper/daily core while bear remains blocked.",
     "Does not authorize live or manual IBKR orders.",
     "Membership is a TRUSTED_HISTORICAL_ASSUMPTION, not provider-attested point-in-time truth.",
-    "Portfolio results are gross; commissions, stamp duty and slippage are not modelled."
+    "Portfolio results are gross; commissions, stamp duty and slippage are not modelled.",
+    "STAR Market 688xxx symbols are excluded from the live scanner and this replay."
   ],
-  "created_at_utc": "2026-09-01T01:49:33.103542+00:00",
-  "replay_code_commit": "329e3c2c81bbf6c4356216263a3c9416b4de0616",
+  "created_at_utc": "2026-09-01T06:27:07.454959+00:00",
+  "replay_code_commit": "96b807c48e45db770793ca0cab3846914db57461",
   "replay_window": {
     "first": "2021-08-12",
     "last": "2026-08-11",
@@ -27,63 +28,66 @@
     "outputs/backtest/pit5y_final/snapshot_archive.sha256": "c7f9b79826a8e2e536ebd49963a14e1a910a366338ce1c0347dbd11191533e1c"
   },
   "code_sha256": {
-    "config/default.yaml": "551c20f28b8bccd5df310fd1bcce098c11b650e79d14872f091358b2d8e256e6",
-    "scripts/backtest_1yr.py": "b8e58dad895cfe166c6517f166af1602a826c0131b0be74ac0325d805a061ca4",
+    "config/default.yaml": "13e87f76c6f044c7a46a2b474743ec3f6a64141ee21dedf772009aaeb9ef752e",
+    "scripts/backtest_1yr.py": "88c0f847865edc40d2574288747595b9890848397ca8516332cc5f0cbb56fd71",
     "scripts/portfolio_sim_v2.py": "274c88e5ce21dd2f4901669cff82bcfdc5075ef50b150fa6ff74c7ba1a74963a",
-    "src/signals/alpha_candidates.py": "6eae511e5192f786ffa59627790119cec1bc7c891314f1839ff847d0c49fa6ce"
+    "src/core/universe.py": "a5580e12c15c6e521743e9127ef04fd5efcde6cce793fb704ba5a18af005505b",
+    "src/pipelines/funnel.py": "d64b917bfdddf84dea02c8ae09e963fed52fd12c8f528d67abd0242c87d4a6db",
+    "src/pipelines/scanner.py": "7fefcdc134d2d740aeb6a87e6b6ab0d42b4f9b3d3f1cbd34d5f513a8011aba28",
+    "src/signals/alpha_candidates.py": "2a1f82a20c5d42b9865e22ab6b14155ae00ca1206c97f377a10ce7e22358aa5d"
   },
   "outputs_sha256": {
-    "backtest_daily_pit5y_bull_choppy.csv": "438b336d44801c040aa97501d538507e575b31368694a603284878120fe55f95",
-    "backtest_detail_pit5y_bull_choppy.csv": "da32af9f65b48e439ea465da6ab9f07a106519a9ef385aa287dbe45bd645337c",
-    "backtest_summary_pit5y_bull_choppy.json": "4dfa09576ef55da52ccc531e19ba18368ead8a2269b5b2d1d0b6f4ea553fe85b",
-    "picks.csv": "4dece3849f0618bce877de762e42233362501e59ab20b5ec028abc916316ed73",
-    "portfolio_equity_curve.csv": "3e6d2e51978ad78a420a46eaeb90ca976c2c0f9251d8a8426a8bb4cc36a5c6e7",
-    "portfolio_sim_v2_summary.json": "b1f7f16d5fb336cebc9f1801de4f3771abeb0bcdf67b4639515250686612817b",
+    "backtest_daily_pit5y_bull_choppy.csv": "3979e8055c5d9947d958643c80618fbd1ab45aea25f34d4bc2ba2f58aefcfe6a",
+    "backtest_detail_pit5y_bull_choppy.csv": "4043c61b400307c517b51ece0135446232f22dba32654922cb1553e996ee2b50",
+    "backtest_summary_pit5y_bull_choppy.json": "da986ab30dce87a9a54a4fa89ef5c790c385494c824c3ca2418a901533c2bfc4",
+    "picks.csv": "a0429f274c9fce55e3f2d0e7fde1599b02da6472eb0445e5f0ef37f6e908584c",
+    "portfolio_equity_curve.csv": "858eaf31ea695eb10017f02aca2f8a5f44a8ee35f2944642638015fe4495afca",
+    "portfolio_sim_v2_summary.json": "0443dcb8768ceeec8a61eb53d9b9e883afb0a132d3e3b880b778980ffe79b1cc",
     "reproduce_portfolio.py": "dfb5dcbffe3df49b20e6d07f1a6cb8553568a54cfb2a78960052a24495251384",
-    "verify_evidence.py": "deefed7f223dca51c89354565745e124d46d656612f23896f5373b7e4eff216f"
+    "verify_evidence.py": "d9afd8ebdd7c7d655be21ee94b54c3e4988b421fe132cd679be8a3dc6e774db8"
   },
   "replay_command": "env -u TUSHARE_TOKEN HOME=<EMPTY_HOME> PYTHONPATH=<NETWORK_BLOCK_SITE> python scripts/backtest_1yr.py --start 2021-08-12 --end 2026-08-11 --config config/default.yaml --universe-mode point_in_time --engines alpha --acceptance-mode live_equivalent --label pit5y_bull_choppy --out-dir outputs/backtest/pit5y_bull_choppy_evidence --price-snapshot-dir <EXTRACTED>/snapshots --pit-schedule-in outputs/backtest/pit5y_final/pit_membership_schedule.json --calendar-in outputs/backtest/pit5y_final/trade_cal_receipt.json --basic-info-in outputs/backtest/pit5y_final/basic_info.json --dump-picks outputs/backtest/pit5y_bull_choppy_evidence/picks.csv",
   "portfolio_command": "python outputs/backtest/pit5y_bull_choppy_evidence/reproduce_portfolio.py --detail outputs/backtest/pit5y_bull_choppy_evidence/backtest_detail_pit5y_bull_choppy.csv --snapshot-dir <EXTRACTED>/snapshots --calendar outputs/backtest/pit5y_final/trade_cal_receipt.json --out-dir outputs/backtest/pit5y_bull_choppy_evidence --position-pct 20 --max-concurrent 5",
   "verification_command": "python outputs/backtest/pit5y_bull_choppy_evidence/verify_evidence.py --archive <ARCHIVE>",
   "replay_result": {
-    "picks_emitted": 1115,
-    "picks_filled": 1071,
-    "picks_skipped": 44,
+    "picks_emitted": 1117,
+    "picks_filled": 1080,
+    "picks_skipped": 37,
     "per_regime": {
       "choppy": {
-        "total": 455,
-        "pnl_wins": 200,
-        "pnl_win_rate": 0.4396,
-        "true_expectancy_pct": 0.62,
+        "total": 462,
+        "pnl_wins": 204,
+        "pnl_win_rate": 0.4416,
+        "true_expectancy_pct": 0.7,
         "day1_stop_count": 0
       },
       "bull": {
-        "total": 616,
-        "pnl_wins": 256,
-        "pnl_win_rate": 0.4156,
-        "true_expectancy_pct": 0.39,
+        "total": 618,
+        "pnl_wins": 263,
+        "pnl_win_rate": 0.4256,
+        "true_expectancy_pct": 0.47,
         "day1_stop_count": 0
       }
     },
-    "true_expectancy_pct": 0.49
+    "true_expectancy_pct": 0.57
   },
   "portfolio_result": {
     "detail_csv": "backtest_detail_pit5y_bull_choppy.csv",
     "position_pct": 20.0,
     "max_concurrent": 5,
     "initial_capital": 100000.0,
-    "trades_in_file": 1071,
-    "trades_executed": 923,
-    "skipped_capacity": 148,
+    "trades_in_file": 1080,
+    "trades_executed": 935,
+    "skipped_capacity": 145,
     "skipped_cash": 0,
-    "sim_days": 1170,
-    "final_equity": 225923.46,
-    "equity_multiple": 2.259,
-    "total_return_pct": 125.92,
-    "annualized_return_pct": 19.19,
-    "max_drawdown_pct": 22.9,
-    "max_drawdown_date": "2025-05-13",
-    "sharpe_ratio": 0.895,
+    "sim_days": 1171,
+    "final_equity": 241486.6,
+    "equity_multiple": 2.415,
+    "total_return_pct": 141.49,
+    "annualized_return_pct": 20.89,
+    "max_drawdown_pct": 21.7,
+    "max_drawdown_date": "2025-04-03",
+    "sharpe_ratio": 0.965,
     "avg_positions_when_active": 3.9,
     "max_concurrent_observed": 5,
     "utilization_pct": 53.6
