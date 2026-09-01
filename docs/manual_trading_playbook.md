@@ -1,7 +1,9 @@
 # Dragon Pulse — Manual / IBKR Trading Playbook
 
-**Engine:** `alpha_rs_pullback` (bull-gated relative-strength pullback, A-shares)
-**Status:** validated config as of 2026-06-23. This is the *current production logic* —
+**Engine:** `alpha_rs_pullback` (bull+choppy relative-strength pullback, A-shares)
+**Status:** paper/daily core as of 2026-09-01. Choppy is **paper-only**; this
+document does not authorize automatic or manual live orders. The underlying rule set was
+validated as of 2026-06-23 —
 both alternative exits (ATR runner) and relaxed entries (chase band) were tested over
 5 years and **rejected**; they only beat this config in the recent bull and lost over
 the full cycle including the 2021–22 bear.
@@ -26,6 +28,12 @@ the full cycle including the 2021–22 bear.
 > honest full-cycle **drawdown is ~30%**. Edge is real but thin and recent-bull-flattered —
 > consistent with the soft live Apr–Jun 2026 result. **Size for a thin edge with deep DD.**
 
+> **Frozen 5Y gate replay (2026-09-01):** opening choppy increased the 20%-per-position,
+> max-5-concurrent gross portfolio from the prior bull-only 1.604x / 33.35% DD / 0.684
+> Sharpe to **2.259x / 22.90% DD / 0.895 Sharpe**. Of 1,071 filled replay trades,
+> 923 fit the portfolio and 148 were skipped by the concurrency cap. These figures are
+> gross, use a trusted historical PIT-membership assumption, and remain non-binding.
+
 ---
 
 ## 1. The rule set (what the bot/you executes)
@@ -34,8 +42,10 @@ the full cycle including the 2021–22 bear.
 ranked, deduped, sector-capped).
 
 **Regime gate (already enforced by the engine):**
-- Trade **only in bull regime.** Zero new entries in choppy or bear. If the watchlist
-  is empty, that's the system working — do nothing.
+- The paper scanner may emit picks in **bull or choppy**. **Bear remains a hard no-entry
+  regime.** If the watchlist is empty, that's the system working — do nothing.
+- Choppy picks stay paper-tracked until a separate promotion decision; do not route them
+  to IBKR merely because they appear in the watchlist.
 
 **Selection (corrected on unbiased point-in-time data, 2026-06-23):**
 - Picks already require **score ≥ 90**, **ADV ≥ ¥80M**, **max 1 per sector**.
@@ -73,9 +83,11 @@ ranked, deduped, sector-capped).
 
 ## 2. Position sizing & risk
 
-Size for the **true (point-in-time) edge**: ~5.7%/yr over the full cycle, Sharpe 0.46,
-and a **~30% max drawdown** at 20%/pos. This is a thin edge with a deep tail — the
-headline +65% was survivorship. The recent 1Y (Sharpe 2.3) is a bull, not the baseline.
+Size from portfolio-level evidence, not per-trade compounding. The frozen bull+choppy
+paper replay produced 2.259x gross equity, 22.90% max drawdown and 0.895 Sharpe at
+20%/position with max 5 concurrent; 148/1,071 trades were capacity-skipped. Costs are
+not modelled and PIT membership is a trusted historical assumption, so treat this as an
+optimistic paper result rather than a live sizing promise.
 
 **Recommended sizing (conservative, for a thin edge + deep DD):**
 
@@ -99,7 +111,7 @@ headline +65% was survivorship. The recent 1Y (Sharpe 2.3) is a bull, not the ba
 
 ## 3. Daily checklist
 
-1. **Regime = bull?** If not, no trades today.
+1. **Paper regime = bull or choppy?** If bear, no new entries. Choppy remains paper-only.
 2. Pull the watchlist; take the top ≤2 picks (≤1/sector).
 3. For each: set **buy limit @ max_entry_price** for the open.
 4. On fill: immediately set **stop @ stop_loss** and **target @ target_1** (OCO bracket).
@@ -115,7 +127,8 @@ headline +65% was survivorship. The recent 1Y (Sharpe 2.3) is a bull, not the ba
 - ❌ Don't use a trailing/runner exit instead of the fixed target (fragile, param-sensitive,
   worse Sharpe over the full cycle).
 - ❌ Don't scale out winners early (consistently the worst variant).
-- ❌ Don't trade in choppy/bear regime.
+- ❌ Don't trade in bear regime.
+- ❌ Don't promote choppy paper picks to live orders without a separate reviewed decision.
 
 ---
 

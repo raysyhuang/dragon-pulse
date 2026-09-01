@@ -116,7 +116,14 @@ def score_rs_pullback_alpha(
     holding_period: int = 5,
 ) -> AlphaCandidateSignal | None:
     """Strong-stock pullback: controlled first dip in a relative-strength leader."""
-    if is_st or regime not in regimes or df.empty or len(df) < 140:
+    if (
+        is_st
+        or regime not in regimes
+        or df.empty
+        or len(df) < 140
+        or csi300_df is None
+        or len(csi300_df) < 61
+    ):
         return None
     if not _base_liquidity(df, min_adv_cny=min_adv_cny):
         return None

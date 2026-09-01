@@ -115,14 +115,14 @@ sniper:
     csi300_symbol: "000300.SH"
 
 # =============================================================================
-# RS PULLBACK ALPHA CORE — bull-gated paper/daily core; Sniper research sleeve available but not promoted
+# RS PULLBACK ALPHA CORE — bull+choppy paper/daily core; bear remains blocked
 # =============================================================================
 alpha_candidates:
   enabled: true
   engines: ["rs_pullback"]
   rs_pullback:
     enabled: true
-    regimes: ["bull", "choppy"]   # choppy opened 2026-08-20: +0.62% exp vs bull +0.39% (5y PIT, n=455)
+    regimes: ["bull", "choppy"]   # paper only; frozen 5Y replay evidence is committed with this gate
     score_floor: 90
     max_entry_pct: 0.02
     min_adv_cny: 80000000
