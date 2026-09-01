@@ -1,0 +1,285 @@
+"""Adversarial contracts for the research-only native overfit diagnostic."""
+
+from __future__ import annotations
+
+import csv
+import hashlib
+import json
+from datetime import date, timedelta
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+from src.research.overfit_diagnostic import DiagnosticError, run_diagnostic
+
+
+STATUS = "RESEARCH_ONLY_NON_BINDING"
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _packet(tmp_path: Path, *, rows: int = 160, variants: int = 4, edge: bool = True) -> tuple[Path, Path]:
+    matrix = tmp_path / "returns.csv"
+    variant_ids = [f"variant_{index}" for index in range(variants)]
+    rng = np.random.default_rng(20260831)
+    values = rng.normal(0.0, 0.01, size=(rows, variants))
+    if edge:
+        values[:, 0] = 0.0015 + rng.normal(0.0, 0.003, size=rows)
+    start = date(2025, 1, 2)
+    with matrix.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.writer(handle, lineterminator="\n")
+        writer.writerow(["date", *variant_ids])
+        for index, row in enumerate(values):
+            writer.writerow([(start + timedelta(days=index)).isoformat(), *[f"{value:.12g}" for value in row]])
+    manifest = {
+        "schema_version": 1,
+        "status": STATUS,
+        "selected_variant": variant_ids[0],
+        "variant_ids": variant_ids,
+        "n_trials_total": variants,
+        "date_start": start.isoformat(),
+        "date_end": (start + timedelta(days=rows - 1)).isoformat(),
+        "periods_per_year": 252,
+        "input_bundle_sha256": "1" * 64,
+        "experiment_config_sha256": "2" * 64,
+        "execution_contract_hash": "3" * 64,
+        "matrix_sha256": _sha256(matrix),
+        "all_tested_and_abandoned_variants_counted": True,
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+    return matrix, manifest_path
+
+
+def _run(tmp_path: Path, **kwargs):
+    matrix, manifest = _packet(tmp_path, **kwargs)
+    output = tmp_path / "evidence"
+    result = run_diagnostic(matrix, manifest, output, n_blocks=4, min_block_observations=20)
+    return output, result
+
+
+def test_success_writes_complete_non_promoting_evidence(tmp_path):
+    output, result = _run(tmp_path)
+
+    assert result["status"] == STATUS
+    assert result["verdict"] in {"VETO_FURTHER_PROMOTION", "NO_VETO_RESEARCH_ONLY_NOT_PROMOTION"}
+    assert "pbo" in result["diagnostics"]
+    assert result["diagnostics"]["pbo"] is not None
+    assert {path.name for path in output.iterdir()} == {
+        "summary.json", "pbo_splits.csv", "artifact_manifest.json"
+    }
+    artifact_manifest = json.loads((output / "artifact_manifest.json").read_text(encoding="utf-8"))
+    assert set(artifact_manifest["files"]) == {"summary.json", "pbo_splits.csv"}
+
+
+def _load_manifest(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _write_manifest(path: Path, manifest: dict) -> None:
+    path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+
+
+def _matrix_rows(path: Path) -> list[list[str]]:
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        return list(csv.reader(handle))
+
+
+def _write_matrix(path: Path, rows: list[list[str]]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle, lineterminator="\n").writerows(rows)
+
+
+def _invoke_invalid(tmp_path: Path, mutate) -> None:
+    matrix, manifest_path = _packet(tmp_path)
+    mutate(matrix, manifest_path)
+    output = tmp_path / "must_not_exist"
+    with pytest.raises(DiagnosticError):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+    assert not list(tmp_path.glob(".must_not_exist.tmp-*"))
+
+
+def _mutate_manifest(field: str, value):
+    def mutate(matrix: Path, manifest_path: Path) -> None:
+        manifest = _load_manifest(manifest_path)
+        manifest[field] = value
+        _write_manifest(manifest_path, manifest)
+    return mutate
+
+
+def _mutate_matrix(change, *, refresh_hash: bool = True):
+    def mutate(matrix: Path, manifest_path: Path) -> None:
+        rows = _matrix_rows(matrix)
+        change(rows)
+        _write_matrix(matrix, rows)
+        if refresh_hash:
+            manifest = _load_manifest(manifest_path)
+            manifest["matrix_sha256"] = _sha256(matrix)
+            _write_manifest(manifest_path, manifest)
+    return mutate
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        _mutate_matrix(lambda rows: rows.__setitem__(slice(1, None), [])),
+        _mutate_matrix(lambda rows: rows[1].__setitem__(0, "2025/01/02")),
+        _mutate_matrix(lambda rows: rows[2].__setitem__(0, rows[1][0])),
+        _mutate_matrix(lambda rows: rows.__setitem__(slice(1, 3), [rows[2], rows[1]])),
+        _mutate_manifest("date_start", "2024-12-31"),
+        _mutate_manifest("date_end", "2026-12-31"),
+        _mutate_matrix(lambda rows: rows[1].__setitem__(1, "nan")),
+        _mutate_matrix(lambda rows: rows[1].__setitem__(1, "")),
+        _mutate_matrix(lambda rows: rows[1].pop()),
+        _mutate_manifest("selected_variant", "not_present"),
+        _mutate_matrix(lambda rows: rows[0].__setitem__(slice(1, None), list(reversed(rows[0][1:])))),
+        _mutate_manifest("n_trials_total", True),
+        _mutate_manifest("n_trials_total", 3),
+        _mutate_manifest("all_tested_and_abandoned_variants_counted", False),
+        _mutate_manifest("input_bundle_sha256", "abc"),
+        _mutate_matrix(lambda rows: rows[1].__setitem__(1, "0.123"), refresh_hash=False),
+        _mutate_manifest("schema_version", 999),
+        _mutate_manifest("status", "PROMOTION_READY"),
+    ],
+    ids=[
+        "empty_rows", "invalid_date", "duplicate_date", "unsorted_dates", "start_bound",
+        "end_bound", "non_finite", "missing_cell", "ragged_row", "selected_absent",
+        "column_order", "trials_bool", "trials_less_than_columns", "incomplete_trial_attestation",
+        "malformed_hash", "matrix_hash_mismatch", "schema", "status",
+    ],
+)
+def test_invalid_packets_fail_closed_without_artifacts(tmp_path, mutate):
+    _invoke_invalid(tmp_path, mutate)
+
+
+def test_requires_at_least_two_variants(tmp_path):
+    matrix, manifest_path = _packet(tmp_path, variants=1)
+    output = tmp_path / "must_not_exist"
+    with pytest.raises(DiagnosticError, match="at least two"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+
+
+def test_rejects_too_few_observations_for_requested_blocks(tmp_path):
+    matrix, manifest_path = _packet(tmp_path, rows=79)
+    output = tmp_path / "must_not_exist"
+    with pytest.raises(DiagnosticError, match="block"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+
+
+def test_no_overwrite_preserves_existing_directory(tmp_path):
+    matrix, manifest_path = _packet(tmp_path)
+    output = tmp_path / "evidence"
+    output.mkdir()
+    sentinel = output / "keep.txt"
+    sentinel.write_text("do not mutate", encoding="utf-8")
+
+    with pytest.raises(DiagnosticError, match="overwrite"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+
+    assert sentinel.read_text(encoding="utf-8") == "do not mutate"
+    assert {path.name for path in output.iterdir()} == {"keep.txt"}
+
+
+def test_outputs_are_deterministic_and_each_file_is_provenance_stamped(tmp_path):
+    matrix, manifest_path = _packet(tmp_path)
+    outputs = [tmp_path / "evidence_a", tmp_path / "evidence_b"]
+    for output in outputs:
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+
+    first_manifest = json.loads((outputs[0] / "artifact_manifest.json").read_text(encoding="utf-8"))
+    second_manifest = json.loads((outputs[1] / "artifact_manifest.json").read_text(encoding="utf-8"))
+    assert first_manifest["files"] == second_manifest["files"]
+    assert first_manifest["composite_sha256"] == second_manifest["composite_sha256"]
+    for name, expected_hash in first_manifest["files"].items():
+        assert _sha256(outputs[0] / name) == expected_hash
+    summary = json.loads((outputs[0] / "summary.json").read_text(encoding="utf-8"))
+    with (outputs[0] / "pbo_splits.csv").open(encoding="utf-8", newline="") as handle:
+        split = next(csv.DictReader(handle))
+    for field in (
+        "status", "code_sha", "matrix_sha256", "input_bundle_sha256",
+        "experiment_config_sha256", "execution_contract_hash", "date_start", "date_end",
+        "n_trials_total", "selected_variant", "assumptions", "thresholds",
+    ):
+        assert field in summary
+        assert field in first_manifest
+        assert field in split
+
+
+def test_synthetic_noise_is_vetoed_while_stable_edge_clears_secondary_gate(tmp_path):
+    noise_dir = tmp_path / "noise"
+    edge_dir = tmp_path / "edge"
+    noise_dir.mkdir()
+    edge_dir.mkdir()
+    _, noise = _run(noise_dir, edge=False)
+    _, edge = _run(edge_dir, edge=True)
+
+    assert noise["verdict"] == "VETO_FURTHER_PROMOTION"
+    assert edge["verdict"] == "NO_VETO_RESEARCH_ONLY_NOT_PROMOTION"
+    assert edge["diagnostics"]["selected_annualized_sharpe"] > noise["diagnostics"]["selected_annualized_sharpe"]
+    assert edge["diagnostics"]["deflated_sharpe_probability"] > noise["diagnostics"]["deflated_sharpe_probability"]
+    forbidden = {"PASS", "APPROVE", "CANDIDATE"}
+    assert not forbidden.intersection(json.dumps(edge).upper().replace('"', "").split())
+
+
+def test_rejects_unequal_cscv_blocks_instead_of_dropping_observations(tmp_path):
+    matrix, manifest_path = _packet(tmp_path, rows=161)
+    with pytest.raises(DiagnosticError, match="divisible"):
+        run_diagnostic(
+            matrix, manifest_path, tmp_path / "must_not_exist",
+            n_blocks=4, min_block_observations=20,
+        )
+
+
+def test_cli_runs_offline_and_invalid_input_returns_nonzero_without_output(tmp_path, monkeypatch, capsys):
+    from scripts import research_overfit_diagnostic
+
+    matrix, manifest_path = _packet(tmp_path)
+    output = tmp_path / "evidence"
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "research_overfit_diagnostic.py", "--matrix", str(matrix), "--manifest",
+            str(manifest_path), "--output", str(output), "--blocks", "4",
+            "--min-block-observations", "20",
+        ],
+    )
+    assert research_overfit_diagnostic.main() == 0
+    assert output.is_dir()
+    assert json.loads(capsys.readouterr().out)["status"] == STATUS
+
+    bad_output = tmp_path / "bad_evidence"
+    manifest = _load_manifest(manifest_path)
+    manifest["status"] = "NOT_RESEARCH_ONLY"
+    _write_manifest(manifest_path, manifest)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "research_overfit_diagnostic.py", "--matrix", str(matrix), "--manifest",
+            str(manifest_path), "--output", str(bad_output), "--blocks", "4",
+            "--min-block-observations", "20",
+        ],
+    )
+    assert research_overfit_diagnostic.main() != 0
+    assert not bad_output.exists()
+
+
+def test_threshold_policy_may_only_be_tightened(tmp_path):
+    matrix, manifest_path = _packet(tmp_path)
+    weakened = dict(
+        min_selected_annualized_sharpe=-100.0,
+        min_deflated_sharpe_probability=0.0,
+        max_pbo=1.0,
+        max_bonferroni_p_value=1.0,
+    )
+    with pytest.raises(DiagnosticError, match="weaken"):
+        run_diagnostic(
+            matrix, manifest_path, tmp_path / "must_not_exist",
+            n_blocks=4, min_block_observations=20, thresholds=weakened,
+        )
+    assert not (tmp_path / "must_not_exist").exists()
