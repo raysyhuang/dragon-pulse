@@ -358,6 +358,32 @@ def test_input_toctou_at_final_boundary_is_refused(tmp_path, monkeypatch, which)
     assert not (tmp_path / "evidence").exists()
 
 
+@pytest.mark.parametrize("which", ["matrix", "manifest"])
+def test_input_symlink_retarget_at_final_boundary_is_refused(tmp_path, monkeypatch, which):
+    monkeypatch.setattr(diagnostic, "_code_identity", lambda _root: IDENTITY)
+    matrix, manifest = _packet(tmp_path)
+    original_path = matrix if which == "matrix" else manifest
+    replacement = tmp_path / f"replacement-{which}"
+    replacement.write_bytes(original_path.read_bytes() + b"\n")
+    lexical = tmp_path / f"{which}-link"
+    lexical.symlink_to(original_path)
+    original_revalidate = diagnostic._revalidate_inputs
+
+    def retarget(expected):
+        lexical.unlink()
+        lexical.symlink_to(replacement)
+        original_revalidate(expected)
+
+    monkeypatch.setattr(diagnostic, "_revalidate_inputs", retarget)
+    matrix_arg = lexical if which == "matrix" else matrix
+    manifest_arg = lexical if which == "manifest" else manifest
+    with pytest.raises(DiagnosticError, match=f"{which} changed"):
+        run_diagnostic(matrix_arg, manifest_arg, tmp_path / "evidence")
+    assert lexical.resolve() == replacement.resolve()
+    assert not (tmp_path / "evidence").exists()
+    assert not list(tmp_path.glob(".evidence.tmp-*"))
+
+
 def _git(root: Path, *args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=root, text=True).strip()
 
@@ -378,6 +404,18 @@ def test_code_identity_binds_head_and_refuses_dirty_staged_ignored_and_symlink_d
         else:
             external = tmp_path / f"external{index}"; external.mkdir(); (repo / "src" / "plugin").symlink_to(external, target_is_directory=True)
         with pytest.raises(DiagnosticError): _code_identity(repo)
+
+
+def test_code_identity_refuses_committed_python_symlink(tmp_path):
+    repo = _repo(tmp_path)
+    external = tmp_path / "external.py"
+    external.write_text("VALUE = 1\n", encoding="utf-8")
+    (repo / "src" / "linked.py").symlink_to(external)
+    _git(repo, "add", "src/linked.py")
+    _git(repo, "commit", "-qm", "add linked python")
+
+    with pytest.raises(DiagnosticError, match="symlinked Python file"):
+        _code_identity(repo)
 
 
 def test_code_identity_mutation_at_final_boundary_is_refused(tmp_path, monkeypatch):

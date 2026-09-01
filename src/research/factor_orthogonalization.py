@@ -341,7 +341,12 @@ def _code_identity(project_root: Path) -> dict[str, str]:
         if record:
             metadata, relative = record.split(b"\t", 1)
             if relative.endswith(b".py"):
-                head[relative] = tuple(metadata.split(b" "))
+                mode, object_type, object_id = metadata.split(b" ")
+                if mode == b"120000":
+                    raise DiagnosticError(
+                        f"symlinked Python file in executable project scope: {os.fsdecode(relative)}"
+                    )
+                head[relative] = (mode, object_type, object_id)
     if not head:
         raise DiagnosticError("cannot establish code identity: no tracked project Python files")
     index = {}
@@ -429,8 +434,12 @@ def _write_csv(path: Path, fields: list[str], rows: list[dict]) -> None:
 
 def run_diagnostic(matrix_path: str | Path, manifest_path: str | Path, output_dir: str | Path) -> dict:
     """Validate, orthogonalize, and atomically publish a diagnostic-only directory."""
-    matrix_path = Path(matrix_path).resolve()
-    manifest_path = Path(manifest_path).resolve()
+    # Preserve the caller's lexical input namespace. Hash and parse the bytes
+    # reached through that path, then traverse the same path again at the final
+    # publication boundary so a retargeted symlink cannot hide behind an early
+    # resolve() of its original target.
+    matrix_path = Path(os.path.abspath(os.fspath(matrix_path)))
+    manifest_path = Path(os.path.abspath(os.fspath(manifest_path)))
     output = Path(os.path.abspath(os.fspath(output_dir)))
     project_root = Path(__file__).resolve().parents[2]
     code_identity = _code_identity(project_root)

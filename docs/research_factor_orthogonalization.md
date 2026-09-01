@@ -64,7 +64,7 @@ Raw and preprocessed factor values are retained alongside the normalized residua
 
 ## Run
 
-The executable code must already be committed at `HEAD`; dirty, ignored, staged, missing, mode-changed, or symlinked Python files under `src/**/*.py` and `scripts/**/*.py` are refused.
+The executable code must already be committed at `HEAD`; dirty, ignored, staged, missing, mode-changed, or symlinked Python files under `src/**/*.py` and `scripts/**/*.py` are refused. This includes Python symlinks committed in `HEAD`: link text is not accepted as a substitute for binding the executable target bytes.
 
 ```bash
 python scripts/research_factor_orthogonalization.py \
@@ -80,7 +80,7 @@ The output path must not exist. A successful directory contains exactly:
 - `summary.json`
 - `artifact_manifest.json`, with SHA-256 for every other output and the deterministic composite over sorted `"<relative_path>  <sha256>\n"` lines.
 
-The matrix and manifest are read once for parsing/hashing and revalidated at the final publication boundary. Executable identity binds the exact filesystem/index/HEAD Python file set, types, modes, and blob bytes. Publication uses Linux `renameat2(RENAME_NOREPLACE)` from a complete sibling temporary directory. The caller's absolute final component stays lexical, so dangling and non-dangling output symlinks are refused rather than followed. Python `BaseException` paths, including `KeyboardInterrupt`, clean unrenamed temporary directories.
+The matrix and manifest are read once through the caller's lexical absolute paths for parsing/hashing, and those same lexical paths are revalidated at the final publication boundary; retargeting an input symlink during execution is refused. Executable identity binds the exact filesystem/index/HEAD Python file set, types, modes, and blob bytes. Publication uses Linux `renameat2(RENAME_NOREPLACE)` from a complete sibling temporary directory. The caller's absolute final component stays lexical, so dangling and non-dangling output symlinks are refused rather than followed. Python `BaseException` paths, including `KeyboardInterrupt`, clean unrenamed temporary directories.
 
 The boundary is namespace-atomic, not crash-durable: there is no file/directory `fsync` claim, and cleanup after `SIGKILL` or machine loss is not promised. Parent directories requested by the caller can remain, and intermediate parent symlinks are outside the final-component lexical boundary.
 
