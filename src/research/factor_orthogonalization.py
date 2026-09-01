@@ -76,9 +76,14 @@ def _iso_date(value: object, field: str) -> str:
 
 
 def _finite_number(value: object, field: str, *, minimum: float, maximum: float) -> float:
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise DiagnosticError(f"{field} must be a finite number")
-    result = float(value)
+    try:
+        result = float(value)
+    except OverflowError as exc:
+        raise DiagnosticError(f"{field} must be a finite number") from exc
+    if not math.isfinite(result):
+        raise DiagnosticError(f"{field} must be a finite number")
     if result < minimum or result > maximum:
         raise DiagnosticError(f"{field} is outside the allowed range")
     return result

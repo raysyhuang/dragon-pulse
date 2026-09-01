@@ -299,6 +299,13 @@ def test_condition_number_threshold_is_enforced(tmp_path, monkeypatch):
     _invalid(tmp_path, monkeypatch, _manifest_change("max_condition_number", 1.0))
 
 
+@pytest.mark.parametrize("field", ["max_condition_number", "max_abs_residual_exposure"])
+def test_astronomically_large_numeric_manifest_values_are_cleanly_refused(
+    tmp_path, monkeypatch, field
+):
+    _invalid(tmp_path, monkeypatch, _manifest_change(field, 10**400))
+
+
 def test_deterministic_hashes_and_exact_verdict_vocabulary(tmp_path, monkeypatch):
     monkeypatch.setattr(diagnostic, "_code_identity", lambda _root: IDENTITY)
     matrix, manifest = _packet(tmp_path)
