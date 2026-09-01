@@ -11,8 +11,10 @@ import json
 import math
 import os
 import shutil
+import stat
 import subprocess
 import tempfile
+from collections.abc import Callable
 from datetime import date
 from pathlib import Path
 from statistics import NormalDist
@@ -88,6 +90,9 @@ def _load_packet(matrix_bytes: bytes, manifest_bytes: bytes, n_blocks: int, min_
     missing = required - set(manifest)
     if missing:
         raise DiagnosticError(f"manifest missing required fields: {', '.join(sorted(missing))}")
+    unknown = set(manifest) - (required | {"complete_historical_variant_count"})
+    if unknown:
+        raise DiagnosticError(f"manifest contains unknown fields: {', '.join(sorted(unknown))}")
     if type(manifest["schema_version"]) is not int or manifest["schema_version"] != 1:
         raise DiagnosticError("unsupported schema_version")
     if manifest["status"] != STATUS:
@@ -138,7 +143,7 @@ def _load_packet(matrix_bytes: bytes, manifest_bytes: bytes, n_blocks: int, min_
     ):
         raise DiagnosticError("min_block_observations must be an integer of at least two")
     try:
-        rows = list(csv.reader(io.StringIO(matrix_bytes.decode("utf-8"), newline="")))
+        rows = list(csv.reader(io.StringIO(matrix_bytes.decode("utf-8"), newline=""), strict=True))
     except (UnicodeError, csv.Error) as exc:
         raise DiagnosticError(f"unparseable matrix CSV: {exc}") from exc
     if not rows:
@@ -208,44 +213,106 @@ def _composite(files: dict[str, str]) -> str:
 def _code_identity(project_root: Path) -> dict[str, str]:
     try:
         code_sha = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=project_root, text=True
+            ["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=project_root, text=True
         ).strip()
-        listed = subprocess.check_output(
-            ["git", "ls-tree", "-r", "--name-only", "-z", "HEAD", "--", "src", "scripts"],
+        head_listing = subprocess.check_output(
+            ["git", "ls-tree", "-r", "-z", "HEAD", "--", "src", "scripts"],
             cwd=project_root,
         )
-        untracked = subprocess.check_output(
-            ["git", "ls-files", "--others", "--exclude-standard", "-z", "--", "src", "scripts"],
+        index_listing = subprocess.check_output(
+            ["git", "ls-files", "--stage", "-z", "--", "src", "scripts"],
             cwd=project_root,
         )
     except (OSError, subprocess.CalledProcessError) as exc:
         raise DiagnosticError(f"cannot establish code identity: {exc}") from exc
-    paths = sorted(
-        path.decode("utf-8") for path in listed.split(b"\0") if path and path.endswith(b".py")
-    )
-    untracked_python = sorted(
-        path.decode("utf-8") for path in untracked.split(b"\0") if path and path.endswith(b".py")
-    )
-    if untracked_python:
-        raise DiagnosticError(f"untracked executable project file: {untracked_python[0]}")
-    if not paths:
+
+    head: dict[bytes, tuple[bytes, bytes, bytes]] = {}
+    for record in head_listing.split(b"\0"):
+        if not record:
+            continue
+        metadata, relative = record.split(b"\t", 1)
+        if relative.endswith(b".py"):
+            mode, object_type, object_id = metadata.split(b" ")
+            head[relative] = (mode, object_type, object_id)
+    if not head:
         raise DiagnosticError("cannot establish code identity: no tracked project Python files")
-    files: dict[str, str] = {}
-    for relative in paths:
+
+    index: dict[bytes, tuple[bytes, bytes]] = {}
+    for record in index_listing.split(b"\0"):
+        if not record:
+            continue
+        metadata, relative = record.split(b"\t", 1)
+        if relative.endswith(b".py"):
+            mode, object_id, stage = metadata.split(b" ")
+            if stage != b"0" or relative in index:
+                raise DiagnosticError("staged executable project files differ from HEAD")
+            index[relative] = (mode, object_id)
+    expected_index = {
+        relative: (mode, object_id)
+        for relative, (mode, _object_type, object_id) in head.items()
+    }
+    if index != expected_index:
+        raise DiagnosticError("staged executable project files differ from HEAD")
+
+    root = os.fsencode(project_root)
+    actual_paths: set[bytes] = set()
+    for scope in (b"src", b"scripts"):
+        scope_path = os.path.join(root, scope)
+        if not os.path.isdir(scope_path):
+            continue
+        for directory, directories, filenames in os.walk(scope_path, followlinks=False):
+            for name in [*directories, *filenames]:
+                path = os.path.join(directory, name)
+                relative = os.path.relpath(path, root)
+                if relative.endswith(b".py"):
+                    actual_paths.add(relative)
+    if actual_paths != set(head):
+        difference = sorted(actual_paths ^ set(head))[0]
+        raise DiagnosticError(
+            f"executable project file set differs from HEAD: {os.fsdecode(difference)}"
+        )
+
+    bundle = hashlib.sha256()
+    for relative in sorted(head):
+        expected_mode, expected_type, object_id = head[relative]
+        path = os.path.join(root, relative)
         try:
-            actual = (project_root / relative).read_bytes()
+            file_stat = os.lstat(path)
+            if stat.S_ISREG(file_stat.st_mode):
+                actual_mode, actual_type = (
+                    b"100755" if file_stat.st_mode & stat.S_IXUSR else b"100644",
+                    b"blob",
+                )
+                with open(path, "rb") as handle:
+                    actual = handle.read()
+            elif stat.S_ISLNK(file_stat.st_mode):
+                actual_mode, actual_type = b"120000", b"blob"
+                actual = os.readlink(path)
+            elif stat.S_ISDIR(file_stat.st_mode):
+                actual_mode, actual_type, actual = b"040000", b"tree", b""
+            else:
+                actual_mode, actual_type, actual = b"special", b"special", b""
             committed = subprocess.check_output(
-                ["git", "show", f"HEAD:{relative}"], cwd=project_root
+                ["git", "cat-file", expected_type, object_id], cwd=project_root
             )
         except (OSError, subprocess.CalledProcessError) as exc:
-            raise DiagnosticError(f"cannot verify executable project file {relative}: {exc}") from exc
-        if actual != committed:
-            raise DiagnosticError(f"executable project file differs from HEAD: {relative}")
-        files[relative] = hashlib.sha256(actual).hexdigest()
+            name = os.fsdecode(relative)
+            raise DiagnosticError(f"cannot verify executable project file {name}: {exc}") from exc
+        if (actual_mode, actual_type, actual) != (expected_mode, expected_type, committed):
+            raise DiagnosticError(
+                f"executable project file differs from HEAD: {os.fsdecode(relative)}"
+            )
+        bundle.update(relative)
+        bundle.update(b"\0" + expected_mode + b" " + expected_type + b"\0")
+        bundle.update(str(len(actual)).encode("ascii") + b"\0" + actual)
     return {
         "code_sha": code_sha,
-        "code_bundle_sha256": _composite(files),
-        "code_bundle_rule": "SHA256 of sorted '<relative_path>  <sha256>\\n' UTF-8 lines for tracked src/**/*.py and scripts/**/*.py",
+        "code_bundle_sha256": bundle.hexdigest(),
+        "code_bundle_rule": (
+            "SHA256 of concatenated path-sorted '<raw_path>\\0<HEAD_mode> <HEAD_type>\\0"
+            "<byte_length>\\0<exact_HEAD_blob_bytes>' records for the exact filesystem/HEAD "
+            "src/**/*.py and scripts/**/*.py set"
+        ),
     }
 
 
@@ -290,6 +357,9 @@ def _cscv_scores(values: np.ndarray, split_index: int, side: str) -> np.ndarray:
     scores = np.mean(values, axis=0) / np.std(values, axis=0, ddof=1)
     if not np.all(np.isfinite(scores)):
         raise DiagnosticError(f"CSCV split {split_index} {side} scores are unevaluable")
+    ordered = np.sort(scores)
+    if np.any(np.isclose(ordered[1:], ordered[:-1], rtol=1e-12, atol=1e-12)):
+        raise DiagnosticError(f"CSCV split {split_index} tied {side} scores are ambiguous")
     return scores
 
 
@@ -330,11 +400,12 @@ def _pbo_splits(
     return float(np.mean([row["is_overfit"] for row in rows])), rows
 
 
-def _publish_no_replace(temp: Path, output: Path) -> None:
+def _publish_no_replace(temp: Path, output: Path, pre_publish_check: Callable[[], None]) -> None:
     libc = ctypes.CDLL(None, use_errno=True)
     renameat2 = getattr(libc, "renameat2", None)
     if renameat2 is None:
         raise DiagnosticError("atomic no-replace directory publication is unsupported")
+    pre_publish_check()
     result = renameat2(-100, os.fsencode(temp), -100, os.fsencode(output), 1)
     if result != 0:
         errno = ctypes.get_errno()
@@ -459,13 +530,15 @@ def run_diagnostic(
             json.dumps(artifact_manifest, sort_keys=True, indent=2, allow_nan=False) + "\n",
             encoding="utf-8",
         )
-        _revalidate_inputs({
-            "matrix": (matrix_path, matrix_digest),
-            "manifest": (manifest_path, manifest_digest),
-        })
-        if _code_identity(project_root) != code_identity:
-            raise DiagnosticError("executable project files changed during execution")
-        _publish_no_replace(temp, output)
+        def pre_publish_check() -> None:
+            if _code_identity(project_root) != code_identity:
+                raise DiagnosticError("executable project files changed during execution")
+            _revalidate_inputs({
+                "matrix": (matrix_path, matrix_digest),
+                "manifest": (manifest_path, manifest_digest),
+            })
+
+        _publish_no_replace(temp, output, pre_publish_check)
     except Exception:
         shutil.rmtree(temp, ignore_errors=True)
         raise

@@ -17,7 +17,7 @@ out-of-sample. Even the favorable verdict is named
 The CSV must contain canonical, strictly increasing `YYYY-MM-DD` dates and one
 finite **daily net portfolio return** column per variant, in exactly the manifest
 order. All variants must share every date. The command deliberately has no
-provider or network fallback.
+provider or network fallback. CSV parsing is strict; malformed quoting is refused.
 
 Schema 1 requires this manifest shape (digests are lowercase SHA-256):
 
@@ -43,7 +43,7 @@ Schema 1 requires this manifest shape (digests are lowercase SHA-256):
 not retained as matrix columns. If optional `complete_historical_variant_count`
 is supplied, it must equal `n_trials_total`. The boolean attestation is an
 explicit operator assertion, not independent proof of search-history
-completeness.
+completeness. No other manifest keys are allowed under schema 1.
 
 ## Exact usage
 
@@ -85,7 +85,8 @@ preserves an existing destination, and removes its temporary directory.
   enumerates all half-block training combinations, selects the best in-sample
   mean/std strategy, ranks it on complementary blocks, and reports the fraction
   whose out-of-sample rank logit is non-positive. Every split is retained in
-  `pbo_splits.csv`.
+  `pbo_splits.csv`. Exact or numerically near-equal train/test strategy scores
+  are refused because winner selection or rank would be ambiguous.
 - **Bonferroni-adjusted selected p-value** multiplies a one-sided normal-approximate
   mean-return p-value by `n_trials_total`, capped at one.
 
@@ -108,3 +109,11 @@ A successful no-overwrite directory contains:
 
 Every file stamps the research-only status, code SHA, packet identities, date
 range, total trial count, selected variant, assumptions, and thresholds.
+
+The code bundle is accepted only when the actual filesystem `src/**/*.py` and
+`scripts/**/*.py` set exactly matches HEAD, the index has no scoped delta, and
+every file's type, executable mode, and bytes match its HEAD object. Ignored and
+staged Python additions are therefore refused; dirty non-Python documentation is
+outside this identity boundary. Its digest is SHA-256 over concatenated,
+raw-path-sorted records of
+`<raw_path>\0<HEAD_mode> <HEAD_type>\0<byte_length>\0<exact_HEAD_blob_bytes>`.

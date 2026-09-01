@@ -23,17 +23,24 @@ def _git(root: Path, *args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=root, text=True).strip()
 
 
-def test_code_identity_binds_clean_head_bytes_and_refuses_dirty_executable(tmp_path):
+def _code_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     (repo / "src").mkdir(parents=True)
     (repo / "scripts").mkdir()
+    (repo / "docs").mkdir()
     (repo / "src" / "engine.py").write_text("VALUE = 1\n", encoding="utf-8")
     (repo / "scripts" / "run.py").write_text("print('ok')\n", encoding="utf-8")
+    (repo / "docs" / "notes.md").write_text("clean\n", encoding="utf-8")
     _git(repo, "init", "-q")
     _git(repo, "config", "user.email", "test@example.com")
     _git(repo, "config", "user.name", "Test")
     _git(repo, "add", ".")
     _git(repo, "commit", "-qm", "fixture")
+    return repo
+
+
+def test_code_identity_binds_clean_head_bytes_and_refuses_dirty_executable(tmp_path):
+    repo = _code_repo(tmp_path)
 
     identity = _code_identity(repo)
 
@@ -42,6 +49,46 @@ def test_code_identity_binds_clean_head_bytes_and_refuses_dirty_executable(tmp_p
     (repo / "src" / "engine.py").write_text("VALUE = 2\n", encoding="utf-8")
     with pytest.raises(DiagnosticError, match="executable project file differs from HEAD"):
         _code_identity(repo)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        "ignored", "staged_add", "staged_delete", "staged_modify", "mode", "symlink", "missing",
+    ],
+)
+def test_code_identity_refuses_any_filesystem_or_index_delta_in_scope(tmp_path, change):
+    repo = _code_repo(tmp_path)
+    engine = repo / "src" / "engine.py"
+    if change == "ignored":
+        (repo / ".gitignore").write_text("src/ignored.py\n", encoding="utf-8")
+        (repo / "src" / "ignored.py").write_text("IGNORED = True\n", encoding="utf-8")
+    elif change == "staged_add":
+        (repo / "scripts" / "added.py").write_text("ADDED = True\n", encoding="utf-8")
+        _git(repo, "add", "scripts/added.py")
+    elif change == "staged_delete":
+        _git(repo, "rm", "src/engine.py")
+    elif change == "staged_modify":
+        engine.write_text("VALUE = 2\n", encoding="utf-8")
+        _git(repo, "add", "src/engine.py")
+        engine.write_text("VALUE = 1\n", encoding="utf-8")
+    elif change == "mode":
+        engine.chmod(0o755)
+    elif change == "symlink":
+        engine.unlink()
+        engine.symlink_to("../scripts/run.py")
+    else:
+        engine.unlink()
+
+    with pytest.raises(DiagnosticError):
+        _code_identity(repo)
+
+
+def test_code_identity_allows_dirty_files_outside_executable_scope(tmp_path):
+    repo = _code_repo(tmp_path)
+    (repo / "docs" / "notes.md").write_text("dirty but allowed\n", encoding="utf-8")
+
+    assert _code_identity(repo)["code_sha"] == _git(repo, "rev-parse", "HEAD")
 
 
 def _sha256(path: Path) -> str:
@@ -183,6 +230,20 @@ def test_invalid_packets_fail_closed_without_artifacts(tmp_path, mutate):
     _invoke_invalid(tmp_path, mutate)
 
 
+def test_malformed_csv_is_refused_even_when_lenient_parser_would_accept_numbers(tmp_path):
+    def malformed(matrix: Path, manifest_path: Path) -> None:
+        lines = matrix.read_text(encoding="utf-8").splitlines()
+        cells = lines[1].split(",")
+        cells[1] = f'"{cells[1]}" '
+        lines[1] = ",".join(cells)
+        matrix.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        manifest = _load_manifest(manifest_path)
+        manifest["matrix_sha256"] = _sha256(matrix)
+        _write_manifest(manifest_path, manifest)
+
+    _invoke_invalid(tmp_path, malformed)
+
+
 def test_matrix_change_before_publication_is_refused_without_output(tmp_path, monkeypatch):
     matrix, manifest = _packet(tmp_path)
     output = tmp_path / "must_not_exist"
@@ -213,9 +274,35 @@ def test_manifest_change_before_publication_is_refused_without_output(tmp_path, 
     assert not output.exists()
 
 
+@pytest.mark.parametrize("changed_input", ["matrix", "manifest"])
+def test_input_mutated_during_final_code_identity_is_refused(tmp_path, monkeypatch, changed_input):
+    matrix, manifest = _packet(tmp_path)
+    output = tmp_path / "must_not_exist"
+    original = diagnostic._code_identity
+    calls = 0
+
+    def mutate_during_second_identity(project_root):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            path = matrix if changed_input == "matrix" else manifest
+            path.write_bytes(path.read_bytes() + b"\n")
+        return original(project_root)
+
+    monkeypatch.setattr(diagnostic, "_code_identity", mutate_during_second_identity)
+    with pytest.raises(DiagnosticError, match=f"{changed_input} changed during execution"):
+        run_diagnostic(matrix, manifest, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+    assert not list(tmp_path.glob(".must_not_exist.tmp-*"))
+
+
 @pytest.mark.parametrize("value", [True, 1.0], ids=["boolean", "float"])
 def test_schema_version_requires_exact_integer_without_artifacts(tmp_path, value):
     _invoke_invalid(tmp_path, _mutate_manifest("schema_version", value))
+
+
+def test_manifest_rejects_unknown_promotion_looking_field(tmp_path):
+    _invoke_invalid(tmp_path, _mutate_manifest("promotion_approved", True))
 
 
 def test_requires_at_least_two_variants(tmp_path):
@@ -317,6 +404,36 @@ def test_cscv_refuses_decimal_near_constant_split_without_artifacts(tmp_path):
     output = tmp_path / "must_not_exist"
 
     with pytest.raises(DiagnosticError, match="CSCV split .* unevaluable"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+
+
+def _set_tied_variant_columns(matrix: Path, manifest_path: Path, perturbation: float) -> None:
+    rows = _matrix_rows(matrix)
+    for index, row in enumerate(rows[1:]):
+        row[2] = f"{float(row[1]) + perturbation * (-1 if index % 2 else 1):.17g}"
+    _write_matrix(matrix, rows)
+    manifest = _load_manifest(manifest_path)
+    manifest["matrix_sha256"] = _sha256(matrix)
+    _write_manifest(manifest_path, manifest)
+
+
+def test_cscv_refuses_identical_nonconstant_variant_scores_without_artifacts(tmp_path):
+    matrix, manifest_path = _packet(tmp_path)
+    _set_tied_variant_columns(matrix, manifest_path, 0.0)
+    output = tmp_path / "must_not_exist"
+
+    with pytest.raises(DiagnosticError, match="CSCV split .* tied .* scores"):
+        run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
+    assert not output.exists()
+
+
+def test_cscv_refuses_numerically_near_tied_variant_scores_without_artifacts(tmp_path):
+    matrix, manifest_path = _packet(tmp_path)
+    _set_tied_variant_columns(matrix, manifest_path, 1e-15)
+    output = tmp_path / "must_not_exist"
+
+    with pytest.raises(DiagnosticError, match="CSCV split .* tied .* scores"):
         run_diagnostic(matrix, manifest_path, output, n_blocks=4, min_block_observations=20)
     assert not output.exists()
 
