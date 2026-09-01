@@ -56,7 +56,7 @@ def test_entry_bar_target_touch_is_locked_until_day_two():
     assert result["exit_day"] == 2
 
 
-def test_entry_bar_gap_stop_uses_open_and_is_negative():
+def test_entry_bar_gap_below_stop_waits_for_t1_legal_exit_open():
     result = evaluate_pick(
         ticker="600118.SH",
         entry_price=10.0,
@@ -67,13 +67,14 @@ def test_entry_bar_gap_stop_uses_open_and_is_negative():
             [
                 {"open": 10.0, "high": 10.1, "low": 9.9, "close": 10.0},
                 {"open": 8.5, "high": 11.5, "low": 8.0, "close": 10.0},
+                {"open": 8.2, "high": 8.5, "low": 8.0, "close": 8.3},
             ]
         ),
     )
 
-    assert result["exit_reason"] == "gap_stop_open"
-    assert result["exit_price"] == 8.5
-    assert result["exit_day"] == 1
+    assert result["exit_reason"] == "entry_gap_below_stop_t1_exit"
+    assert result["exit_price"] == 8.2
+    assert result["exit_day"] == 2
     assert result["hit_stop"] is True
     assert result["pnl_pct"] < 0
 
@@ -206,18 +207,20 @@ def test_runner_exit_eligible_gap_stop_fills_at_open():
     assert result["exit_day"] == 2
 
 
-def test_limit_touch_gap_stop_uses_open_fill_not_intraday_limit_fill():
+def test_limit_touch_gap_below_stop_fills_then_exits_at_t1_open():
     result = evaluate_pick(
         ticker="600118.SH", entry_price=10.0, stop_loss=9.0, target_1=11.0,
         holding_period=3, max_entry_price=10.2, entry_mode="limit_touch",
         forward_df=_bars([
             {"open": 10.0, "high": 10.1, "low": 9.9, "close": 10.0},
             {"open": 8.5, "high": 10.3, "low": 8.2, "close": 9.0},
+            {"open": 8.1, "high": 8.4, "low": 7.9, "close": 8.2},
         ]),
     )
     assert result["actual_entry_price"] == 8.5
-    assert result["exit_reason"] == "gap_stop_open"
-    assert result["exit_price"] == 8.5
+    assert result["exit_reason"] == "entry_gap_below_stop_t1_exit"
+    assert result["exit_price"] == 8.1
+    assert result["exit_day"] == 2
 
 
 def test_hold_expiry_keeps_inclusive_horizon_after_entry_lockout():

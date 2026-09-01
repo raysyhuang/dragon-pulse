@@ -123,7 +123,7 @@ def run_scan(config: dict, asof_date: Optional[str] = None) -> dict:
     # --- Build universe: top 1000 by market cap ---
     logger.info("Building universe: top 1000 A-shares by market cap...")
     universe = get_top_n_cn_by_market_cap(n=1000, provider_config=provider_config)
-    if config.get("universe", {}).get("exclude_star_market", False):
+    if config.get("universe", {}).get("exclude_star_market", True):
         before = len(universe)
         universe = exclude_star_market_tickers(universe)
         logger.info("Excluded %d STAR Market stocks", before - len(universe))

@@ -146,7 +146,7 @@ def build_engine_candidates(
         return name in alpha_engines and bool((alpha_config.get(name) or {}).get("enabled", False))
 
     all_signals: list[tuple[str, object]] = []
-    exclude_star_market = bool((config.get("universe") or {}).get("exclude_star_market", False))
+    exclude_star_market = bool((config.get("universe") or {}).get("exclude_star_market", True))
 
     for ticker, feat_df, feats in feat_items:
         if not feats:
