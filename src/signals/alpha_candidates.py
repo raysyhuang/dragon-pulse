@@ -14,6 +14,9 @@ import numpy as np
 import pandas as pd
 
 from src.core.cn_limits import get_daily_limit
+from src.core.universe import is_star_market_ticker
+
+DEFAULT_RS_PULLBACK_REGIMES = ("bull",)
 
 
 def _valid(x) -> bool:
@@ -106,7 +109,7 @@ def score_rs_pullback_alpha(
     csi300_df: pd.DataFrame | None = None,
     *,
     is_st: bool = False,
-    regimes: tuple[str, ...] = ("bull", "bear"),
+    regimes: tuple[str, ...] = DEFAULT_RS_PULLBACK_REGIMES,
     score_floor: float = 80.0,
     max_entry_pct: float = 0.02,
     min_adv_cny: float = 80_000_000,
@@ -116,7 +119,15 @@ def score_rs_pullback_alpha(
     holding_period: int = 5,
 ) -> AlphaCandidateSignal | None:
     """Strong-stock pullback: controlled first dip in a relative-strength leader."""
-    if is_st or regime not in regimes or df.empty or len(df) < 140:
+    if (
+        is_st
+        or is_star_market_ticker(ticker)
+        or regime not in regimes
+        or df.empty
+        or len(df) < 140
+        or csi300_df is None
+        or len(csi300_df) < 61
+    ):
         return None
     if not _base_liquidity(df, min_adv_cny=min_adv_cny):
         return None

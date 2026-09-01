@@ -1,0 +1,33 @@
+{
+  "status": "RESEARCH_ONLY_NON_BINDING",
+  "position_pct": 20.0,
+  "max_concurrent": 5,
+  "detail_file": "backtest_detail_pit5y_bull_choppy.csv",
+  "detail_sha256": "45299dc276b4d9be59cc351c7200d42426cc37674c0d201a64e868193809b2b2",
+  "calendar_file": "trade_cal_receipt.json",
+  "calendar_sha256": "7b9c9dbc2cb2f2d98e51c66a14920ceb204328d186fe9909ab5a0a1f8cc461c2",
+  "snapshot_count_loaded": 537,
+  "result": {
+    "detail_csv": "backtest_detail_pit5y_bull_choppy.csv",
+    "position_pct": 20.0,
+    "max_concurrent": 5,
+    "initial_capital": 100000.0,
+    "trades_in_file": 1080,
+    "trades_executed": 935,
+    "skipped_capacity": 145,
+    "skipped_cash": 0,
+    "sim_days": 1171,
+    "final_equity": 248211.42,
+    "equity_multiple": 2.482,
+    "total_return_pct": 148.21,
+    "annualized_return_pct": 21.61,
+    "max_drawdown_pct": 21.01,
+    "max_drawdown_date": "2025-04-03",
+    "sharpe_ratio": 0.991,
+    "avg_positions_when_active": 3.9,
+    "max_concurrent_observed": 5,
+    "utilization_pct": 53.6
+  },
+  "equity_curve_file": "portfolio_equity_curve.csv",
+  "equity_curve_sha256": "a73d325facf09809a9690f5644a81e14f3eafa2f5a943a0b4671bd5be813291b"
+}

@@ -25,6 +25,7 @@ universe:
   cache_max_age_days: 7
   exclude_st: true
   exclude_delisting_warning: true
+  exclude_star_market: true  # Ray/IBKR cannot trade 688xxx.SH; fail closed in scan and replay
 
 # Required by config validator (legacy compat)
 liquidity:
@@ -115,14 +116,14 @@ sniper:
     csi300_symbol: "000300.SH"
 
 # =============================================================================
-# RS PULLBACK ALPHA CORE — bull-gated paper/daily core; Sniper research sleeve available but not promoted
+# RS PULLBACK ALPHA CORE — bull+choppy paper/daily core; bear remains blocked
 # =============================================================================
 alpha_candidates:
   enabled: true
   engines: ["rs_pullback"]
   rs_pullback:
     enabled: true
-    regimes: ["bull"]
+    regimes: ["bull", "choppy"]   # paper only; frozen 5Y replay evidence is committed with this gate
     score_floor: 90
     max_entry_pct: 0.02
     min_adv_cny: 80000000
@@ -196,8 +197,8 @@ book_size:
     max_picks: 2
     min_score: 90
   choppy:
-    max_picks: 0
-    min_score: 999
+    max_picks: 2
+    min_score: 90
   bear:
     max_picks: 0
     min_score: 999
@@ -207,7 +208,7 @@ book_size:
 # =============================================================================
 acceptance:
   enabled: true
-  excluded_regimes: ["bear", "choppy"]  # bull-gated RS Pullback: no bear/choppy exposure
+  excluded_regimes: ["bear"]  # bear stays out: -0.17% exp gross, -0.32% at 0.15% round-trip cost
   dq_full_threshold: 55       # day quality ≥ this → full mode (A+B tiers)
   dq_selective_threshold: 20  # day quality ≥ this → selective (A-tier only)
   max_full: 2                 # max picks in full mode
@@ -228,7 +229,7 @@ outputs:
 runtime:
   threads: true
   yf_auto_adjust: false
-  method_version: "v4.1-rs-pullback-bull-gated-paper"
+  method_version: "v4.2-rs-pullback-bull-choppy-paper"
   china_trading_days: true
   exclude_suspended: true
 

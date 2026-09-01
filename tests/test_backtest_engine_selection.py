@@ -187,6 +187,34 @@ def test_backtest_no_chase_fills_at_next_open_when_within_max_entry():
     assert result["pnl_pct"] == 8.37
 
 
+def test_gap_below_stop_exits_at_earliest_t1_legal_open():
+    forward_df = pd.DataFrame(
+        [
+            {"open": 10.00, "high": 10.10, "low": 9.90, "close": 10.00},
+            {"open": 8.00, "high": 8.40, "low": 7.80, "close": 8.10},
+            {"open": 7.50, "high": 7.70, "low": 7.20, "close": 7.40},
+        ]
+    )
+
+    result = evaluate_pick(
+        ticker="600000.SH",
+        entry_price=10.00,
+        stop_loss=9.00,
+        target_1=11.00,
+        holding_period=3,
+        forward_df=forward_df,
+        max_entry_price=10.20,
+        entry_mode="no_chase_next_open",
+    )
+
+    assert result["entry_status"] == "filled"
+    assert result["actual_entry_price"] == 8.00
+    assert result["exit_day"] == 2
+    assert result["exit_reason"] == "entry_gap_below_stop_t1_exit"
+    assert result["exit_price"] == 7.50
+    assert result["pnl_pct"] == -6.25
+
+
 def test_backtest_pick_rank_modes_order_by_risk_and_reward():
     wide_high_score = SimpleNamespace(score=99.0, entry_price=10.0, stop_loss=9.0, target_1=11.0)
     tight_lower_score = SimpleNamespace(score=90.0, entry_price=10.0, stop_loss=9.8, target_1=10.5)

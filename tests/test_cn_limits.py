@@ -18,6 +18,7 @@ from src.core.cn_limits import get_daily_limit
     # SSE STAR Market
     ("688001.SH", 0.20),
     ("688981.SH", 0.20),
+    ("689009.SH", 0.20),
     # SZSE ChiNext
     ("300750.SZ", 0.20),
     ("301269.SZ", 0.20),

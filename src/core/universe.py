@@ -16,6 +16,17 @@ from typing import Callable, Optional
 from io import StringIO
 
 
+def is_star_market_ticker(ticker: str) -> bool:
+    """Return whether *ticker* is a STAR ordinary share or CDR (688/689xxx)."""
+    code = str(ticker).strip().upper().split(".", 1)[0]
+    return len(code) == 6 and code[:3] in {"688", "689"} and code.isdigit()
+
+
+def exclude_star_market_tickers(tickers) -> list[str]:
+    """Remove STAR Market symbols while preserving input order."""
+    return [str(ticker) for ticker in tickers if not is_star_market_ticker(ticker)]
+
+
 def normalize_ticker_for_yahoo(sym: str) -> str:
     """Normalize ticker symbol for Yahoo Finance (BRK.B -> BRK-B)."""
     return str(sym).strip().replace(".", "-")
@@ -239,7 +250,7 @@ def get_china_a_universe(
         filtered: list[str] = []
         for ticker in tickers:
             code = ticker.split(".", 1)[0]
-            if "STAR" in board_filters and code.startswith("688"):
+            if "STAR" in board_filters and is_star_market_ticker(ticker):
                 continue
             if "CHINEXT" in board_filters and code.startswith(("300", "301")):
                 continue

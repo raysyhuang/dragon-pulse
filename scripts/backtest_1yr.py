@@ -58,6 +58,7 @@ from src.signals.mean_reversion import (
 )
 from src.signals.sniper import score_sniper
 from src.signals.alpha_candidates import (
+    DEFAULT_RS_PULLBACK_REGIMES,
     score_accumulation_breakout_alpha,
     score_limitup_continuation_alpha,
     score_rs_pullback_alpha,
@@ -66,8 +67,8 @@ from src.signals.alpha_candidates import (
 
 _TARGET_EXIT_REASONS = {"target_hit", "target_hit_gap"}
 _STOP_EXIT_REASONS = {
-    "gap_stop_open", "same_bar_stop_first", "stop_hit", "stop_hit_gap",
-    "trail_stop", "trail_stop_gap",
+    "gap_stop_open", "entry_gap_below_stop_t1_exit", "same_bar_stop_first",
+    "stop_hit", "stop_hit_gap", "trail_stop", "trail_stop_gap",
 }
 _HOLD_EXIT_REASONS = {"hold_expired", "hold_expired_runner"}
 
@@ -426,8 +427,9 @@ def evaluate_pick(
     """Evaluate a single pick against forward price data.
 
     T+1: entry fills at the first forward bar; exits begin on the following
-    bar. The sole entry-bar exception is an open at/below stop, recorded as
-    ``gap_stop_open`` at the open.
+    bar. If the entry opens below the planned stop, the position exits at the
+    earliest legally sellable next-session open rather than booking a fictitious
+    same-bar flat exit.
 
     Entry modes:
         signal              — legacy: assume fill at signal entry_price
@@ -521,10 +523,17 @@ def evaluate_pick(
 
     first_open = float(bars.iloc[0][open_col])
     if first_open <= stop_loss:
+        if len(bars) < 2:
+            result["exit_reason"] = "entry_gap_below_stop_t1_pending"
+            result["unrealized_pnl_pct"] = round(
+                (float(bars.iloc[0][close_col]) / entry_price - 1) * 100, 2
+            )
+            return result
+        first_legal_exit_open = float(bars.iloc[1][open_col])
         result.update(
-            exit_price=min(stop_loss, first_open),
-            exit_day=1,
-            exit_reason="gap_stop_open",
+            exit_price=first_legal_exit_open,
+            exit_day=2,
+            exit_reason="entry_gap_below_stop_t1_exit",
             hit_stop=True,
         )
         result["pnl_pct"] = round((result["exit_price"] / entry_price - 1) * 100, 2)
@@ -945,6 +954,21 @@ def main():
                     encoding="utf-8")
                 logger.info("basic_info frozen to %s", args.basic_info_out)
 
+    if config.get("universe", {}).get("exclude_star_market", True):
+        from src.core.universe import exclude_star_market_tickers
+
+        before = len(universe)
+        universe = exclude_star_market_tickers(universe)
+        allowed_tickers = set(universe)
+        data_map = {ticker: frame for ticker, frame in data_map.items() if ticker in allowed_tickers}
+        info_map = {ticker: info for ticker, info in info_map.items() if ticker in allowed_tickers}
+        if pit_schedule:
+            pit_schedule = [
+                (rebalance_date, set(exclude_star_market_tickers(members)))
+                for rebalance_date, members in pit_schedule
+            ]
+        logger.info("Excluded %d STAR Market stocks from replay universe", before - len(universe))
+
     csi300_full = csi300_full.rename(columns={column: column.lower() for column in csi300_full.columns if column in ("Open", "High", "Low", "Close", "Volume")})
 
     # --- Config ---
@@ -1127,7 +1151,7 @@ def main():
                             regime=regime,
                             csi300_df=csi_slice,
                             is_st=is_st,
-                            regimes=tuple(rs_cfg.get("regimes", ["bull", "bear"])),
+                            regimes=tuple(rs_cfg.get("regimes", DEFAULT_RS_PULLBACK_REGIMES)),
                             score_floor=float(rs_cfg.get("score_floor", 80.0)),
                             max_entry_pct=float(rs_cfg.get("max_entry_pct", 0.02)),
                             min_adv_cny=float(rs_cfg.get("min_adv_cny", 80_000_000)),
@@ -1510,7 +1534,7 @@ def main():
             "true_expectancy_pct": 0.0,
             "weighted_expectancy_pct": 0.0,
             "hold_expired_positive_pct": 0.0,
-            "day1_stop_count": 0,
+            "entry_gap_below_stop_count": 0,
             "profitable_days_pct": 0.0,
             "exit_day_distribution": {},
             "per_trade_compounded_dd_pct": 0.0,
@@ -1570,8 +1594,10 @@ def main():
         if len(hold_expired_df) > 0 else 0
     )
 
-    # Day-1 stop count (gap-through losses)
-    day1_stops = int(((df_valid["exit_reason"] == "stop_hit") & (df_valid["exit_day"] == 1)).sum())
+    # Entry gaps below the planned stop: T+1 forces exit at the next-session open.
+    entry_gap_below_stop_count = int(
+        (df_valid["exit_reason"] == "entry_gap_below_stop_t1_exit").sum()
+    )
 
     # Exit-day distribution for stop hits
     stop_df = df_valid[df_valid["exit_reason"] == "stop_hit"]
@@ -1602,7 +1628,7 @@ def main():
         e_avg_win = float(edf[edf["pnl_pct"] > 0]["pnl_pct"].mean()) if (edf["pnl_pct"] > 0).any() else 0
         e_avg_loss = float(edf[edf["pnl_pct"] <= 0]["pnl_pct"].mean()) if (edf["pnl_pct"] <= 0).any() else 0
         e_true_exp = float(edf["pnl_pct"].mean())
-        e_day1_stops = int(((edf["exit_reason"] == "stop_hit") & (edf["exit_day"] == 1)).sum())
+        e_entry_gaps = int((edf["exit_reason"] == "entry_gap_below_stop_t1_exit").sum())
         e_hold_exp = edf[edf["exit_reason"] == "hold_expired"]
         e_hold_pos = (e_hold_exp["pnl_pct"] > 0).sum() / len(e_hold_exp) if len(e_hold_exp) > 0 else 0
         engine_stats[engine] = {
@@ -1610,7 +1636,7 @@ def main():
             "pnl_win_rate": round(e_pnl_wr, 4), "target_hit_rate": round(e_hr, 4),
             "avg_win_pct": round(e_avg_win, 2), "avg_loss_pct": round(e_avg_loss, 2),
             "true_expectancy_pct": round(e_true_exp, 2),
-            "day1_stop_count": e_day1_stops,
+            "entry_gap_below_stop_count": e_entry_gaps,
             "hold_expired_positive_pct": round(e_hold_pos, 4),
         }
 
@@ -1622,12 +1648,12 @@ def main():
         r_pnl_wins = int((rdf["pnl_pct"] > 0).sum())
         r_pnl_wr = r_pnl_wins / r_total if r_total > 0 else 0
         r_true_exp = float(rdf["pnl_pct"].mean())
-        r_day1_stops = int(((rdf["exit_reason"] == "stop_hit") & (rdf["exit_day"] == 1)).sum())
+        r_entry_gaps = int((rdf["exit_reason"] == "entry_gap_below_stop_t1_exit").sum())
         regime_stats[regime] = {
             "total": r_total, "pnl_wins": r_pnl_wins,
             "pnl_win_rate": round(r_pnl_wr, 4),
             "true_expectancy_pct": round(r_true_exp, 2),
-            "day1_stop_count": r_day1_stops,
+            "entry_gap_below_stop_count": r_entry_gaps,
         }
 
     # Per-subtype breakdown (MR only)
@@ -1639,13 +1665,13 @@ def main():
         s_pnl_wins = int((sdf["pnl_pct"] > 0).sum())
         s_pnl_wr = s_pnl_wins / s_total if s_total > 0 else 0
         s_true_exp = float(sdf["pnl_pct"].mean()) if s_total > 0 else 0
-        s_day1_stops = int(((sdf["exit_reason"] == "stop_hit") & (sdf["exit_day"] == 1)).sum())
+        s_entry_gaps = int((sdf["exit_reason"] == "entry_gap_below_stop_t1_exit").sum())
         subtype_stats[subtype] = {
             "total": s_total,
             "pnl_wins": s_pnl_wins,
             "pnl_win_rate": round(s_pnl_wr, 4),
             "true_expectancy_pct": round(s_true_exp, 2),
-            "day1_stop_count": s_day1_stops,
+            "entry_gap_below_stop_count": s_entry_gaps,
         }
 
     # Equity curve (compounded daily equal-weighted returns)
@@ -1715,7 +1741,7 @@ def main():
         "true_expectancy_pct": round(true_expectancy, 2),
         "weighted_expectancy_pct": round(weighted_expectancy, 2),
         "hold_expired_positive_pct": round(hold_expired_positive_pct, 4),
-        "day1_stop_count": day1_stops,
+        "entry_gap_below_stop_count": entry_gap_below_stop_count,
         "profitable_days_pct": round(profitable_days_pct, 4),
         "exit_day_distribution": exit_day_dist,
         # NOT a portfolio drawdown: this compounds mean per-signal-date trade P&L with
@@ -1746,8 +1772,9 @@ def main():
     logger.info("PnL win rate: %.1f%% | Target hit rate: %.1f%%", pnl_win_rate * 100, target_hit_rate * 100)
     logger.info("Avg win: +%.2f%% | Avg loss: %.2f%%", avg_win, avg_loss)
     logger.info("True expectancy: %.2f%% | Weighted: %.2f%%", true_expectancy, weighted_expectancy)
-    logger.info("Day-1 stops: %d (%.1f%%) | Hold-expired positive: %.1f%%",
-                day1_stops, day1_stops / total * 100 if total > 0 else 0,
+    logger.info("Entry gaps below stop (T+1 next-open exits): %d (%.1f%%) | Hold-expired positive: %.1f%%",
+                entry_gap_below_stop_count,
+                entry_gap_below_stop_count / total * 100 if total > 0 else 0,
                 hold_expired_positive_pct * 100)
     logger.info("Profitable days: %.1f%% | Zero-pick days: %d (%.1f%%) | Avg picks/active day: %.1f",
                 profitable_days_pct * 100, zero_pick_days, zero_pick_days_pct * 100, avg_picks_per_active_day)
@@ -1756,21 +1783,21 @@ def main():
         logger.info("Stop exit-day dist: %s", exit_day_dist)
     logger.info("")
     for engine, stats in engine_stats.items():
-        logger.info("  %s: n=%d WR=%.1f%% HR=%.1f%% trueExp=%.2f%% d1stops=%d holdPos=%.0f%%",
+        logger.info("  %s: n=%d WR=%.1f%% HR=%.1f%% trueExp=%.2f%% entryGaps=%d holdPos=%.0f%%",
                      engine, stats["total"], stats["pnl_win_rate"] * 100, stats["target_hit_rate"] * 100,
-                     stats["true_expectancy_pct"], stats["day1_stop_count"],
+                     stats["true_expectancy_pct"], stats["entry_gap_below_stop_count"],
                      stats["hold_expired_positive_pct"] * 100)
     logger.info("")
     for regime_name, stats in regime_stats.items():
-        logger.info("  %s: n=%d WR=%.1f%% trueExp=%.2f%% d1stops=%d",
+        logger.info("  %s: n=%d WR=%.1f%% trueExp=%.2f%% entryGaps=%d",
                      regime_name, stats["total"], stats["pnl_win_rate"] * 100,
-                     stats["true_expectancy_pct"], stats["day1_stop_count"])
+                     stats["true_expectancy_pct"], stats["entry_gap_below_stop_count"])
     if subtype_stats:
         logger.info("")
         for subtype, stats in subtype_stats.items():
-            logger.info("  subtype=%s: n=%d WR=%.1f%% trueExp=%.2f%% d1stops=%d",
+            logger.info("  subtype=%s: n=%d WR=%.1f%% trueExp=%.2f%% entryGaps=%d",
                         subtype, stats["total"], stats["pnl_win_rate"] * 100,
-                        stats["true_expectancy_pct"], stats["day1_stop_count"])
+                        stats["true_expectancy_pct"], stats["entry_gap_below_stop_count"])
 
     # Save artifacts
     summary_path = out_dir / f"backtest_summary{suffix}.json"

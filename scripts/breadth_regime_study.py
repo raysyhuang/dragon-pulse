@@ -7,12 +7,12 @@ Production gate (``src/pipelines/funnel.py:classify_regime``) is price-only:
     bear   iff close < SMA_l
     choppy otherwise
 
-Only ``bull`` produces picks (rs_pullback ``regimes: ["bull"]``, acceptance
-``excluded_regimes: [bear, choppy]``, ``book_size.{bear,choppy}.max_picks: 0``),
-so the gate alone decides whether the scanner is in the market at all. Breadth is
-computed and written into every artifact but never consulted. As of 2026-08-12
-the two disagree loudly: breadth 72%, CSI300 above its SMA20, yet SMA20 still
-under SMA50 — 29 sessions with no picks.
+At the time of this study, only ``bull`` produced picks (rs_pullback
+``regimes: ["bull"]``, acceptance ``excluded_regimes: [bear, choppy]``). The
+current paper default later opened choppy after a separate frozen replay; bear
+remains blocked. This script records the historical breadth-OR experiment and
+must not be read as the current gate. Breadth is computed and written into every
+artifact but is not an OR condition for regime eligibility.
 
 This asks whether a breadth term would have opened the gate sooner, and whether
 the days it opens are days worth owning.

@@ -1,0 +1,115 @@
+{
+  "created_at": "2026-09-01T08:04:47.161037Z",
+  "input_mode": "live",
+  "bundle_id": null,
+  "bundle_composite_sha256": null,
+  "pit_grade": null,
+  "config_path": "config/default.yaml",
+  "label": "pit5y_bull_choppy",
+  "start": "2021-08-12",
+  "end": "2026-08-11",
+  "period": "2021-08-12 to 2026-08-11",
+  "exit_mode": "target_stop",
+  "entry_mode": "no_chase_next_open",
+  "mr_target_mode": "sma5",
+  "engines": "alpha",
+  "gap_filter_disabled": false,
+  "sniper_trailing_disabled": false,
+  "acceptance_mode": "live_equivalent",
+  "universe_source": "market_cap",
+  "outputs_root": null,
+  "allowed_regimes": [],
+  "excluded_regimes": [
+    "bear"
+  ],
+  "min_score_floor": null,
+  "pick_rank_mode": "score",
+  "ticker_cooldown_days": 0,
+  "post_stop_cooldown_days": 0,
+  "trading_days_scanned": 1210,
+  "regime_filtered_days": 644,
+  "days_with_picks": 560,
+  "zero_pick_days": 650,
+  "zero_pick_days_pct": 0.5372,
+  "avg_picks_per_active_day": 1.93,
+  "picks_emitted": 1117,
+  "picks_filled": 1080,
+  "picks_skipped": 37,
+  "picks_skipped_by_reason": {
+    "entry_skipped_no_chase": 37
+  },
+  "portfolio_input_set": "picks_filled \u2014 rows with entry_status='filled' and a usable pnl_pct",
+  "total_picks": 1080,
+  "entry_skipped_no_chase": 37,
+  "target_hits": 267,
+  "stop_hits": 473,
+  "hold_expired": 340,
+  "pnl_win_rate": 0.438,
+  "target_hit_rate": 0.2472,
+  "avg_win_pct": 6.83,
+  "avg_loss_pct": -4.28,
+  "true_expectancy_pct": 0.58,
+  "weighted_expectancy_pct": 0.58,
+  "hold_expired_positive_pct": 0.5882,
+  "entry_gap_below_stop_count": 6,
+  "profitable_days_pct": 0.5153,
+  "exit_day_distribution": {
+    "day_2_stops": 151,
+    "day_3_stops": 100,
+    "day_4_stops": 76,
+    "day_5_stops": 65
+  },
+  "per_trade_compounded_dd_pct": 55.67,
+  "cumulative_pnl_pct": 1123.59,
+  "final_equity_multiple": 12.24,
+  "total_time_min": 6.8,
+  "breadth_suppressed_days": 4,
+  "acceptance_mode_counts": {
+    "regime_filtered": 644,
+    "full": 495,
+    "selective": 67
+  },
+  "price_data_fingerprint": "2cc9ddd2e56dee47e0c83aac9f505987ca076482ec9badfaec24a69c7d113b2b",
+  "price_snapshot_mode": "read_write",
+  "price_snapshot_dir": "<EXTRACTED>/snapshots",
+  "download_bad_tickers": [],
+  "download_bad_ticker_count": 0,
+  "per_engine": {
+    "alpha_rs_pullback": {
+      "total": 1080,
+      "pnl_wins": 473,
+      "pnl_win_rate": 0.438,
+      "target_hit_rate": 0.2472,
+      "avg_win_pct": 6.83,
+      "avg_loss_pct": -4.28,
+      "true_expectancy_pct": 0.58,
+      "entry_gap_below_stop_count": 6,
+      "hold_expired_positive_pct": 0.5882
+    }
+  },
+  "per_regime": {
+    "choppy": {
+      "total": 462,
+      "pnl_wins": 207,
+      "pnl_win_rate": 0.4481,
+      "true_expectancy_pct": 0.72,
+      "entry_gap_below_stop_count": 3
+    },
+    "bull": {
+      "total": 618,
+      "pnl_wins": 266,
+      "pnl_win_rate": 0.4304,
+      "true_expectancy_pct": 0.48,
+      "entry_gap_below_stop_count": 3
+    }
+  },
+  "per_subtype": {
+    "rs_pullback_alpha": {
+      "total": 1080,
+      "pnl_wins": 473,
+      "pnl_win_rate": 0.438,
+      "true_expectancy_pct": 0.58,
+      "entry_gap_below_stop_count": 6
+    }
+  }
+}

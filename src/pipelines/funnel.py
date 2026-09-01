@@ -14,12 +14,14 @@ import pandas as pd
 
 from src.core.acceptance import run_acceptance, AcceptanceResult
 from src.core.cn_limits import get_daily_limit
+from src.core.universe import is_star_market_ticker
 from src.signals.mean_reversion import (
     resolve_mr_subtype_and_exit_params,
     score_mean_reversion,
 )
 from src.signals.sniper import score_sniper
 from src.signals.alpha_candidates import (
+    DEFAULT_RS_PULLBACK_REGIMES,
     score_accumulation_breakout_alpha,
     score_limitup_continuation_alpha,
     score_rs_pullback_alpha,
@@ -144,9 +146,12 @@ def build_engine_candidates(
         return name in alpha_engines and bool((alpha_config.get(name) or {}).get("enabled", False))
 
     all_signals: list[tuple[str, object]] = []
+    exclude_star_market = bool((config.get("universe") or {}).get("exclude_star_market", True))
 
     for ticker, feat_df, feats in feat_items:
         if not feats:
+            continue
+        if exclude_star_market and is_star_market_ticker(ticker):
             continue
         try:
             is_st = info_map.get(ticker, {}).get("is_st", False)
@@ -205,7 +210,7 @@ def build_engine_candidates(
                         regime=regime,
                         csi300_df=csi300_df,
                         is_st=is_st,
-                        regimes=tuple(rs_cfg.get("regimes", ["bull", "bear"])),
+                        regimes=tuple(rs_cfg.get("regimes", DEFAULT_RS_PULLBACK_REGIMES)),
                         score_floor=float(rs_cfg.get("score_floor", 80.0)),
                         max_entry_pct=float(rs_cfg.get("max_entry_pct", 0.02)),
                         min_adv_cny=float(rs_cfg.get("min_adv_cny", 80_000_000)),

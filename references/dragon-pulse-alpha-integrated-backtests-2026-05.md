@@ -309,4 +309,9 @@ Worst bull-gated months by expectancy:
 
 ### Verdict
 
+> **Historical-only note (superseded 2026-09):** this May bull-only operating
+> recommendation predates the hash-bound five-year BULL+CHOPPY replay and the
+> complete 688/689 STAR exclusion. It is not the current paper gate and is not a
+> like-for-like comparator for the current evidence.
+
 Bull-gated RS Pullback is a clear robustness improvement over 3Y RS-only, especially once 30 bps round-trip friction is applied. It is strong enough to start **daily paper trading**, but not yet strong enough for automatic capital deployment: use bull-only, RS Pullback only, no integrated Sniper, max 2–3 positions, and record fills/slippage before considering live enablement. MAS was not touched.
