@@ -145,3 +145,9 @@ The system now shows progress percentages:
 **No Candidates**: Try lowering filters in `config/default.yaml` or expanding universe mode.
 
 **Recommended**: Use `python main.py` for everything.
+
+## Research-only overfit evidence gate
+
+The offline native diagnostic for immutable variant-return packets is documented
+in [`docs/research_overfit_diagnostic.md`](docs/research_overfit_diagnostic.md).
+It is non-binding and is not connected to scan, selection, alerts, or execution.
