@@ -112,6 +112,12 @@ movers:
   cooling_days_required: 1
 ```
 
+## Research-only diagnostics
+
+The offline, non-binding factor orthogonalization contract and CLI are documented in
+[`docs/research_factor_orthogonalization.md`](docs/research_factor_orthogonalization.md).
+They are isolated from scan, selection, alert, scheduler, and order paths.
+
 ## Progress Indicators
 
 The system now shows progress percentages:
