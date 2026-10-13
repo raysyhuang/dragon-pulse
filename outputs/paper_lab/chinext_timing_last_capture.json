@@ -1,13 +1,13 @@
 {
-  "captured_at": "2026-10-13T15:30:38Z",
+  "captured_at": "2026-10-13T18:02:26Z",
   "evidence_label": "RESEARCH_ONLY_NON_BINDING",
   "execution_status": "PAPER_ONLY_NO_ORDERS",
   "expected_session": "20261013",
   "freshness": "CURRENT",
   "latest_session": "2026-10-13",
   "ledger_rows": 3774,
-  "query_end_date": "20261013",
-  "response_sha256": "a47eea8436cbdb61e34247c599ed90b93e0e7cc43419cc24262b28e011b1f2fc",
-  "rows_appended": 1,
+  "query_end_date": "20261014",
+  "response_sha256": "0d4b5cf50d28975e95d489e6ad6174fe65ade5acc8935327449d9952038f4305",
+  "rows_appended": 0,
   "ts_code": "399006.SZ"
 }
