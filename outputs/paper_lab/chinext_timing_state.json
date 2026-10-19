@@ -1,9 +1,9 @@
 {
-  "capture_sha256": "8b23288c025e9e2d4d923fe3fdc50cee0a27f4622930bd83ccced937f006121b",
-  "completed_at": "2026-10-16T15:17:33Z",
+  "capture_sha256": "3cba2076fc7753c6482ed1763d32a4019c945e3199cc2e2f980d76776b8e8fb9",
+  "completed_at": "2026-10-19T15:13:08Z",
   "inception": "2026-08-10",
   "ledger": {
-    "latest": "2026-10-16",
-    "rows": 3777
+    "latest": "2026-10-19",
+    "rows": 3778
   }
 }
