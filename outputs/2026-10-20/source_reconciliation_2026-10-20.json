@@ -1,0 +1,58 @@
+{
+  "check": "SOURCE_RECONCILIATION_HEALTHCHECK_NON_BINDING",
+  "binding": false,
+  "asof": "2026-10-20",
+  "session": "20261019",
+  "tolerance": {
+    "relative": 0.0005,
+    "absolute": 0.01
+  },
+  "agreed": 0,
+  "total": 4,
+  "rows": [
+    {
+      "code": "000300.SH",
+      "name": "沪深300",
+      "kind": "index",
+      "tushare": 4174.5349,
+      "ifind": null,
+      "ifind_code": null,
+      "agree": false,
+      "failure": "IFIND_STALE",
+      "detail": "000300.SH: iFinD dated 最新, asked 20261019"
+    },
+    {
+      "code": "600519.SH",
+      "name": "贵州茅台",
+      "kind": "equity",
+      "tushare": 1324.97,
+      "ifind": null,
+      "ifind_code": null,
+      "agree": false,
+      "failure": "IFIND_STALE",
+      "detail": "600519.SH: iFinD dated 最新, asked 20261019"
+    },
+    {
+      "code": "000001.SZ",
+      "name": "平安银行",
+      "kind": "equity",
+      "tushare": 11.65,
+      "ifind": null,
+      "ifind_code": null,
+      "agree": false,
+      "failure": "IFIND_STALE",
+      "detail": "000001.SZ: iFinD dated 最新, asked 20261019"
+    },
+    {
+      "code": "601318.SH",
+      "name": "中国平安",
+      "kind": "equity",
+      "tushare": 51.67,
+      "ifind": null,
+      "ifind_code": null,
+      "agree": false,
+      "failure": "IFIND_STALE",
+      "detail": "601318.SH: iFinD dated 最新, asked 20261019"
+    }
+  ]
+}
