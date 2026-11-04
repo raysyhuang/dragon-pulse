@@ -1,12 +1,12 @@
 {
   "date": "2026-11-04",
-  "generated_utc": "2026-11-03T16:42:34.998086",
+  "generated_utc": "2026-11-04T06:46:17.638605",
   "regime": "bear",
   "regime_detail": {
     "csi300_last": 4008.88,
     "csi300_sma_short": 4148.67,
     "csi300_sma_long": 4383.99,
-    "market_breadth_pct_above_sma20": 0.4289
+    "market_breadth_pct_above_sma20": 0.4301
   },
   "universe_size": 868,
   "downloaded": 868,
