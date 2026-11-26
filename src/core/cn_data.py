@@ -102,7 +102,12 @@ def _ak_fetch_index_daily(code: str, exch: str, start: Optional[datetime], end: 
     start_str = start.strftime("%Y%m%d") if start else None
     end_str = end.strftime("%Y%m%d") if end else None
 
-    df = ak.stock_zh_index_daily(symbol=symbol)
+    # AkShare 1.20.44 renamed the Sina index endpoint. The legacy name is
+    # still a callable error stub in newer versions, so prefer the new name.
+    fetch_index = getattr(ak, "index_zh_daily_sina", None)
+    if fetch_index is None:
+        fetch_index = ak.stock_zh_index_daily
+    df = fetch_index(symbol=symbol)
     if df is None or df.empty:
         return pd.DataFrame()
 
@@ -148,7 +153,11 @@ def _ak_fetch_daily(code: str, exch: str, start: Optional[datetime], end: Option
     adj_map = {"none": "", "qfq": "qfq", "hfq": "hfq"}
     adj_val = adj_map.get(str(adjust).lower(), "")
 
-    df = ak.stock_zh_a_hist(
+    # The same Eastmoney daily endpoint was renamed in AkShare 1.20.46.
+    fetch_daily = getattr(ak, "stock_zh_a_hist_em", None)
+    if fetch_daily is None:
+        fetch_daily = ak.stock_zh_a_hist
+    df = fetch_daily(
         symbol=code,
         period="daily",
         start_date=start_str,
